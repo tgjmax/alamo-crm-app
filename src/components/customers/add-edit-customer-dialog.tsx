@@ -15,7 +15,7 @@ import {
   CustomerListItem,
   CustomerPassportInput,
 } from '@/api/customers.api';
-import { isoToMdy, mdyToIso } from '@/utils/dateFormat';
+import { isoToDob, dobToIso } from '@/utils/dateFormat';
 
 interface AddEditCustomerDialogProps {
   open: boolean;
@@ -56,7 +56,7 @@ export function AddEditCustomerDialog({ open, onOpenChange, customer }: AddEditC
         firstName: customer.firstName,
         middleName: customer.middleName ?? '',
         lastName: customer.lastName,
-        dob: mdyToIso(customer.dob),
+        dob: dobToIso(customer.dob),
         gender: customer.gender,
         verified: customer.verified,
         phone: customer.phone,
@@ -93,7 +93,7 @@ export function AddEditCustomerDialog({ open, onOpenChange, customer }: AddEditC
         firstName: form.firstName,
         middleName: form.middleName || undefined,
         lastName: form.lastName,
-        dob: isoToMdy(form.dob),
+        dob: isoToDob(form.dob),
         gender: form.gender,
         phone: form.phone,
         email: form.email || undefined,

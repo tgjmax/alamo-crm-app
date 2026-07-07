@@ -17,7 +17,7 @@ const BASE_CUSTOMER = {
   middleName: 'Reginald',
   givenName: 'Alexander Reginald',
   paxType: 'ADT' as const,
-  dob: '01-01-1980',
+  dob: '01-Jan-1980',
   gender: 'M',
   phone: '555-0100',
   email: 'alex@example.com',
@@ -47,7 +47,7 @@ describe('CustomersPage', () => {
     expect(await screen.findByText('Varghese/Alexander Reginald')).toBeInTheDocument();
     expect(screen.getByText('Alexander Reginald')).toBeInTheDocument();
     expect(screen.getByText('Varghese')).toBeInTheDocument();
-    expect(screen.getByText('01-01-1980')).toBeInTheDocument();
+    expect(screen.getByText('01-Jan-1980')).toBeInTheDocument();
     expect(screen.getByText('ADT')).toBeInTheDocument();
     expect(screen.getByText('Male')).toBeInTheDocument();
     expect(screen.getByText('alex@example.com')).toBeInTheDocument();
@@ -178,7 +178,7 @@ describe('CustomersPage', () => {
     });
     const writeText = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
     renderWithClient(<CustomersPage />);
-    await screen.findByText('01-01-1980');
+    await screen.findByText('01-Jan-1980');
 
     await userEvent.click(screen.getByRole('button', { name: 'Copy 01011980' }));
     expect(writeText).toHaveBeenLastCalledWith('01011980');
@@ -272,7 +272,7 @@ describe('CustomersPage', () => {
           firstName: 'New',
           middleName: 'Middleton',
           lastName: 'Customer',
-          dob: '05-15-1990',
+          dob: '15-May-1990',
           phone: '555-0199',
         })
       );

@@ -31,7 +31,7 @@ export interface CustomerListItem {
   middleName?: string;
   givenName?: string;
   paxType: 'INF' | 'CHD' | 'ADT';
-  /** MM-DD-YYYY */
+  /** DD-MMM-YYYY */
   dob: string;
   gender: string;
   phone: string;
@@ -74,7 +74,7 @@ export interface CreateCustomerInput {
   firstName: string;
   lastName: string;
   middleName?: string;
-  /** MM-DD-YYYY */
+  /** DD-MMM-YYYY */
   dob: string;
   gender: string;
   phone: string;
@@ -134,7 +134,7 @@ export interface ImportCustomerRow {
   firstName: string;
   lastName: string;
   middleName?: string;
-  /** MM-DD-YYYY */
+  /** DD-MMM-YYYY */
   dob: string;
   gender?: string;
   phone: string;
