@@ -1,0 +1,191 @@
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { vi } from 'vitest';
+import * as XLSX from 'xlsx';
+import BookingImportWizard from './BookingImportWizard';
+import * as bookingsApi from '../api/bookings.api';
+
+function buildTestFile(): File {
+  const worksheet = XLSX.utils.aoa_to_sheet([
+    ['Date', 'Invoice', 'Name of PAX', 'Amount', 'PNR', 'Flight', 'Dep City', 'Arr City', 'Dep Date', 'Arr Date'],
+    ['2026-05-04', '0000150', 'JOSEPH/SHINY S', '2400.02', 'GUDBFX', 'QR', 'DXB', 'COK', '2026-05-08', '2026-05-28'],
+    ['2026-05-14', 'REISSUE', 'ANILKUMAR SATHI/VISHNU', '50', 'DJMUFL', 'EK', 'DXB', 'COK', '2026-05-26', '2026-07-28'],
+  ]);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
+  const arrayBuffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
+  return new File([arrayBuffer], 'bookings.xlsx', {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+}
+
+async function selectOption(triggerName: string, optionName: string) {
+  await userEvent.click(screen.getByRole('combobox', { name: triggerName }));
+  await userEvent.click(await screen.findByRole('option', { name: optionName }));
+}
+
+async function mapAllColumns() {
+  await selectOption('Map Booking Date', 'Date');
+  await selectOption('Map Invoice', 'Invoice');
+  await selectOption('Map Name of PAX', 'Name of PAX');
+  await selectOption('Map Amount', 'Amount');
+  await selectOption('Map PNR', 'PNR');
+  await selectOption('Map Flight', 'Flight');
+  await selectOption('Map Dep City', 'Dep City');
+  await selectOption('Map Arr City', 'Arr City');
+  await selectOption('Map Dep Date', 'Dep Date');
+  await selectOption('Map Arr Date', 'Arr Date');
+}
+
+describe('BookingImportWizard', () => {
+  it('derives bookingType New for a numeric invoice and Reissue for REISSUE text, then previews', async () => {
+    vi.spyOn(bookingsApi, 'importBookings').mockResolvedValueOnce([
+      { index: 0, status: 'would_import' },
+      { index: 1, status: 'would_import' },
+    ]);
+    render(<BookingImportWizard onClose={() => {}} />);
+
+    await userEvent.upload(screen.getByLabelText('Booking import file'), buildTestFile());
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Map Booking Date' })).toBeInTheDocument());
+    await mapAllColumns();
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
+
+    await waitFor(() => {
+      const [rows, paymentDefault, dryRun] = vi.mocked(bookingsApi.importBookings).mock.calls[0];
+      expect(rows[0]).toEqual(
+        expect.objectContaining({ bookingType: 'New', invoiceNumber: '0000150', passengerName: 'JOSEPH/SHINY S' })
+      );
+      expect(rows[1]).toEqual(
+        expect.objectContaining({
+          bookingType: 'Reissue',
+          invoiceNumber: undefined,
+          passengerName: 'ANILKUMAR SATHI/VISHNU',
+        })
+      );
+      expect(paymentDefault).toEqual({ status: 'paid', type: 'card' });
+      expect(dryRun).toBe(true);
+    });
+    expect(await screen.findByText(/2 of 2 row\(s\) ready to import\./)).toBeInTheDocument();
+  });
+
+  it('sends the chosen payment default and commits on dryRun false', async () => {
+    vi.spyOn(bookingsApi, 'importBookings')
+      .mockResolvedValueOnce([
+        { index: 0, status: 'would_import' },
+        { index: 1, status: 'would_import' },
+      ])
+      .mockResolvedValueOnce([
+        { index: 0, status: 'imported' },
+        { index: 1, status: 'needs_manual_linking' },
+      ]);
+    render(<BookingImportWizard onClose={() => {}} />);
+
+    await userEvent.upload(screen.getByLabelText('Booking import file'), buildTestFile());
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Map Booking Date' })).toBeInTheDocument());
+    await mapAllColumns();
+    await selectOption('Import payment type', 'Cash');
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
+    await screen.findByText(/2 of 2 row\(s\) ready to import\./);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Commit Import' }));
+
+    await waitFor(() => {
+      const [, paymentDefault, dryRun] = vi.mocked(bookingsApi.importBookings).mock.calls[1];
+      expect(paymentDefault).toEqual({ status: 'paid', type: 'cash' });
+      expect(dryRun).toBe(false);
+    });
+    expect(await screen.findByText('needs_manual_linking')).toBeInTheDocument();
+    expect(await screen.findByText(/1 of 2 row\(s\) imported\./)).toBeInTheDocument();
+  });
+
+  it('imports a voided row with only Booking Date and Invoice mapped (PNR/Flight/etc left blank)', async () => {
+    vi.spyOn(bookingsApi, 'importBookings').mockResolvedValueOnce([{ index: 0, status: 'would_import' }]);
+    const worksheet = XLSX.utils.aoa_to_sheet([
+      ['Date', 'Invoice', 'Name of PAX', 'Amount', 'Remark'],
+      ['2026-05-04', 'VOID-001', 'JOSEPH/SHINY S', '0', 'VOID'],
+    ]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
+    const arrayBuffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
+    const file = new File([arrayBuffer], 'void.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+
+    render(<BookingImportWizard onClose={() => {}} />);
+    await userEvent.upload(screen.getByLabelText('Booking import file'), file);
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Map Booking Date' })).toBeInTheDocument());
+    await selectOption('Map Booking Date', 'Date');
+    await selectOption('Map Invoice', 'Invoice');
+    await selectOption('Map Name of PAX', 'Name of PAX');
+    await selectOption('Map Amount', 'Amount');
+    await selectOption('Map Remark', 'Remark');
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
+
+    await waitFor(() => {
+      const [rows] = vi.mocked(bookingsApi.importBookings).mock.calls[0];
+      expect(rows[0]).toEqual(
+        expect.objectContaining({
+          bookingType: 'New',
+          invoiceNumber: 'VOID-001',
+          remark: 'VOID',
+          pnr: undefined,
+          airlineCode: undefined,
+          arrCity: undefined,
+          depDate: undefined,
+          arrDate: undefined,
+        })
+      );
+    });
+  });
+
+  it('treats empty, "null", and "--" Amount cells as 0', async () => {
+    vi.spyOn(bookingsApi, 'importBookings').mockResolvedValueOnce([
+      { index: 0, status: 'would_import' },
+      { index: 1, status: 'would_import' },
+      { index: 2, status: 'would_import' },
+    ]);
+    const worksheet = XLSX.utils.aoa_to_sheet([
+      ['Date', 'Invoice', 'Name of PAX', 'Amount'],
+      ['2026-05-04', 'INV-1', 'A/B', ''],
+      ['2026-05-04', 'INV-2', 'C/D', 'null'],
+      ['2026-05-04', 'INV-3', 'E/F', '--'],
+    ]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
+    const arrayBuffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
+    const file = new File([arrayBuffer], 'blank-amounts.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+
+    render(<BookingImportWizard onClose={() => {}} />);
+    await userEvent.upload(screen.getByLabelText('Booking import file'), file);
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Map Booking Date' })).toBeInTheDocument());
+    await selectOption('Map Booking Date', 'Date');
+    await selectOption('Map Invoice', 'Invoice');
+    await selectOption('Map Name of PAX', 'Name of PAX');
+    await selectOption('Map Amount', 'Amount');
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
+
+    await waitFor(() => {
+      const [rows] = vi.mocked(bookingsApi.importBookings).mock.calls[0];
+      expect(rows[0].amount).toBe(0);
+      expect(rows[1].amount).toBe(0);
+      expect(rows[2].amount).toBe(0);
+    });
+  });
+
+  it('shows an error and re-enables Preview when the import request fails', async () => {
+    vi.spyOn(bookingsApi, 'importBookings').mockRejectedValueOnce(new Error('network down'));
+    render(<BookingImportWizard onClose={() => {}} />);
+
+    await userEvent.upload(screen.getByLabelText('Booking import file'), buildTestFile());
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Map Booking Date' })).toBeInTheDocument());
+    await selectOption('Map Booking Date', 'Date');
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
+
+    expect(
+      await screen.findByText('Import request failed. Check your connection and try again.')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Preview' })).toBeEnabled();
+  });
+});
