@@ -11,38 +11,124 @@ function renderWithClient(ui: React.ReactElement) {
   return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
 }
 
+const BASE_ROW: bookingsApi.BookingRow = {
+  id: 'p1',
+  invoiceNumber: '0000150',
+  bookingDate: '2026-05-04',
+  passengerName: 'JOSEPH/SHINY S',
+  amount: 2400.02,
+  pnr: 'GUDBFX',
+  airlineCode: 'QR',
+  depCity: 'DXB',
+  arrCity: 'COK',
+  depDate: '2026-05-08',
+  arrDate: '2026-05-28',
+  remark: 'Handle with care',
+  paymentStatus: 'paid',
+};
+
 describe('BookingsPage', () => {
   beforeEach(() => {
     vi.spyOn(bookingsApi, 'listBookings').mockResolvedValue({
-      bookings: [
-        {
-          id: 'b1',
-          invoiceNumber: '0000150',
-          bookingDate: '2026-05-04',
-          pnr: 'GUDBFX',
-          airlineCode: 'QR',
-          depCity: 'DXB',
-          arrCity: 'COK',
-          depDate: '2026-05-08',
-          arrDate: '2026-05-28',
-          remark: 'Handle with care',
-          payment: { status: 'paid', type: 'card' },
-          passengers: [{ id: 'p1', passengerName: 'JOSEPH/SHINY S', amount: 2400.02 }],
-        },
-      ],
+      bookings: [BASE_ROW],
       total: 1,
       page: 1,
-      pageSize: 50,
+      pageSize: 25,
     });
   });
 
-  it('lists existing bookings with their passengers', async () => {
+  it('lists bookings with the requested columns', async () => {
     renderWithClient(<BookingsPage />);
     expect(await screen.findByText('0000150')).toBeInTheDocument();
     expect(screen.getByText(/JOSEPH\/SHINY S/)).toBeInTheDocument();
+    expect(screen.getByText('GUDBFX')).toBeInTheDocument();
+    expect(screen.getByText('QR')).toBeInTheDocument();
     expect(screen.getByText('DXB')).toBeInTheDocument();
     expect(screen.getByText('COK')).toBeInTheDocument();
     expect(screen.getByText('Paid')).toBeInTheDocument();
+    expect(screen.getByText('Handle with care')).toBeInTheDocument();
+  });
+
+  it('displays the booking, departure, and arrival dates as "DD Mon YYYY"', async () => {
+    renderWithClient(<BookingsPage />);
+    expect(await screen.findByText('04 May 2026')).toBeInTheDocument();
+    expect(screen.getByText('08 May 2026')).toBeInTheDocument();
+    expect(screen.getByText('28 May 2026')).toBeInTheDocument();
+  });
+
+  it('debounces the search box into a server-side q param', async () => {
+    renderWithClient(<BookingsPage />);
+    await userEvent.type(screen.getByLabelText('Search bookings'), 'GUD');
+
+    await waitFor(() => {
+      const lastCall = vi.mocked(bookingsApi.listBookings).mock.calls.slice(-1)[0]?.[0];
+      expect(lastCall).toMatchObject({ q: 'GUD' });
+    });
+  });
+
+  it('filters by payment status via the faceted filter', async () => {
+    renderWithClient(<BookingsPage />);
+    await userEvent.click(screen.getByRole('button', { name: /Payment Status/ }));
+    await userEvent.click(await screen.findByRole('option', { name: 'Pending' }));
+
+    await waitFor(() => {
+      const lastCall = vi.mocked(bookingsApi.listBookings).mock.calls.slice(-1)[0]?.[0];
+      expect(lastCall).toMatchObject({ paymentStatus: 'pending' });
+    });
+  });
+
+  it('sorts by Amount when its column header is clicked', async () => {
+    renderWithClient(<BookingsPage />);
+    await screen.findByText('0000150');
+    await userEvent.click(screen.getByRole('button', { name: /Amount/ }));
+
+    await waitFor(() => {
+      const lastCall = vi.mocked(bookingsApi.listBookings).mock.calls.slice(-1)[0]?.[0];
+      expect(lastCall).toMatchObject({ sortBy: 'amount', sortDir: 'asc' });
+    });
+  });
+
+  it('changes rows per page via the pagination footer', async () => {
+    renderWithClient(<BookingsPage />);
+    await userEvent.click(screen.getByRole('combobox', { name: 'Rows per page' }));
+    await userEvent.click(await screen.findByRole('option', { name: '50' }));
+
+    await waitFor(() => {
+      const lastCall = vi.mocked(bookingsApi.listBookings).mock.calls.slice(-1)[0]?.[0];
+      expect(lastCall).toMatchObject({ pageSize: 50 });
+    });
+  });
+
+  it('paginates via numbered page links', async () => {
+    vi.spyOn(bookingsApi, 'listBookings').mockImplementation((params = {}) =>
+      Promise.resolve({
+        bookings: [{ ...BASE_ROW, id: `p${params.page ?? 1}`, invoiceNumber: `INV-${params.page ?? 1}` }],
+        total: 100,
+        page: params.page ?? 1,
+        pageSize: 25,
+      })
+    );
+    renderWithClient(<BookingsPage />);
+
+    expect(await screen.findByText('INV-1')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('link', { name: '2' }));
+    expect(await screen.findByText('INV-2')).toBeInTheDocument();
+  });
+
+  it('applies airline and departure-date filters via the Filters popover', async () => {
+    renderWithClient(<BookingsPage />);
+    await userEvent.click(screen.getByRole('button', { name: /Filters/ }));
+    await userEvent.type(await screen.findByLabelText('Airline'), 'QR');
+    await userEvent.type(screen.getByLabelText('Departure date filter value'), '2026-05-01');
+    await userEvent.click(screen.getByRole('button', { name: 'Apply' }));
+
+    await waitFor(() => {
+      const lastCall = vi.mocked(bookingsApi.listBookings).mock.calls.slice(-1)[0]?.[0];
+      expect(lastCall).toMatchObject({
+        airlineCode: 'QR',
+        depDate: { operator: 'before', from: '2026-05-01' },
+      });
+    });
   });
 
   it('shows matching customers when typing 3+ letters in the passenger name field', async () => {
@@ -132,16 +218,17 @@ describe('BookingsPage', () => {
     vi.spyOn(bookingsApi, 'listBookings').mockResolvedValue({
       bookings: [
         {
-          id: 'v1',
+          id: 'pv1',
           invoiceNumber: 'VOID-001',
           bookingDate: '2026-05-04',
+          passengerName: 'JOSEPH/SHINY S',
+          amount: 0,
           remark: 'VOID',
-          passengers: [{ id: 'pv1', passengerName: 'JOSEPH/SHINY S', amount: 0 }],
         },
       ],
       total: 1,
       page: 1,
-      pageSize: 50,
+      pageSize: 25,
     });
     renderWithClient(<BookingsPage />);
     expect(await screen.findByText('VOID-001')).toBeInTheDocument();
@@ -160,6 +247,7 @@ describe('BookingsPage', () => {
 
     await screen.findByText('0000150');
     await userEvent.click(screen.getByRole('button', { name: /Reissue\/Refund/ }));
+    await userEvent.type(screen.getByLabelText('Adjustment booking date'), '2026-09-14');
     await userEvent.type(screen.getByLabelText('Adjustment PNR'), 'WXITNF');
     await userEvent.type(screen.getByLabelText('Adjustment airline code'), 'AF');
     await userEvent.type(screen.getByLabelText('Adjustment departure city'), 'DXB');
@@ -174,7 +262,9 @@ describe('BookingsPage', () => {
       const [passengerId, payload] = vi.mocked(bookingsApi.createAdjustment).mock.calls[0];
       expect(passengerId).toBe('p1');
       expect(payload).toEqual(
-        expect.objectContaining({ bookingType: 'Reissue', amount: 280, pnr: 'WXITNF', airlineCode: 'AF', depCity: 'DXB' })
+        expect.objectContaining({
+          bookingType: 'Reissue', bookingDate: '2026-09-14', amount: 280, pnr: 'WXITNF', airlineCode: 'AF', depCity: 'DXB',
+        })
       );
     });
   });
@@ -192,6 +282,7 @@ describe('BookingsPage', () => {
     await userEvent.click(screen.getByRole('button', { name: /Reissue\/Refund/ }));
     await userEvent.click(screen.getByRole('combobox', { name: 'Adjustment type' }));
     await userEvent.click(await screen.findByRole('option', { name: 'Refund' }));
+    await userEvent.type(screen.getByLabelText('Adjustment booking date'), '2026-09-14');
     await userEvent.type(screen.getByLabelText('Adjustment PNR'), 'WXITNF');
     await userEvent.type(screen.getByLabelText('Adjustment airline code'), 'AF');
     await userEvent.type(screen.getByLabelText('Adjustment departure city'), 'DXB');
@@ -206,39 +297,23 @@ describe('BookingsPage', () => {
       const [passengerId, payload] = vi.mocked(bookingsApi.createAdjustment).mock.calls[0];
       expect(passengerId).toBe('p1');
       expect(payload).toEqual(
-        expect.objectContaining({ bookingType: 'Refund', amount: 150, pnr: 'WXITNF', airlineCode: 'AF', depCity: 'DXB' })
+        expect.objectContaining({
+          bookingType: 'Refund', bookingDate: '2026-09-14', amount: 150, pnr: 'WXITNF', airlineCode: 'AF', depCity: 'DXB',
+        })
       );
     });
   });
 
-  it('paginates through bookings with Previous/Next', async () => {
-    vi.spyOn(bookingsApi, 'listBookings').mockImplementation((page = 1) =>
-      Promise.resolve({
-        bookings: [
-          {
-            id: `b${page}`,
-            invoiceNumber: `INV-${page}`,
-            bookingDate: '2026-05-04',
-            pnr: 'ABC123',
-            airlineCode: 'QR',
-            depCity: 'DXB',
-            arrCity: 'COK',
-            depDate: '2026-05-08',
-            arrDate: '2026-05-28',
-            payment: { status: 'paid', type: 'card' },
-            passengers: [{ id: `p${page}`, passengerName: 'A/B', amount: 100 }],
-          },
-        ],
-        total: 100,
-        page,
-        pageSize: 50,
-      })
-    );
+  it('toggles column visibility via the View dropdown', async () => {
     renderWithClient(<BookingsPage />);
+    await screen.findByText('0000150');
 
-    expect(await screen.findByText('INV-1')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
-    expect(await screen.findByText('INV-2')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'View' }));
+    await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Remark' }));
+
+    await waitFor(() => {
+      expect(screen.queryByText('Handle with care')).not.toBeInTheDocument();
+    });
   });
 
   it('imports bookings via the Import Bookings dialog', async () => {

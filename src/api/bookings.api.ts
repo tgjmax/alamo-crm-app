@@ -33,21 +33,6 @@ export interface PassengerListItem {
   amount: number;
 }
 
-export interface BookingListItem {
-  id: string;
-  invoiceNumber: string;
-  bookingDate: string;
-  pnr?: string;
-  airlineCode?: string;
-  depCity?: string;
-  arrCity?: string;
-  depDate?: string;
-  arrDate?: string;
-  remark?: string;
-  payment?: PaymentInput;
-  passengers: PassengerListItem[];
-}
-
 export interface CreateBookingResponse {
   id: string;
   invoiceNumber: string;
@@ -59,15 +44,70 @@ export async function createBooking(input: CreateBookingInput): Promise<CreateBo
   return res.data;
 }
 
-export interface BookingListPage {
-  bookings: BookingListItem[];
+/** One flattened row per passenger (New, Reissue, or Refund) — `id` is the passenger id. */
+export interface BookingRow {
+  id: string;
+  bookingDate: string;
+  invoiceNumber: string;
+  passengerName: string;
+  amount: number;
+  pnr?: string;
+  airlineCode?: string;
+  depCity?: string;
+  arrCity?: string;
+  depDate?: string;
+  arrDate?: string;
+  paymentStatus?: 'paid' | 'pending';
+  remark?: string;
+}
+
+export interface BookingRowPage {
+  bookings: BookingRow[];
   total: number;
   page: number;
   pageSize: number;
 }
 
-export async function listBookings(page = 1): Promise<BookingListPage> {
-  const res = await apiClient.get<BookingListPage>('/bookings', { params: { page } });
+export const BOOKING_PAGE_SIZES = [10, 25, 50, 100] as const;
+
+export type DateRangeOperator = 'before' | 'after' | 'between';
+
+export interface DateRangeParam {
+  operator: DateRangeOperator;
+  from?: string;
+  to?: string;
+}
+
+export type BookingSortBy =
+  | 'date' | 'invoiceNumber' | 'passengerName' | 'amount' | 'pnr' | 'airlineCode'
+  | 'depCity' | 'arrCity' | 'depDate' | 'arrDate';
+
+export interface BookingListParams {
+  page?: number;
+  pageSize?: number;
+  q?: string;
+  paymentStatus?: 'paid' | 'pending';
+  airlineCode?: string;
+  depDate?: DateRangeParam;
+  arrDate?: DateRangeParam;
+  sortBy?: BookingSortBy;
+  sortDir?: 'asc' | 'desc';
+}
+
+export async function listBookings(params: BookingListParams = {}): Promise<BookingRowPage> {
+  const { depDate, arrDate, ...rest } = params;
+  const query: Record<string, unknown> = { ...rest };
+  if (depDate) {
+    query.depDateOp = depDate.operator;
+    if (depDate.from) query.depDateFrom = depDate.from;
+    if (depDate.to) query.depDateTo = depDate.to;
+  }
+  if (arrDate) {
+    query.arrDateOp = arrDate.operator;
+    if (arrDate.from) query.arrDateFrom = arrDate.from;
+    if (arrDate.to) query.arrDateTo = arrDate.to;
+  }
+  const res = await apiClient.get<BookingRowPage>('/bookings', { params: query });
   return res.data;
 }
 
@@ -78,6 +118,7 @@ export async function addPassenger(bookingId: string, input: PassengerInput): Pr
 
 export interface AdjustmentInput {
   bookingType: 'Reissue' | 'Refund';
+  bookingDate: string;
   amount: number;
   pnr: string;
   airlineCode?: string;

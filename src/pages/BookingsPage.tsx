@@ -1,17 +1,28 @@
-import { FormEvent, Fragment, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Badge } from '@/components/ui/badge';
+import { Fragment, FormEvent, useEffect, useState } from 'react';
+import { SortingState, VisibilityState, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { BookingListItem, PassengerListItem, createAdjustment, listBookings } from '../api/bookings.api';
+import { BOOKING_PAGE_SIZES, BookingSortBy, createAdjustment, listBookings } from '../api/bookings.api';
+import { buildBookingColumns } from '@/components/bookings/booking-columns';
+import { BookingFiltersPopover, BookingCustomFilters } from '@/components/bookings/booking-filters-popover';
 import { CreateBookingDialog } from '@/components/bookings/create-booking-dialog';
 import { ImportBookingsDialog } from '@/components/bookings/import-bookings-dialog';
 import { ExportBookingsDialog } from '@/components/bookings/export-bookings-dialog';
+import { DataTableFacetedFilter } from '@/components/data-table/data-table-faceted-filter';
+import { DataTableViewOptions } from '@/components/data-table/data-table-view-options';
+import { DataTablePagination } from '@/components/data-table/data-table-pagination';
+
+const PAYMENT_STATUS_OPTIONS = [
+  { label: 'Paid', value: 'paid' },
+  { label: 'Pending', value: 'pending' },
+];
 
 const emptyAdjustmentForm = {
   bookingType: 'Reissue' as 'Reissue' | 'Refund',
+  bookingDate: '',
   pnr: '',
   airlineCode: '',
   depCity: '',
@@ -21,52 +32,62 @@ const emptyAdjustmentForm = {
   amount: '',
 };
 
-function PaymentStatusBadge({ status }: { status: 'paid' | 'pending' }) {
-  if (status === 'paid') {
-    return (
-      <Badge className="border-green-200 bg-green-100 text-green-800 hover:bg-green-100 dark:border-green-800 dark:bg-green-950 dark:text-green-300">
-        Paid
-      </Badge>
-    );
-  }
-  return (
-    <Badge className="border-red-200 bg-red-100 text-red-800 hover:bg-red-100 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
-      Pending
-    </Badge>
-  );
-}
-
-interface FlatRow {
-  booking: BookingListItem;
-  passenger: PassengerListItem;
-}
-
 export default function BookingsPage() {
+  const [searchInput, setSearchInput] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [statusValues, setStatusValues] = useState<Set<string>>(new Set());
+  const [customFilters, setCustomFilters] = useState<BookingCustomFilters>({});
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(25);
+
   const [adjustingPassengerId, setAdjustingPassengerId] = useState<string | null>(null);
   const [adjustmentForm, setAdjustmentForm] = useState(emptyAdjustmentForm);
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showExport, setShowExport] = useState(false);
-  const [page, setPage] = useState(1);
   const queryClient = useQueryClient();
 
-  const { data: bookingData } = useQuery({
-    queryKey: ['bookings', page],
-    queryFn: () => listBookings(page),
-  });
-  const bookings = bookingData?.bookings ?? [];
-  const total = bookingData?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / (bookingData?.pageSize ?? 50)));
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(searchInput), 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
-  const flatRows: FlatRow[] = bookings.flatMap((booking) =>
-    booking.passengers.map((passenger) => ({ booking, passenger }))
-  );
+  const paymentStatus =
+    statusValues.size === 1 ? (Array.from(statusValues)[0] as 'paid' | 'pending') : undefined;
+  const sortBy = sorting[0]?.id as BookingSortBy | undefined;
+  const sortDir = sorting[0] ? (sorting[0].desc ? 'desc' : 'asc') : undefined;
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedQuery, paymentStatus, customFilters, sortBy, sortDir, pageSize]);
+
+  const { data } = useQuery({
+    queryKey: ['bookings', 'list', { page, pageSize, q: debouncedQuery, paymentStatus, customFilters, sortBy, sortDir }],
+    queryFn: () =>
+      listBookings({
+        page,
+        pageSize,
+        q: debouncedQuery || undefined,
+        paymentStatus,
+        airlineCode: customFilters.airlineCode,
+        depDate: customFilters.depDate,
+        arrDate: customFilters.arrDate,
+        sortBy,
+        sortDir,
+      }),
+    placeholderData: keepPreviousData,
+  });
+
+  const bookings = data?.bookings ?? [];
+  const total = data?.total ?? 0;
 
   const adjustmentMutation = useMutation({
     mutationFn: ({ passengerId, input }: { passengerId: string; input: Parameters<typeof createAdjustment>[1] }) =>
       createAdjustment(passengerId, input),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['bookings', 'list'] });
       setAdjustingPassengerId(null);
       setAdjustmentForm(emptyAdjustmentForm);
     },
@@ -78,6 +99,7 @@ export default function BookingsPage() {
       passengerId,
       input: {
         bookingType: adjustmentForm.bookingType,
+        bookingDate: adjustmentForm.bookingDate,
         amount: Number(adjustmentForm.amount),
         pnr: adjustmentForm.pnr,
         airlineCode: adjustmentForm.airlineCode || undefined,
@@ -90,8 +112,24 @@ export default function BookingsPage() {
     });
   }
 
+  const columns = buildBookingColumns({ onAdjust: setAdjustingPassengerId });
+
+  const table = useReactTable({
+    data: bookings,
+    columns,
+    state: { sorting, columnVisibility },
+    pageCount: Math.max(1, Math.ceil(total / pageSize)),
+    manualPagination: true,
+    manualSorting: true,
+    manualFiltering: true,
+    getRowId: (row) => row.id,
+    onSortingChange: setSorting,
+    onColumnVisibilityChange: setColumnVisibility,
+    getCoreRowModel: getCoreRowModel(),
+  });
+
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="mx-auto max-w-[1800px] space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-xl font-semibold">Bookings</h2>
         <div className="flex gap-2">
@@ -107,69 +145,58 @@ export default function BookingsPage() {
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          aria-label="Search bookings"
+          placeholder="Search by PAX name or PNR…"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          className="h-8 w-[220px] lg:w-[300px]"
+        />
+        <DataTableFacetedFilter
+          title="Payment Status"
+          options={PAYMENT_STATUS_OPTIONS}
+          selectedValues={statusValues}
+          onChange={setStatusValues}
+        />
+        <BookingFiltersPopover value={customFilters} onApply={setCustomFilters} />
+        <DataTableViewOptions table={table} />
+      </div>
+
       <div className="rounded-md border">
-        {flatRows.length === 0 ? (
-          <p className="p-6 text-center text-sm text-muted-foreground">No bookings yet.</p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="whitespace-nowrap">Date</TableHead>
-                <TableHead className="whitespace-nowrap">Invoice#</TableHead>
-                <TableHead className="whitespace-nowrap">Name of PAX</TableHead>
-                <TableHead className="whitespace-nowrap">Amount</TableHead>
-                <TableHead className="whitespace-nowrap">PNR</TableHead>
-                <TableHead className="whitespace-nowrap">Airlines</TableHead>
-                <TableHead className="whitespace-nowrap">Departure City</TableHead>
-                <TableHead className="whitespace-nowrap">Arrival City</TableHead>
-                <TableHead className="whitespace-nowrap">Departure Date</TableHead>
-                <TableHead className="whitespace-nowrap">Arrival Date</TableHead>
-                <TableHead className="whitespace-nowrap text-center">Payment Status</TableHead>
-                <TableHead className="whitespace-nowrap">Remark</TableHead>
-                <TableHead className="whitespace-nowrap" />
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id} className="whitespace-nowrap">
+                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
+                ))}
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {flatRows.map(({ booking, passenger }) => (
-                <Fragment key={passenger.id}>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
+                  No bookings found.
+                </TableCell>
+              </TableRow>
+            ) : (
+              table.getRowModel().rows.map((row) => (
+                <Fragment key={row.id}>
                   <TableRow>
-                    <TableCell className="whitespace-nowrap">{booking.bookingDate}</TableCell>
-                    <TableCell className="whitespace-nowrap font-medium">{booking.invoiceNumber}</TableCell>
-                    <TableCell className="whitespace-nowrap">{passenger.passengerName}</TableCell>
-                    <TableCell className="whitespace-nowrap">${passenger.amount}</TableCell>
-                    <TableCell className="whitespace-nowrap">{booking.pnr}</TableCell>
-                    <TableCell className="whitespace-nowrap">{booking.airlineCode}</TableCell>
-                    <TableCell className="whitespace-nowrap">{booking.depCity}</TableCell>
-                    <TableCell className="whitespace-nowrap">{booking.arrCity}</TableCell>
-                    <TableCell className="whitespace-nowrap">{booking.depDate}</TableCell>
-                    <TableCell className="whitespace-nowrap">{booking.arrDate}</TableCell>
-                    <TableCell className="whitespace-nowrap text-center">
-                      {booking.payment ? (
-                        <PaymentStatusBadge status={booking.payment.status} />
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-muted-foreground">{booking.remark}</TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      <Button
-                        type="button"
-                        variant="link"
-                        size="sm"
-                        className="h-auto p-0 text-xs"
-                        onClick={() => setAdjustingPassengerId(passenger.id)}
-                      >
-                        Reissue/Refund
-                      </Button>
-                    </TableCell>
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id} className="whitespace-nowrap">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
                   </TableRow>
-                  {adjustingPassengerId === passenger.id && (
+                  {adjustingPassengerId === row.original.id && (
                     <TableRow>
-                      <TableCell colSpan={13}>
-                        <form
-                          onSubmit={(e) => handleAdjustmentSubmit(e, passenger.id)}
-                          className="space-y-2"
-                        >
+                      <TableCell colSpan={row.getVisibleCells().length}>
+                        <form onSubmit={(e) => handleAdjustmentSubmit(e, row.original.id)} className="space-y-2">
                           <Select
                             value={adjustmentForm.bookingType}
                             onValueChange={(v) =>
@@ -184,6 +211,13 @@ export default function BookingsPage() {
                               <SelectItem value="Refund">Refund</SelectItem>
                             </SelectContent>
                           </Select>
+                          <Input
+                            aria-label="Adjustment booking date"
+                            type="date"
+                            value={adjustmentForm.bookingDate}
+                            onChange={(e) => setAdjustmentForm({ ...adjustmentForm, bookingDate: e.target.value })}
+                            required
+                          />
                           <Input
                             aria-label="Adjustment PNR"
                             value={adjustmentForm.pnr}
@@ -232,37 +266,22 @@ export default function BookingsPage() {
                     </TableRow>
                   )}
                 </Fragment>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+              ))
+            )}
+          </TableBody>
+        </Table>
       </div>
 
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
-        <span>
-          Page {page} of {totalPages} ({total} total)
-        </span>
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page <= 1}
-          >
-            Previous
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page >= totalPages}
-          >
-            Next
-          </Button>
-        </div>
-      </div>
+      <DataTablePagination
+        page={page}
+        pageSize={pageSize}
+        pageSizes={BOOKING_PAGE_SIZES}
+        total={total}
+        selectedCount={0}
+        currentPageRowCount={bookings.length}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+      />
 
       <CreateBookingDialog open={showCreate} onOpenChange={setShowCreate} />
       <ImportBookingsDialog open={showImport} onOpenChange={setShowImport} />
