@@ -68,7 +68,7 @@ export interface BookingRowPage {
   pageSize: number;
 }
 
-export const BOOKING_PAGE_SIZES = [10, 25, 50, 100] as const;
+export const BOOKING_PAGE_SIZES = [10, 15, 25, 50, 100] as const;
 
 export type DateRangeOperator = 'before' | 'after' | 'between';
 
@@ -90,6 +90,8 @@ export interface BookingListParams {
   airlineCode?: string;
   depDate?: DateRangeParam;
   arrDate?: DateRangeParam;
+  year?: number;
+  month?: number;
   sortBy?: BookingSortBy;
   sortDir?: 'asc' | 'desc';
 }

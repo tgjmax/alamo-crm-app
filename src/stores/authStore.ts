@@ -18,15 +18,20 @@ export interface AuthUser {
 interface AuthState {
   accessToken: string | null;
   user: AuthUser | null;
+  /** Whether a boot-time session-restore attempt has already run this app load — see sessionRestore.ts. */
+  sessionRestoreAttempted: boolean;
   setSession: (accessToken: string, user: AuthUser) => void;
   setAccessToken: (accessToken: string) => void;
   clearSession: () => void;
+  markSessionRestoreAttempted: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   accessToken: null,
   user: null,
+  sessionRestoreAttempted: false,
   setSession: (accessToken, user) => set({ accessToken, user }),
   setAccessToken: (accessToken) => set({ accessToken }),
   clearSession: () => set({ accessToken: null, user: null }),
+  markSessionRestoreAttempted: () => set({ sessionRestoreAttempted: true }),
 }));

@@ -13,11 +13,16 @@ import BookingsPage from './pages/BookingsPage';
 import GroupsPage from './pages/GroupsPage';
 import GroupEditorPage from './pages/GroupEditorPage';
 import WidgetEditorPage from './pages/WidgetEditorPage';
+import SalesPage from './pages/SalesPage';
 import AppShell from './components/AppShell';
 import { useAuthStore } from './stores/authStore';
+import { canViewSalesReports } from './utils/permissions';
+import { restoreSession } from './api/sessionRestore';
 
 const rootRoute = createRootRoute({
+  beforeLoad: () => restoreSession(),
   component: () => <Outlet />,
+  pendingComponent: () => <div className="flex h-svh items-center justify-center text-sm text-muted-foreground">Loading…</div>,
 });
 
 const loginRoute = createRoute({
@@ -75,6 +80,17 @@ const bookingsRoute = createRoute({
   component: BookingsPage,
 });
 
+const salesRoute = createRoute({
+  getParentRoute: () => authedRoute,
+  path: '/sales',
+  beforeLoad: () => {
+    if (!canViewSalesReports(useAuthStore.getState().user)) {
+      throw redirect({ to: '/dashboard' });
+    }
+  },
+  component: SalesPage,
+});
+
 const groupsRoute = createRoute({
   getParentRoute: () => authedRoute,
   path: '/groups',
@@ -96,7 +112,7 @@ const groupEditRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   loginRoute,
   indexRoute,
-  authedRoute.addChildren([dashboardRoute, widgetNewRoute, widgetEditRoute, customersRoute, bookingsRoute, groupsRoute, groupNewRoute, groupEditRoute]),
+  authedRoute.addChildren([dashboardRoute, widgetNewRoute, widgetEditRoute, customersRoute, bookingsRoute, salesRoute, groupsRoute, groupNewRoute, groupEditRoute]),
 ]);
 
 export function createAppRouter(history?: RouterHistory) {

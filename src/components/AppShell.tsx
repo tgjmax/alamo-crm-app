@@ -11,17 +11,29 @@ import {
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { LayoutDashboard, Users, BookOpen, Filter } from 'lucide-react';
+import { LayoutDashboard, Users, BookOpen, TrendingUp, Filter } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
+import { canViewSalesReports } from '../utils/permissions';
+import { logoutRequest } from '../api/auth.api';
 
 export default function AppShell() {
   const user = useAuthStore((s) => s.user);
   const clearSession = useAuthStore((s) => s.clearSession);
   const router = useRouter();
+  const showSales = canViewSalesReports(user);
 
   async function handleSignOut() {
-    clearSession();
-    await router.navigate({ to: '/login' });
+    // Clears the httpOnly refresh cookie server-side — without this, the boot-time
+    // session restore would silently log the user back in on their next reload.
+    // A failed logout call (e.g. network issue) shouldn't block leaving the app.
+    try {
+      await logoutRequest();
+    } catch {
+      // Ignore — local session is cleared and the user is navigated away regardless.
+    } finally {
+      clearSession();
+      await router.navigate({ to: '/login' });
+    }
   }
 
   return (
@@ -56,6 +68,16 @@ export default function AppShell() {
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
+            {showSales && (
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <Link to="/sales">
+                    <TrendingUp />
+                    <span>Sales</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
             <SidebarMenuItem>
               <SidebarMenuButton asChild>
                 <Link to="/groups">

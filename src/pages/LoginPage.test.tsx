@@ -21,7 +21,8 @@ function renderAtLogin() {
 
 describe('LoginPage', () => {
   beforeEach(() => {
-    useAuthStore.setState({ accessToken: null, user: null });
+    useAuthStore.setState({ accessToken: null, user: null, sessionRestoreAttempted: false });
+    vi.spyOn(authApi, 'refreshRequest').mockRejectedValue(new Error('no session'));
   });
 
   it('logs in, stores the session, and navigates to /dashboard', async () => {
