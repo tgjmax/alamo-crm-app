@@ -156,7 +156,7 @@ export function buildCustomerColumns({
             type="button"
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-6 w-6"
             disabled={!row.original.passport}
             aria-label={`View passport for ${row.original.firstName} ${row.original.lastName}`}
             onClick={() => onViewPassport(row.original)}

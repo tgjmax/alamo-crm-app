@@ -169,7 +169,7 @@ describe('CustomersPage', () => {
     expect(writeText).toHaveBeenCalledTimes(3);
   });
 
-  it('copies the Date of Birth to the clipboard with dashes stripped (MMDDYYYY)', async () => {
+  it('copies the Date of Birth to the clipboard with dashes stripped (DDMMMYYYY)', async () => {
     vi.spyOn(customersApi, 'listCustomers').mockResolvedValue({
       customers: [BASE_CUSTOMER],
       total: 1,
@@ -180,8 +180,8 @@ describe('CustomersPage', () => {
     renderWithClient(<CustomersPage />);
     await screen.findByText('01-Jan-1980');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Copy 01011980' }));
-    expect(writeText).toHaveBeenLastCalledWith('01011980');
+    await userEvent.click(screen.getByRole('button', { name: 'Copy 01Jan1980' }));
+    expect(writeText).toHaveBeenLastCalledWith('01Jan1980');
   });
 
   it('debounces the search box into a server-side query param', async () => {

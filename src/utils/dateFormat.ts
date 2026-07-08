@@ -16,12 +16,9 @@ export function dobToIso(dob: string): string {
   return `${year}-${month}-${day}`;
 }
 
-/** Converts the API's wire format ('DD-MMM-YYYY') to a digits-only 'MMDDYYYY' string, for copy-to-clipboard. */
+/** Converts the API's wire format ('DD-MMM-YYYY') to a 'DDMMMYYYY' string (dashes stripped), for copy-to-clipboard. */
 export function dobToDigits(dob: string): string {
-  const [day, monthAbbr, year] = dob.split('-');
-  const monthIndex = MONTH_ABBREVIATIONS.findIndex((m) => m.toLowerCase() === monthAbbr.toLowerCase());
-  const month = String(monthIndex + 1).padStart(2, '0');
-  return `${month}${day}${year}`;
+  return dob.replace(/-/g, '');
 }
 
 /**

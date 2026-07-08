@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 import { BOOKING_PAGE_SIZES, BookingSortBy, createAdjustment, listBookings } from '../api/bookings.api';
 import { buildBookingColumns } from '@/components/bookings/booking-columns';
 import { BookingFiltersPopover, BookingCustomFilters } from '@/components/bookings/booking-filters-popover';
@@ -186,7 +187,7 @@ export default function BookingsPage() {
             ) : (
               table.getRowModel().rows.map((row) => (
                 <Fragment key={row.id}>
-                  <TableRow>
+                  <TableRow className={cn('hover:!bg-muted', row.index % 2 === 1 && 'bg-muted/60')}>
                     {row.getVisibleCells().map((cell) => (
                       <TableCell key={cell.id} className="whitespace-nowrap">
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
