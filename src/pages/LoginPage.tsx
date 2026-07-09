@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useBranding } from '@/hooks/useBranding';
 import { loginRequest } from '../api/auth.api';
 import { useAuthStore } from '../stores/authStore';
 
@@ -13,6 +14,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const setSession = useAuthStore((s) => s.setSession);
   const router = useRouter();
+  const branding = useBranding();
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -28,7 +30,8 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-4">
-      <img src="/logo.png" alt="Alamo Travels" className="h-40 w-40" />
+      <img src={branding.logoUrl ?? '/logo.png'} alt={branding.name} className="h-40 w-40" />
+      <p className="text-sm text-muted-foreground">{branding.tagline}</p>
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle className="text-xl">

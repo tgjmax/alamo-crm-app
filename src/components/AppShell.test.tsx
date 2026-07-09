@@ -6,6 +6,7 @@ import { vi } from 'vitest';
 import { createAppRouter } from '../router';
 import { useAuthStore } from '../stores/authStore';
 import * as authApi from '../api/auth.api';
+import * as organizationApi from '../api/organization.api';
 
 function renderAuthedApp(initialPath: string) {
   useAuthStore.setState({
@@ -26,6 +27,7 @@ describe('AppShell', () => {
   beforeEach(() => {
     useAuthStore.setState({ accessToken: null, user: null, sessionRestoreAttempted: false });
     vi.spyOn(authApi, 'refreshRequest').mockRejectedValue(new Error('no session'));
+    vi.spyOn(organizationApi, 'getBranding').mockResolvedValue({ name: 'Alamo Travels', tagline: 'Internal CRM', logoUrl: null });
   });
 
   it('shows sidebar links and the signed-in user', async () => {
@@ -37,6 +39,25 @@ describe('AppShell', () => {
     expect(screen.getByRole('link', { name: 'Groups' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Sales' })).toBeInTheDocument();
     expect(screen.getByText('Admin User')).toBeInTheDocument();
+  });
+
+  it('shows the profile photo instead of initials in the account menu trigger when photoUrl is set', async () => {
+    useAuthStore.setState({
+      accessToken: 't',
+      user: {
+        id: '1', name: 'Admin User', email: 'admin@alamo.test', role: 'admin',
+        photoUrl: 'https://signed.example.com/avatar.jpg',
+      },
+    });
+    const router = createAppRouter(createMemoryHistory({ initialEntries: ['/customers'] }));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
+    );
+    await screen.findByRole('link', { name: 'Dashboard' });
+    expect(screen.getByRole('img', { name: 'Admin User' })).toHaveAttribute('src', 'https://signed.example.com/avatar.jpg');
   });
 
   it('hides the Sales link from an agent without data.viewReports', async () => {
@@ -86,11 +107,20 @@ describe('AppShell', () => {
     });
   });
 
+  it('opens the account menu and navigates to Settings', async () => {
+    const router = renderAuthedApp('/customers');
+    await userEvent.click(await screen.findByRole('button', { name: 'Account menu' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Settings' }));
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/settings');
+    });
+  });
+
   it('signs out and redirects to /login', async () => {
     const logout = vi.spyOn(authApi, 'logoutRequest').mockResolvedValue(undefined);
     const router = renderAuthedApp('/customers');
-    await screen.findByRole('button', { name: 'Sign out' });
-    await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Account menu' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Sign out' }));
     await waitFor(() => {
       expect(logout).toHaveBeenCalled();
       expect(useAuthStore.getState().user).toBeNull();

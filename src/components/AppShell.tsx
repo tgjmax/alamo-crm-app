@@ -13,16 +13,24 @@ import {
   SidebarRail,
   SidebarTrigger,
 } from '@/components/ui/sidebar';
-import { LayoutDashboard, Users, BookOpen, TrendingUp, Filter, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, BookOpen, TrendingUp, Filter, Settings, LogOut } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useAuthStore } from '../stores/authStore';
 import { canViewSalesReports } from '../utils/permissions';
 import { logoutRequest } from '../api/auth.api';
+import { useBranding } from '@/hooks/useBranding';
 
 export default function AppShell() {
   const user = useAuthStore((s) => s.user);
   const clearSession = useAuthStore((s) => s.clearSession);
   const router = useRouter();
   const showSales = canViewSalesReports(user);
+  const branding = useBranding();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   function isActive(path: string): boolean {
@@ -48,11 +56,11 @@ export default function AppShell() {
             <SidebarMenuItem>
               <SidebarMenuButton size="lg" tabIndex={-1} className="h-16 cursor-default hover:bg-transparent">
                 <div className="flex aspect-square size-12 shrink-0 items-center justify-center overflow-hidden rounded-md group-data-[collapsible=icon]:size-8">
-                  <img src="/logo.png" alt="Alamo Travels" className="size-full object-cover" />
+                  <img src={branding.logoUrl ?? '/logo.png'} alt={branding.name} className="size-full object-cover" />
                 </div>
                 <div className="grid flex-1 text-left text-base leading-tight">
-                  <span className="truncate font-bold">Alamo Travels</span>
-                  <span className="truncate text-sm text-muted-foreground">Internal CRM</span>
+                  <span className="truncate font-bold">{branding.name}</span>
+                  <span className="truncate text-sm text-muted-foreground">{branding.tagline}</span>
                 </div>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -129,21 +137,33 @@ export default function AppShell() {
         <SidebarFooter>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton size="lg" tabIndex={-1} className="cursor-default hover:bg-transparent">
-                <div className="flex aspect-square size-8 shrink-0 items-center justify-center rounded-full bg-sidebar-primary text-sm font-semibold text-sidebar-primary-foreground">
-                  {user?.name?.[0]?.toUpperCase() ?? '?'}
-                </div>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">{user?.name}</span>
-                  <span className="truncate text-xs text-muted-foreground">{user?.role}</span>
-                </div>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton onClick={handleSignOut}>
-                <LogOut />
-                <span>Sign out</span>
-              </SidebarMenuButton>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <SidebarMenuButton size="lg" aria-label="Account menu" className="h-14">
+                    <div className="flex aspect-square size-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-sidebar-primary text-base font-semibold text-sidebar-primary-foreground group-data-[collapsible=icon]:size-8">
+                      {user?.photoUrl ? (
+                        <img src={user.photoUrl} alt={user.name} className="size-full object-cover" />
+                      ) : (
+                        user?.name?.[0]?.toUpperCase() ?? '?'
+                      )}
+                    </div>
+                    <div className="grid flex-1 text-left text-base leading-tight">
+                      <span className="truncate font-medium">{user?.name}</span>
+                      <span className="truncate text-sm text-muted-foreground">{user?.role}</span>
+                    </div>
+                  </SidebarMenuButton>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="top" align="start" className="w-56">
+                  <DropdownMenuItem onClick={() => router.navigate({ to: '/settings' })}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleSignOut}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sign out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarFooter>

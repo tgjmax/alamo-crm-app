@@ -128,6 +128,35 @@ describe('BookingImportWizard', () => {
     });
   });
 
+  it('maps a Voided column and sends it as a real boolean', async () => {
+    vi.spyOn(bookingsApi, 'importBookings').mockResolvedValueOnce([{ index: 0, status: 'would_import' }]);
+    const worksheet = XLSX.utils.aoa_to_sheet([
+      ['Date', 'Invoice', 'Name of PAX', 'Amount', 'Voided'],
+      ['2026-05-04', 'VOID-IMPORT-UI', 'JOSEPH/SHINY S', '0', 'TRUE'],
+    ]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
+    const arrayBuffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
+    const file = new File([arrayBuffer], 'voided.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+
+    render(<BookingImportWizard onClose={() => {}} />);
+    await userEvent.upload(screen.getByLabelText('Booking import file'), file);
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Map Booking Date' })).toBeInTheDocument());
+    await selectOption('Map Booking Date', 'Date');
+    await selectOption('Map Invoice', 'Invoice');
+    await selectOption('Map Name of PAX', 'Name of PAX');
+    await selectOption('Map Amount', 'Amount');
+    await selectOption('Map Voided', 'Voided');
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
+
+    await waitFor(() => {
+      const [rows] = vi.mocked(bookingsApi.importBookings).mock.calls[0];
+      expect(rows[0]).toEqual(expect.objectContaining({ voided: true }));
+    });
+  });
+
   it('imports a voided row with only Booking Date and Invoice mapped (PNR/Flight/etc left blank)', async () => {
     vi.spyOn(bookingsApi, 'importBookings').mockResolvedValueOnce([{ index: 0, status: 'would_import' }]);
     const worksheet = XLSX.utils.aoa_to_sheet([

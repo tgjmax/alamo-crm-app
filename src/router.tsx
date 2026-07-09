@@ -14,6 +14,7 @@ import GroupsPage from './pages/GroupsPage';
 import GroupEditorPage from './pages/GroupEditorPage';
 import WidgetEditorPage from './pages/WidgetEditorPage';
 import SalesPage from './pages/SalesPage';
+import SettingsPage from './pages/SettingsPage';
 import AppShell from './components/AppShell';
 import { useAuthStore } from './stores/authStore';
 import { canViewSalesReports } from './utils/permissions';
@@ -109,10 +110,16 @@ const groupEditRoute = createRoute({
   component: GroupEditorPage,
 });
 
+const settingsRoute = createRoute({
+  getParentRoute: () => authedRoute,
+  path: '/settings',
+  component: SettingsPage,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
   indexRoute,
-  authedRoute.addChildren([dashboardRoute, widgetNewRoute, widgetEditRoute, customersRoute, bookingsRoute, salesRoute, groupsRoute, groupNewRoute, groupEditRoute]),
+  authedRoute.addChildren([dashboardRoute, widgetNewRoute, widgetEditRoute, customersRoute, bookingsRoute, salesRoute, groupsRoute, groupNewRoute, groupEditRoute, settingsRoute]),
 ]);
 
 export function createAppRouter(history?: RouterHistory) {

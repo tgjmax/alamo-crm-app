@@ -20,6 +20,7 @@ const TARGET_FIELDS: TargetField[] = [
   { key: 'invoiceNumber', label: 'Invoice', required: true },
   { key: 'passengerName', label: 'Name of PAX', required: true },
   { key: 'amount', label: 'Amount', required: true },
+  { key: 'voided', label: 'Voided' },
   { key: 'pnr', label: 'PNR' },
   { key: 'airlineCode', label: 'Flight' },
   { key: 'depCity', label: 'Dep City' },
@@ -31,6 +32,7 @@ const TARGET_FIELDS: TargetField[] = [
 ];
 
 const BLANK_AMOUNT_VALUES = new Set(['', 'null', '--']);
+const TRUTHY_VOIDED_VALUES = new Set(['true', 'yes', 'y', '1', 't']);
 
 function parseAmount(raw: string | undefined): number {
   const trimmed = (raw ?? '').trim();
@@ -58,12 +60,15 @@ function buildRows(headers: string[], rawRows: string[][], mapping: ColumnMappin
       invoiceNumber = undefined;
     }
 
+    const voidedRaw = get('voided');
+
     return {
       bookingType,
       bookingDate: get('bookingDate') ?? '',
       invoiceNumber,
       passengerName: get('passengerName') ?? '',
       amount: parseAmount(get('amount')),
+      voided: voidedRaw ? TRUTHY_VOIDED_VALUES.has(voidedRaw.trim().toLowerCase()) : undefined,
       pnr: get('pnr'),
       airlineCode: get('airlineCode'),
       depCity: get('depCity'),

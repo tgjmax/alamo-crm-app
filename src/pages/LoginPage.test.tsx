@@ -7,6 +7,7 @@ import { vi } from 'vitest';
 import { createAppRouter } from '../router';
 import { useAuthStore } from '../stores/authStore';
 import * as authApi from '../api/auth.api';
+import * as organizationApi from '../api/organization.api';
 
 function renderAtLogin() {
   const router = createAppRouter(createMemoryHistory({ initialEntries: ['/login'] }));
@@ -23,11 +24,28 @@ describe('LoginPage', () => {
   beforeEach(() => {
     useAuthStore.setState({ accessToken: null, user: null, sessionRestoreAttempted: false });
     vi.spyOn(authApi, 'refreshRequest').mockRejectedValue(new Error('no session'));
+    vi.spyOn(organizationApi, 'getBranding').mockResolvedValue({ name: 'Alamo Travels', tagline: 'Internal CRM', logoUrl: null });
   });
 
   it('shows the Alamo Travels logo', async () => {
     renderAtLogin();
     expect(await screen.findByRole('img', { name: 'Alamo Travels' })).toBeInTheDocument();
+  });
+
+  it('falls back to the default branding if the branding fetch fails', async () => {
+    vi.spyOn(organizationApi, 'getBranding').mockRejectedValue(new Error('network error'));
+    renderAtLogin();
+    expect(await screen.findByRole('img', { name: 'Alamo Travels' })).toBeInTheDocument();
+    expect(screen.getByText('Internal CRM')).toBeInTheDocument();
+  });
+
+  it('shows a custom org name, tagline, and logo once branding loads', async () => {
+    vi.spyOn(organizationApi, 'getBranding').mockResolvedValue({
+      name: 'Acme Travel', tagline: 'Custom Tagline', logoUrl: 'https://signed.example.com/logo.png',
+    });
+    renderAtLogin();
+    expect(await screen.findByRole('img', { name: 'Acme Travel' })).toHaveAttribute('src', 'https://signed.example.com/logo.png');
+    expect(screen.getByText('Custom Tagline')).toBeInTheDocument();
   });
 
   it('logs in, stores the session, and navigates to /dashboard', async () => {

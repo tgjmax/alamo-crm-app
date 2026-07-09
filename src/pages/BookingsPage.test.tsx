@@ -202,6 +202,8 @@ describe('BookingsPage', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));
     await userEvent.type(screen.getByLabelText('Invoice number'), '0000202');
+    await userEvent.type(screen.getByLabelText('PNR'), 'ABC123');
+    await userEvent.type(screen.getByLabelText('Airline code'), 'QR');
     await userEvent.type(screen.getByLabelText('Passenger name'), 'PEND/PAX');
     await userEvent.type(screen.getByLabelText('Amount'), '500');
     await userEvent.click(screen.getByRole('combobox', { name: 'Payment status' }));
@@ -226,6 +228,8 @@ describe('BookingsPage', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));
     await userEvent.type(screen.getByLabelText('Invoice number'), '0000203');
+    await userEvent.type(screen.getByLabelText('PNR'), 'ABC123');
+    await userEvent.type(screen.getByLabelText('Airline code'), 'QR');
     await userEvent.type(screen.getByLabelText('Passenger name'), 'PAID/PAX');
     await userEvent.type(screen.getByLabelText('Amount'), '500');
     expect(screen.queryByLabelText('Amount owed')).not.toBeInTheDocument();
@@ -262,6 +266,56 @@ describe('BookingsPage', () => {
       const [firstCallArgs] = vi.mocked(bookingsApi.createBooking).mock.calls[0];
       expect(firstCallArgs.depCity).toBeUndefined();
     });
+  });
+
+  it('hides trip and payment fields and submits voided:true when Mark as voided is checked', async () => {
+    vi.spyOn(bookingsApi, 'createBooking').mockResolvedValue({
+      id: 'b6',
+      invoiceNumber: 'VOID-UI-1',
+      passengers: [{ id: 'p6', passengerName: 'VOID/PAX', amount: 0 }],
+    });
+    renderWithClient(<BookingsPage />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Mark as voided' }));
+
+    expect(screen.queryByLabelText('PNR')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Airline code')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Departure city')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Arrival city')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Departure date')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Arrival date')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Payment status')).not.toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText('Invoice number'), 'VOID-UI-1');
+    await userEvent.type(screen.getByLabelText('Passenger name'), 'VOID/PAX');
+    await userEvent.type(screen.getByLabelText('Amount'), '0');
+    await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));
+
+    await waitFor(() => {
+      expect(bookingsApi.createBooking).toHaveBeenCalled();
+      const [firstCallArgs] = vi.mocked(bookingsApi.createBooking).mock.calls[0];
+      expect(firstCallArgs).toEqual(
+        expect.objectContaining({
+          invoiceNumber: 'VOID-UI-1',
+          voided: true,
+          pnr: undefined,
+          airlineCode: undefined,
+          depCity: undefined,
+          arrCity: undefined,
+          depDate: undefined,
+          arrDate: undefined,
+          payment: undefined,
+        })
+      );
+    });
+  });
+
+  it('leaves the full form visible and submits voided:false by default', async () => {
+    renderWithClient(<BookingsPage />);
+    await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));
+    expect(screen.getByLabelText('PNR')).toBeInTheDocument();
+    expect(screen.getByLabelText('Payment status')).toBeInTheDocument();
   });
 
   it('shows a dash for Payment Status on a voided booking with no payment on file', async () => {
@@ -426,6 +480,28 @@ describe('BookingsPage', () => {
     renderWithClient(<BookingsPage />);
     await userEvent.click(screen.getByRole('button', { name: 'Import Bookings' }));
     expect(await screen.findByLabelText('Booking import file')).toBeInTheDocument();
+  });
+
+  it('opens the Voided Invoices dialog and lists only voided invoices', async () => {
+    vi.spyOn(bookingsApi, 'listBookings').mockImplementation((params = {}) => {
+      if (params.voided) {
+        return Promise.resolve({
+          bookings: [{
+            ...BASE_ROW, id: 'pv1', invoiceNumber: 'VOID-100', bookingDate: '2026-06-01',
+            remark: 'Duplicate print', voided: true,
+          }],
+          total: 1, page: 1, pageSize: 25,
+        });
+      }
+      return Promise.resolve({ bookings: [BASE_ROW], total: 1, page: 1, pageSize: 25 });
+    });
+    renderWithClient(<BookingsPage />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Voided Invoices' }));
+
+    expect(await screen.findByText('VOID-100')).toBeInTheDocument();
+    expect(screen.getByText('Duplicate print')).toBeInTheDocument();
+    expect(vi.mocked(bookingsApi.listBookings)).toHaveBeenCalledWith(expect.objectContaining({ voided: true }));
   });
 
   it('exports bookings via the Export dialog', async () => {

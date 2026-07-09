@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,6 +17,7 @@ interface CreateBookingDialogProps {
 const emptyForm = {
   invoiceNumber: '',
   bookingDate: new Date().toISOString().slice(0, 10),
+  voided: false,
   pnr: '',
   airlineCode: '',
   depCity: '',
@@ -70,18 +72,21 @@ export function CreateBookingDialog({ open, onOpenChange }: CreateBookingDialogP
     createMutation.mutate({
       invoiceNumber: form.invoiceNumber,
       bookingDate: form.bookingDate,
-      pnr: form.pnr || undefined,
-      airlineCode: form.airlineCode || undefined,
-      depCity: form.depCity || undefined,
-      arrCity: form.arrCity || undefined,
-      depDate: form.depDate || undefined,
-      arrDate: form.arrDate || undefined,
+      voided: form.voided,
+      pnr: form.voided ? undefined : form.pnr || undefined,
+      airlineCode: form.voided ? undefined : form.airlineCode || undefined,
+      depCity: form.voided ? undefined : form.depCity || undefined,
+      arrCity: form.voided ? undefined : form.arrCity || undefined,
+      depDate: form.voided ? undefined : form.depDate || undefined,
+      arrDate: form.voided ? undefined : form.arrDate || undefined,
       remark: form.remark || undefined,
-      payment: {
-        status: form.paymentStatus,
-        type: form.paymentType,
-        amount: form.paymentStatus === 'pending' ? Number(form.pendingAmount) : 0,
-      },
+      payment: form.voided
+        ? undefined
+        : {
+            status: form.paymentStatus,
+            type: form.paymentType,
+            amount: form.paymentStatus === 'pending' ? Number(form.pendingAmount) : 0,
+          },
       passengers: [{ passengerName: form.passengerName, amount: Number(form.amount) }],
     });
   }
@@ -100,48 +105,62 @@ export function CreateBookingDialog({ open, onOpenChange }: CreateBookingDialogP
             placeholder="Invoice number"
             required
           />
-          <Input
-            aria-label="PNR"
-            value={form.pnr}
-            onChange={(e) => setForm({ ...form, pnr: e.target.value })}
-            placeholder="PNR (optional)"
-          />
-          <Input
-            aria-label="Airline code"
-            value={form.airlineCode}
-            onChange={(e) => setForm({ ...form, airlineCode: e.target.value })}
-            placeholder="Airline code (optional)"
-          />
-          <Input
-            aria-label="Departure city"
-            value={form.depCity}
-            onChange={(e) => setForm({ ...form, depCity: e.target.value })}
-            placeholder="Departure city (optional)"
-          />
-          <Input
-            aria-label="Arrival city"
-            value={form.arrCity}
-            onChange={(e) => setForm({ ...form, arrCity: e.target.value })}
-            placeholder="Arrival city (optional)"
-          />
-          <div className="space-y-2">
-            <Label htmlFor="booking-dep-date">Departure date</Label>
-            <Input
-              id="booking-dep-date"
-              type="date"
-              value={form.depDate}
-              onChange={(e) => setForm({ ...form, depDate: e.target.value })}
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="booking-voided"
+              checked={form.voided}
+              onCheckedChange={(checked) => setForm({ ...form, voided: checked === true })}
             />
+            <Label htmlFor="booking-voided">Mark as voided</Label>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="booking-arr-date">Arrival date</Label>
-            <Input
-              id="booking-arr-date"
-              type="date"
-              value={form.arrDate}
-              onChange={(e) => setForm({ ...form, arrDate: e.target.value })}
-            />
-          </div>
+          {!form.voided && (
+            <>
+              <Input
+                aria-label="PNR"
+                value={form.pnr}
+                onChange={(e) => setForm({ ...form, pnr: e.target.value })}
+                placeholder="PNR"
+                required
+              />
+              <Input
+                aria-label="Airline code"
+                value={form.airlineCode}
+                onChange={(e) => setForm({ ...form, airlineCode: e.target.value })}
+                placeholder="Airline code"
+                required
+              />
+              <Input
+                aria-label="Departure city"
+                value={form.depCity}
+                onChange={(e) => setForm({ ...form, depCity: e.target.value })}
+                placeholder="Departure city (optional)"
+              />
+              <Input
+                aria-label="Arrival city"
+                value={form.arrCity}
+                onChange={(e) => setForm({ ...form, arrCity: e.target.value })}
+                placeholder="Arrival city (optional)"
+              />
+              <div className="space-y-2">
+                <Label htmlFor="booking-dep-date">Departure date</Label>
+                <Input
+                  id="booking-dep-date"
+                  type="date"
+                  value={form.depDate}
+                  onChange={(e) => setForm({ ...form, depDate: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="booking-arr-date">Arrival date</Label>
+                <Input
+                  id="booking-arr-date"
+                  type="date"
+                  value={form.arrDate}
+                  onChange={(e) => setForm({ ...form, arrDate: e.target.value })}
+                />
+              </div>
+            </>
+          )}
           <div className="relative">
             <Input
               aria-label="Passenger name"
@@ -180,48 +199,52 @@ export function CreateBookingDialog({ open, onOpenChange }: CreateBookingDialogP
               onChange={(e) => setForm({ ...form, remark: e.target.value })}
             />
           </div>
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <Label>Payment status</Label>
-              <Select
-                value={form.paymentStatus}
-                onValueChange={(v) => setForm({ ...form, paymentStatus: v as 'paid' | 'pending' })}
-              >
-                <SelectTrigger aria-label="Payment status" className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="paid">Paid</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-2">
-              <Label>Payment type</Label>
-              <Select
-                value={form.paymentType}
-                onValueChange={(v) => setForm({ ...form, paymentType: v as 'card' | 'check' | 'cash' })}
-              >
-                <SelectTrigger aria-label="Payment type" className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="card">Card</SelectItem>
-                  <SelectItem value="check">Check</SelectItem>
-                  <SelectItem value="cash">Cash</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          {form.paymentStatus === 'pending' && (
-            <Input
-              aria-label="Amount owed"
-              type="number"
-              value={form.pendingAmount}
-              onChange={(e) => setForm({ ...form, pendingAmount: e.target.value })}
-              placeholder="Amount owed"
-              required
-            />
+          {!form.voided && (
+            <>
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <Label>Payment status</Label>
+                  <Select
+                    value={form.paymentStatus}
+                    onValueChange={(v) => setForm({ ...form, paymentStatus: v as 'paid' | 'pending' })}
+                  >
+                    <SelectTrigger aria-label="Payment status" className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="paid">Paid</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label>Payment type</Label>
+                  <Select
+                    value={form.paymentType}
+                    onValueChange={(v) => setForm({ ...form, paymentType: v as 'card' | 'check' | 'cash' })}
+                  >
+                    <SelectTrigger aria-label="Payment type" className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="card">Card</SelectItem>
+                      <SelectItem value="check">Check</SelectItem>
+                      <SelectItem value="cash">Cash</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {form.paymentStatus === 'pending' && (
+                <Input
+                  aria-label="Amount owed"
+                  type="number"
+                  value={form.pendingAmount}
+                  onChange={(e) => setForm({ ...form, pendingAmount: e.target.value })}
+                  placeholder="Amount owed"
+                  required
+                />
+              )}
+            </>
           )}
           {createMutation.isError && (
             <p className="text-sm text-destructive">Save failed. Check your connection and try again.</p>

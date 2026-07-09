@@ -17,6 +17,7 @@ export interface PassengerInput {
 export interface CreateBookingInput {
   invoiceNumber: string;
   bookingDate: string;
+  voided?: boolean;
   pnr?: string;
   airlineCode?: string;
   depCity?: string;
@@ -62,6 +63,7 @@ export interface BookingRow {
   paymentAmount?: number;
   paymentType?: 'card' | 'check' | 'cash';
   paymentPaidOn?: string;
+  voided?: boolean;
   bookingType: 'New' | 'Reissue' | 'Refund';
   /** The underlying Booking's id — present only on New rows (payment lives on the Booking,
    * not the passenger, for those). Undefined on Reissue/Refund rows, which use `id` (their
@@ -101,6 +103,7 @@ export interface BookingListParams {
   arrDate?: DateRangeParam;
   year?: number;
   month?: number;
+  voided?: boolean;
   sortBy?: BookingSortBy;
   sortDir?: 'asc' | 'desc';
 }
@@ -167,6 +170,7 @@ export interface ImportBookingRow {
   invoiceNumber?: string;
   passengerName: string;
   amount: number;
+  voided?: boolean;
   pnr?: string;
   airlineCode?: string;
   depCity?: string;

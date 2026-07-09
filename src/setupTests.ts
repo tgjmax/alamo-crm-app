@@ -47,6 +47,14 @@ if (!navigator.clipboard) {
   });
 }
 
+// jsdom doesn't implement URL.createObjectURL, used to preview a file chosen
+// via an <input type="file"> before it's uploaded (e.g. organization-tab.tsx's
+// logo picker) — without this, selecting a file throws synchronously inside
+// the change handler and fails the test run even though assertions pass.
+if (!URL.createObjectURL) {
+  URL.createObjectURL = (): string => 'blob:mock-url';
+}
+
 // jsdom's Blob/File implementation doesn't implement arrayBuffer() (needed by
 // the xlsx import wizard's parseXlsxFile, which reads File objects built in
 // tests via `new File([...])`). Polyfill via FileReader, which jsdom does support.

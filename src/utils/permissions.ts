@@ -7,3 +7,7 @@ export function canViewSalesReports(user: AuthUser | null): boolean {
 export function canEditBookings(user: AuthUser | null): boolean {
   return user?.role === 'admin' || Boolean(user?.permissions?.bookings.edit);
 }
+
+export function canEditOrganization(user: AuthUser | null): boolean {
+  return user?.role === 'admin';
+}
