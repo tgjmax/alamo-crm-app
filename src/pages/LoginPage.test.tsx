@@ -25,6 +25,11 @@ describe('LoginPage', () => {
     vi.spyOn(authApi, 'refreshRequest').mockRejectedValue(new Error('no session'));
   });
 
+  it('shows the Alamo Travels logo', async () => {
+    renderAtLogin();
+    expect(await screen.findByRole('img', { name: 'Alamo Travels' })).toBeInTheDocument();
+  });
+
   it('logs in, stores the session, and navigates to /dashboard', async () => {
     vi.spyOn(authApi, 'loginRequest').mockResolvedValue({
       accessToken: 'token-123',

@@ -27,7 +27,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-svh items-center justify-center bg-background p-4">
+    <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-4">
+      <img src="/logo.png" alt="Alamo Travels" className="h-40 w-40" />
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle className="text-xl">

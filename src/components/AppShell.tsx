@@ -1,17 +1,19 @@
-import { Link, Outlet, useRouter } from '@tanstack/react-router';
+import { Link, Outlet, useRouter, useRouterState } from '@tanstack/react-router';
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
   SidebarHeader,
+  SidebarInset,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
+  SidebarRail,
   SidebarTrigger,
 } from '@/components/ui/sidebar';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { LayoutDashboard, Users, BookOpen, TrendingUp, Filter } from 'lucide-react';
+import { LayoutDashboard, Users, BookOpen, TrendingUp, Filter, LogOut } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { canViewSalesReports } from '../utils/permissions';
 import { logoutRequest } from '../api/auth.api';
@@ -21,11 +23,13 @@ export default function AppShell() {
   const clearSession = useAuthStore((s) => s.clearSession);
   const router = useRouter();
   const showSales = canViewSalesReports(user);
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  function isActive(path: string): boolean {
+    return pathname === path || pathname.startsWith(`${path}/`);
+  }
 
   async function handleSignOut() {
-    // Clears the httpOnly refresh cookie server-side — without this, the boot-time
-    // session restore would silently log the user back in on their next reload.
-    // A failed logout call (e.g. network issue) shouldn't block leaving the app.
     try {
       await logoutRequest();
     } catch {
@@ -40,74 +44,119 @@ export default function AppShell() {
     <SidebarProvider>
       <Sidebar collapsible="icon">
         <SidebarHeader>
-          <span className="px-2 text-sm font-semibold">Alamo Travels</span>
-        </SidebarHeader>
-        <SidebarContent>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild>
-                <Link to="/dashboard">
-                  <LayoutDashboard />
-                  <span>Dashboard</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild>
-                <Link to="/customers">
-                  <Users />
-                  <span>Customers</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild>
-                <Link to="/bookings">
-                  <BookOpen />
-                  <span>Bookings</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            {showSales && (
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <Link to="/sales">
-                    <TrendingUp />
-                    <span>Sales</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild>
-                <Link to="/groups">
-                  <Filter />
-                  <span>Groups</span>
-                </Link>
+              <SidebarMenuButton size="lg" tabIndex={-1} className="h-16 cursor-default hover:bg-transparent">
+                <div className="flex aspect-square size-12 shrink-0 items-center justify-center overflow-hidden rounded-md group-data-[collapsible=icon]:size-8">
+                  <img src="/logo.png" alt="Alamo Travels" className="size-full object-cover" />
+                </div>
+                <div className="grid flex-1 text-left text-base leading-tight">
+                  <span className="truncate font-bold">Alamo Travels</span>
+                  <span className="truncate text-sm text-muted-foreground">Internal CRM</span>
+                </div>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
+        </SidebarHeader>
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive('/dashboard')}
+                  className="h-10 text-base font-medium [&>svg]:size-5 data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground data-[active=true]:hover:bg-sidebar-primary data-[active=true]:hover:text-sidebar-primary-foreground"
+                >
+                  <Link to="/dashboard">
+                    <LayoutDashboard />
+                    <span>Dashboard</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive('/customers')}
+                  className="h-10 text-base font-medium [&>svg]:size-5 data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground data-[active=true]:hover:bg-sidebar-primary data-[active=true]:hover:text-sidebar-primary-foreground"
+                >
+                  <Link to="/customers">
+                    <Users />
+                    <span>Customers</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive('/bookings')}
+                  className="h-10 text-base font-medium [&>svg]:size-5 data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground data-[active=true]:hover:bg-sidebar-primary data-[active=true]:hover:text-sidebar-primary-foreground"
+                >
+                  <Link to="/bookings">
+                    <BookOpen />
+                    <span>Bookings</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              {showSales && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive('/sales')}
+                    className="h-10 text-base font-medium [&>svg]:size-5 data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground data-[active=true]:hover:bg-sidebar-primary data-[active=true]:hover:text-sidebar-primary-foreground"
+                  >
+                    <Link to="/sales">
+                      <TrendingUp />
+                      <span>Sales</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive('/groups')}
+                  className="h-10 text-base font-medium [&>svg]:size-5 data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground data-[active=true]:hover:bg-sidebar-primary data-[active=true]:hover:text-sidebar-primary-foreground"
+                >
+                  <Link to="/groups">
+                    <Filter />
+                    <span>Groups</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroup>
         </SidebarContent>
+        <SidebarFooter>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton size="lg" tabIndex={-1} className="cursor-default hover:bg-transparent">
+                <div className="flex aspect-square size-8 shrink-0 items-center justify-center rounded-full bg-sidebar-primary text-sm font-semibold text-sidebar-primary-foreground">
+                  {user?.name?.[0]?.toUpperCase() ?? '?'}
+                </div>
+                <div className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-medium">{user?.name}</span>
+                  <span className="truncate text-xs text-muted-foreground">{user?.role}</span>
+                </div>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton onClick={handleSignOut}>
+                <LogOut />
+                <span>Sign out</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarFooter>
+        <SidebarRail />
       </Sidebar>
-      <div className="flex min-h-svh flex-1 flex-col">
-        <header className="flex h-14 items-center gap-3 border-b px-4">
-          <SidebarTrigger />
-          <Separator orientation="vertical" className="h-6" />
-          <div className="ml-auto flex items-center gap-3">
-            {user && (
-              <span className="text-sm text-muted-foreground">
-                <span className="text-foreground">{user.name}</span> ({user.role})
-              </span>
-            )}
-            <Button variant="outline" size="sm" onClick={handleSignOut}>
-              Sign out
-            </Button>
-          </div>
+      <SidebarInset>
+        <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+          <SidebarTrigger className="-ml-1" />
         </header>
-        <main className="flex-1 p-4">
+        <div className="flex-1 p-4">
           <Outlet />
-        </main>
-      </div>
+        </div>
+      </SidebarInset>
     </SidebarProvider>
   );
 }

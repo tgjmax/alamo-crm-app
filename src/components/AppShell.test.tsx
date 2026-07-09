@@ -30,6 +30,7 @@ describe('AppShell', () => {
 
   it('shows sidebar links and the signed-in user', async () => {
     renderAuthedApp('/customers');
+    expect(await screen.findByRole('img', { name: 'Alamo Travels' })).toBeInTheDocument();
     expect(await screen.findByRole('link', { name: 'Dashboard' })).toBeInTheDocument();
     expect(await screen.findByRole('link', { name: 'Customers' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Bookings' })).toBeInTheDocument();
@@ -60,6 +61,20 @@ describe('AppShell', () => {
     );
     await screen.findByRole('link', { name: 'Dashboard' });
     expect(screen.queryByRole('link', { name: 'Sales' })).not.toBeInTheDocument();
+  });
+
+  it('highlights the current page in the sidebar and updates on navigation', async () => {
+    const router = renderAuthedApp('/customers');
+    await screen.findByRole('link', { name: 'Customers' });
+    expect(screen.getByRole('link', { name: 'Customers' })).toHaveAttribute('data-active', 'true');
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('data-active', 'false');
+
+    await userEvent.click(screen.getByRole('link', { name: 'Bookings' }));
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/bookings');
+    });
+    expect(screen.getByRole('link', { name: 'Bookings' })).toHaveAttribute('data-active', 'true');
+    expect(screen.getByRole('link', { name: 'Customers' })).toHaveAttribute('data-active', 'false');
   });
 
   it('navigates between pages via sidebar links', async () => {
