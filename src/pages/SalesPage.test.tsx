@@ -20,6 +20,7 @@ const BASE_ROW: bookingsApi.BookingRow = {
   pnr: 'GUDBFX',
   airlineCode: 'EK',
   paymentStatus: 'paid',
+  bookingType: 'New',
 };
 
 const SUMMARY: salesApi.SalesSummary = {

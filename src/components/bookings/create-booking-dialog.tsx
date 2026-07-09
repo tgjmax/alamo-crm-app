@@ -25,6 +25,7 @@ const emptyForm = {
   remark: '',
   paymentStatus: 'paid' as 'paid' | 'pending',
   paymentType: 'card' as 'card' | 'check' | 'cash',
+  pendingAmount: '',
   passengerName: '',
   amount: '',
 };
@@ -76,7 +77,11 @@ export function CreateBookingDialog({ open, onOpenChange }: CreateBookingDialogP
       depDate: form.depDate || undefined,
       arrDate: form.arrDate || undefined,
       remark: form.remark || undefined,
-      payment: { status: form.paymentStatus, type: form.paymentType },
+      payment: {
+        status: form.paymentStatus,
+        type: form.paymentType,
+        amount: form.paymentStatus === 'pending' ? Number(form.pendingAmount) : 0,
+      },
       passengers: [{ passengerName: form.passengerName, amount: Number(form.amount) }],
     });
   }
@@ -208,6 +213,16 @@ export function CreateBookingDialog({ open, onOpenChange }: CreateBookingDialogP
               </Select>
             </div>
           </div>
+          {form.paymentStatus === 'pending' && (
+            <Input
+              aria-label="Amount owed"
+              type="number"
+              value={form.pendingAmount}
+              onChange={(e) => setForm({ ...form, pendingAmount: e.target.value })}
+              placeholder="Amount owed"
+              required
+            />
+          )}
           {createMutation.isError && (
             <p className="text-sm text-destructive">Save failed. Check your connection and try again.</p>
           )}

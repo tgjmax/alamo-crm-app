@@ -98,6 +98,36 @@ describe('BookingImportWizard', () => {
     expect(await screen.findByText(/1 of 2 row\(s\) imported\./)).toBeInTheDocument();
   });
 
+  it('maps a Pending Amount column and sends it per-row when importing as pending', async () => {
+    vi.spyOn(bookingsApi, 'importBookings').mockResolvedValueOnce([{ index: 0, status: 'would_import' }]);
+    const worksheet = XLSX.utils.aoa_to_sheet([
+      ['Date', 'Invoice', 'Name of PAX', 'Amount', 'Pending Amount'],
+      ['2026-05-04', '0000150', 'JOSEPH/SHINY S', '500', '150'],
+    ]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
+    const arrayBuffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
+    const file = new File([arrayBuffer], 'pending-amount.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+
+    render(<BookingImportWizard onClose={() => {}} />);
+    await userEvent.upload(screen.getByLabelText('Booking import file'), file);
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Map Booking Date' })).toBeInTheDocument());
+    await selectOption('Map Booking Date', 'Date');
+    await selectOption('Map Invoice', 'Invoice');
+    await selectOption('Map Name of PAX', 'Name of PAX');
+    await selectOption('Map Amount', 'Amount');
+    await selectOption('Map Pending Amount', 'Pending Amount');
+    await selectOption('Import payment status', 'Pending');
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
+
+    await waitFor(() => {
+      const [rows] = vi.mocked(bookingsApi.importBookings).mock.calls[0];
+      expect(rows[0]).toEqual(expect.objectContaining({ amount: 500, pendingAmount: 150 }));
+    });
+  });
+
   it('imports a voided row with only Booking Date and Invoice mapped (PNR/Flight/etc left blank)', async () => {
     vi.spyOn(bookingsApi, 'importBookings').mockResolvedValueOnce([{ index: 0, status: 'would_import' }]);
     const worksheet = XLSX.utils.aoa_to_sheet([

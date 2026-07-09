@@ -3,15 +3,19 @@ import { SortingState, VisibilityState, flexRender, getCoreRowModel, useReactTab
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { BOOKING_PAGE_SIZES, BookingSortBy, createAdjustment, listBookings } from '@/api/bookings.api';
+import { BOOKING_PAGE_SIZES, BookingRow, BookingSortBy, createAdjustment, listBookings } from '@/api/bookings.api';
 import { buildBookingColumns } from './booking-columns';
 import { BookingFiltersPopover, BookingCustomFilters } from './booking-filters-popover';
+import { RecordPaymentDialog } from './record-payment-dialog';
 import { DataTableFacetedFilter } from '@/components/data-table/data-table-faceted-filter';
 import { DataTableViewOptions } from '@/components/data-table/data-table-view-options';
 import { DataTablePagination } from '@/components/data-table/data-table-pagination';
+import { useAuthStore } from '@/stores/authStore';
+import { canEditBookings } from '@/utils/permissions';
 
 const PAYMENT_STATUS_OPTIONS = [
   { label: 'Paid', value: 'paid' },
@@ -28,6 +32,9 @@ const emptyAdjustmentForm = {
   depDate: '',
   arrDate: '',
   amount: '',
+  paymentStatus: 'paid' as 'paid' | 'pending',
+  paymentType: 'card' as 'card' | 'check' | 'cash',
+  pendingAmount: '',
 };
 
 export interface BookingsTableScope {
@@ -55,6 +62,8 @@ export function BookingsTable({ scope, defaultPageSize = 25, queryKeyPrefix }: B
 
   const [adjustingPassengerId, setAdjustingPassengerId] = useState<string | null>(null);
   const [adjustmentForm, setAdjustmentForm] = useState(emptyAdjustmentForm);
+  const [recordPaymentRow, setRecordPaymentRow] = useState<BookingRow | null>(null);
+  const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -117,12 +126,24 @@ export function BookingsTable({ scope, defaultPageSize = 25, queryKeyPrefix }: B
         arrCity: adjustmentForm.arrCity || undefined,
         depDate: adjustmentForm.depDate || undefined,
         arrDate: adjustmentForm.arrDate || undefined,
-        payment: { status: 'paid', type: 'card' },
+        payment: {
+          status: adjustmentForm.paymentStatus,
+          type: adjustmentForm.paymentType,
+          amount: adjustmentForm.paymentStatus === 'pending' ? Number(adjustmentForm.pendingAmount) : 0,
+        },
       },
     });
   }
 
-  const columns = useMemo(() => buildBookingColumns({ onAdjust: setAdjustingPassengerId }), [setAdjustingPassengerId]);
+  const columns = useMemo(
+    () =>
+      buildBookingColumns({
+        onAdjust: setAdjustingPassengerId,
+        onRecordPayment: setRecordPaymentRow,
+        canEditPayment: canEditBookings(user),
+      }),
+    [setAdjustingPassengerId, user]
+  );
 
   const table = useReactTable({
     data: bookings,
@@ -253,6 +274,53 @@ export function BookingsTable({ scope, defaultPageSize = 25, queryKeyPrefix }: B
                             onChange={(e) => setAdjustmentForm({ ...adjustmentForm, amount: e.target.value })}
                             required
                           />
+                          <div className="flex items-center gap-6">
+                            <div className="flex items-center gap-2">
+                              <Label>Payment status</Label>
+                              <Select
+                                value={adjustmentForm.paymentStatus}
+                                onValueChange={(v) =>
+                                  setAdjustmentForm({ ...adjustmentForm, paymentStatus: v as 'paid' | 'pending' })
+                                }
+                              >
+                                <SelectTrigger aria-label="Adjustment payment status" className="w-32">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="paid">Paid</SelectItem>
+                                  <SelectItem value="pending">Pending</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Label>Payment type</Label>
+                              <Select
+                                value={adjustmentForm.paymentType}
+                                onValueChange={(v) =>
+                                  setAdjustmentForm({ ...adjustmentForm, paymentType: v as 'card' | 'check' | 'cash' })
+                                }
+                              >
+                                <SelectTrigger aria-label="Adjustment payment type" className="w-32">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="card">Card</SelectItem>
+                                  <SelectItem value="check">Check</SelectItem>
+                                  <SelectItem value="cash">Cash</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          {adjustmentForm.paymentStatus === 'pending' && (
+                            <Input
+                              aria-label="Adjustment amount owed"
+                              type="number"
+                              value={adjustmentForm.pendingAmount}
+                              onChange={(e) => setAdjustmentForm({ ...adjustmentForm, pendingAmount: e.target.value })}
+                              placeholder="Amount owed"
+                              required
+                            />
+                          )}
                           <Button type="submit" size="sm">
                             Save adjustment
                           </Button>
@@ -277,6 +345,8 @@ export function BookingsTable({ scope, defaultPageSize = 25, queryKeyPrefix }: B
         onPageChange={setPage}
         onPageSizeChange={setPageSize}
       />
+
+      <RecordPaymentDialog row={recordPaymentRow} onOpenChange={(open) => !open && setRecordPaymentRow(null)} queryKeyPrefix={queryKeyPrefix} />
     </>
   );
 }

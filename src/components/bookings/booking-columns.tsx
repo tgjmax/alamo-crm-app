@@ -5,7 +5,11 @@ import { BookingRow } from '@/api/bookings.api';
 import { formatDisplayDate } from '@/utils/dateFormat';
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header';
 
-function PaymentStatusBadge({ status }: { status?: 'paid' | 'pending' }) {
+function formatCurrency(n: number): string {
+  return `$${n.toFixed(2)}`;
+}
+
+function PaymentStatusBadge({ status, amount }: { status?: 'paid' | 'pending'; amount?: number }) {
   if (!status) return <span className="text-muted-foreground">—</span>;
   if (status === 'paid') {
     return (
@@ -15,17 +19,22 @@ function PaymentStatusBadge({ status }: { status?: 'paid' | 'pending' }) {
     );
   }
   return (
-    <Badge className="border-red-200 bg-red-100 text-red-800 hover:bg-red-100 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
-      Pending
-    </Badge>
+    <div className="flex flex-col items-center gap-0.5">
+      <Badge className="border-red-200 bg-red-100 text-red-800 hover:bg-red-100 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
+        Pending
+      </Badge>
+      {amount !== undefined && <span className="text-xs text-muted-foreground">{formatCurrency(amount)} due</span>}
+    </div>
   );
 }
 
 interface BuildBookingColumnsArgs {
   onAdjust: (passengerId: string) => void;
+  onRecordPayment: (row: BookingRow) => void;
+  canEditPayment: boolean;
 }
 
-export function buildBookingColumns({ onAdjust }: BuildBookingColumnsArgs): ColumnDef<BookingRow>[] {
+export function buildBookingColumns({ onAdjust, onRecordPayment, canEditPayment }: BuildBookingColumnsArgs): ColumnDef<BookingRow>[] {
   return [
     {
       id: 'date',
@@ -100,7 +109,7 @@ export function buildBookingColumns({ onAdjust }: BuildBookingColumnsArgs): Colu
       enableSorting: false,
       cell: ({ row }) => (
         <div className="flex justify-center">
-          <PaymentStatusBadge status={row.original.paymentStatus} />
+          <PaymentStatusBadge status={row.original.paymentStatus} amount={row.original.paymentAmount} />
         </div>
       ),
     },
@@ -118,15 +127,28 @@ export function buildBookingColumns({ onAdjust }: BuildBookingColumnsArgs): Colu
       enableSorting: false,
       enableHiding: false,
       cell: ({ row }) => (
-        <Button
-          type="button"
-          variant="link"
-          size="sm"
-          className="h-auto p-0 text-xs"
-          onClick={() => onAdjust(row.original.id)}
-        >
-          Reissue/Refund
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className="h-auto p-0 text-xs"
+            onClick={() => onAdjust(row.original.id)}
+          >
+            Reissue/Refund
+          </Button>
+          {canEditPayment && row.original.paymentStatus === 'pending' && (
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              className="h-auto p-0 text-xs"
+              onClick={() => onRecordPayment(row.original)}
+            >
+              Record payment
+            </Button>
+          )}
+        </div>
       ),
     },
   ];

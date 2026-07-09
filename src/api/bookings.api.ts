@@ -5,6 +5,7 @@ export interface PaymentInput {
   status: 'paid' | 'pending';
   type: 'card' | 'check' | 'cash';
   paidOn?: string;
+  amount: number;
 }
 
 export interface PassengerInput {
@@ -58,6 +59,14 @@ export interface BookingRow {
   depDate?: string;
   arrDate?: string;
   paymentStatus?: 'paid' | 'pending';
+  paymentAmount?: number;
+  paymentType?: 'card' | 'check' | 'cash';
+  paymentPaidOn?: string;
+  bookingType: 'New' | 'Reissue' | 'Refund';
+  /** The underlying Booking's id — present only on New rows (payment lives on the Booking,
+   * not the passenger, for those). Undefined on Reissue/Refund rows, which use `id` (their
+   * own passenger id) directly instead. */
+  bookingId?: string;
   remark?: string;
 }
 
@@ -118,6 +127,10 @@ export async function addPassenger(bookingId: string, input: PassengerInput): Pr
   return res.data;
 }
 
+export async function updateBookingPayment(bookingId: string, payment: PaymentInput): Promise<void> {
+  await apiClient.patch(`/bookings/${bookingId}/payment`, payment);
+}
+
 export interface AdjustmentInput {
   bookingType: 'Reissue' | 'Refund';
   bookingDate: string;
@@ -144,6 +157,10 @@ export async function createAdjustment(passengerId: string, input: AdjustmentInp
   return res.data;
 }
 
+export async function updatePassengerPayment(passengerId: string, payment: PaymentInput): Promise<void> {
+  await apiClient.patch(`/passengers/${passengerId}/payment`, payment);
+}
+
 export interface ImportBookingRow {
   bookingType: 'New' | 'Reissue' | 'Refund';
   bookingDate: string;
@@ -157,6 +174,7 @@ export interface ImportBookingRow {
   depDate?: string;
   arrDate?: string;
   remark?: string;
+  pendingAmount?: number;
 }
 
 export interface PaymentDefault {

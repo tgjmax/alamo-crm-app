@@ -27,6 +27,7 @@ const TARGET_FIELDS: TargetField[] = [
   { key: 'depDate', label: 'Dep Date' },
   { key: 'arrDate', label: 'Arr Date' },
   { key: 'remark', label: 'Remark' },
+  { key: 'pendingAmount', label: 'Pending Amount' },
 ];
 
 const BLANK_AMOUNT_VALUES = new Set(['', 'null', '--']);
@@ -70,6 +71,7 @@ function buildRows(headers: string[], rawRows: string[][], mapping: ColumnMappin
       depDate: get('depDate'),
       arrDate: get('arrDate'),
       remark: get('remark'),
+      pendingAmount: parseAmount(get('pendingAmount')),
     };
   });
 }

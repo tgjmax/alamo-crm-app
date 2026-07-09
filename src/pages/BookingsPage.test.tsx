@@ -1,10 +1,11 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi } from 'vitest';
 import BookingsPage from './BookingsPage';
 import * as bookingsApi from '../api/bookings.api';
 import * as customersApi from '../api/customers.api';
+import { useAuthStore } from '../stores/authStore';
 
 function renderWithClient(ui: React.ReactElement) {
   const client = new QueryClient();
@@ -25,6 +26,8 @@ const BASE_ROW: bookingsApi.BookingRow = {
   arrDate: '2026-05-28',
   remark: 'Handle with care',
   paymentStatus: 'paid',
+  bookingType: 'New',
+  bookingId: 'bk0',
 };
 
 describe('BookingsPage', () => {
@@ -47,6 +50,7 @@ describe('BookingsPage', () => {
     expect(screen.getByText('COK')).toBeInTheDocument();
     expect(screen.getByText('Paid')).toBeInTheDocument();
     expect(screen.getByText('Handle with care')).toBeInTheDocument();
+    expect(screen.queryByText(/due/)).not.toBeInTheDocument();
   });
 
   it('displays the booking, departure, and arrival dates as "DD Mon YYYY"', async () => {
@@ -188,6 +192,52 @@ describe('BookingsPage', () => {
     });
   });
 
+  it('requires and submits an Amount owed value when Payment status is Pending', async () => {
+    vi.spyOn(bookingsApi, 'createBooking').mockResolvedValue({
+      id: 'b4',
+      invoiceNumber: '0000202',
+      passengers: [{ id: 'p4', passengerName: 'PEND/PAX', amount: 500 }],
+    });
+    renderWithClient(<BookingsPage />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));
+    await userEvent.type(screen.getByLabelText('Invoice number'), '0000202');
+    await userEvent.type(screen.getByLabelText('Passenger name'), 'PEND/PAX');
+    await userEvent.type(screen.getByLabelText('Amount'), '500');
+    await userEvent.click(screen.getByRole('combobox', { name: 'Payment status' }));
+    await userEvent.click(await screen.findByRole('option', { name: 'Pending' }));
+    await userEvent.type(screen.getByLabelText('Amount owed'), '200');
+    await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));
+
+    await waitFor(() => {
+      expect(bookingsApi.createBooking).toHaveBeenCalled();
+      const [firstCallArgs] = vi.mocked(bookingsApi.createBooking).mock.calls[0];
+      expect(firstCallArgs.payment).toEqual({ status: 'pending', type: 'card', amount: 200 });
+    });
+  });
+
+  it('hides Amount owed and submits amount 0 when Payment status is Paid', async () => {
+    vi.spyOn(bookingsApi, 'createBooking').mockResolvedValue({
+      id: 'b5',
+      invoiceNumber: '0000203',
+      passengers: [{ id: 'p5', passengerName: 'PAID/PAX', amount: 500 }],
+    });
+    renderWithClient(<BookingsPage />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));
+    await userEvent.type(screen.getByLabelText('Invoice number'), '0000203');
+    await userEvent.type(screen.getByLabelText('Passenger name'), 'PAID/PAX');
+    await userEvent.type(screen.getByLabelText('Amount'), '500');
+    expect(screen.queryByLabelText('Amount owed')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));
+
+    await waitFor(() => {
+      expect(bookingsApi.createBooking).toHaveBeenCalled();
+      const [firstCallArgs] = vi.mocked(bookingsApi.createBooking).mock.calls[0];
+      expect(firstCallArgs.payment).toEqual({ status: 'paid', type: 'card', amount: 0 });
+    });
+  });
+
   it('creates a booking without a Departure city (historic data does not have it)', async () => {
     vi.spyOn(bookingsApi, 'createBooking').mockResolvedValue({
       id: 'b3',
@@ -224,6 +274,7 @@ describe('BookingsPage', () => {
           passengerName: 'JOSEPH/SHINY S',
           amount: 0,
           remark: 'VOID',
+          bookingType: 'New',
         },
       ],
       total: 1,
@@ -234,6 +285,18 @@ describe('BookingsPage', () => {
     expect(await screen.findByText('VOID-001')).toBeInTheDocument();
     expect(screen.getByText('VOID')).toBeInTheDocument();
     expect(screen.getByText('—')).toBeInTheDocument();
+  });
+
+  it('shows the outstanding amount under a Pending payment badge', async () => {
+    vi.spyOn(bookingsApi, 'listBookings').mockResolvedValue({
+      bookings: [{ ...BASE_ROW, id: 'p6', paymentStatus: 'pending', paymentAmount: 150, bookingType: 'New', bookingId: 'bk1' }],
+      total: 1,
+      page: 1,
+      pageSize: 25,
+    });
+    renderWithClient(<BookingsPage />);
+    expect(await screen.findByText('Pending')).toBeInTheDocument();
+    expect(screen.getByText('$150.00 due')).toBeInTheDocument();
   });
 
   it('creates a reissue adjustment for a passenger', async () => {
@@ -304,6 +367,49 @@ describe('BookingsPage', () => {
     });
   });
 
+  it('lets the adjustment form set Payment status to Pending and submits its Amount owed', async () => {
+    vi.spyOn(bookingsApi, 'createAdjustment').mockResolvedValue({
+      id: 'adj3', bookingType: 'Reissue', parentRef: 'p1', amount: 280,
+    });
+    renderWithClient(<BookingsPage />);
+
+    await screen.findByText('0000150');
+    await userEvent.click(screen.getByRole('button', { name: /Reissue\/Refund/ }));
+    await userEvent.type(screen.getByLabelText('Adjustment booking date'), '2026-09-14');
+    await userEvent.type(screen.getByLabelText('Adjustment PNR'), 'WXITNF');
+    await userEvent.type(screen.getByLabelText('Adjustment amount'), '280');
+    await userEvent.click(screen.getByRole('combobox', { name: 'Adjustment payment status' }));
+    await userEvent.click(await screen.findByRole('option', { name: 'Pending' }));
+    await userEvent.type(screen.getByLabelText('Adjustment amount owed'), '80');
+    await userEvent.click(screen.getByRole('button', { name: 'Save adjustment' }));
+
+    await waitFor(() => {
+      expect(bookingsApi.createAdjustment).toHaveBeenCalled();
+      const [, payload] = vi.mocked(bookingsApi.createAdjustment).mock.calls[0];
+      expect(payload.payment).toEqual({ status: 'pending', type: 'card', amount: 80 });
+    });
+  });
+
+  it('defaults the adjustment form to Paid with amount 0 when payment status is left unset', async () => {
+    vi.spyOn(bookingsApi, 'createAdjustment').mockResolvedValue({
+      id: 'adj4', bookingType: 'Refund', parentRef: 'p1', amount: 150,
+    });
+    renderWithClient(<BookingsPage />);
+
+    await screen.findByText('0000150');
+    await userEvent.click(screen.getByRole('button', { name: /Reissue\/Refund/ }));
+    await userEvent.type(screen.getByLabelText('Adjustment booking date'), '2026-09-14');
+    await userEvent.type(screen.getByLabelText('Adjustment PNR'), 'WXITNF');
+    await userEvent.type(screen.getByLabelText('Adjustment amount'), '150');
+    expect(screen.queryByLabelText('Adjustment amount owed')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Save adjustment' }));
+
+    await waitFor(() => {
+      const [, payload] = vi.mocked(bookingsApi.createAdjustment).mock.calls[0];
+      expect(payload.payment).toEqual({ status: 'paid', type: 'card', amount: 0 });
+    });
+  });
+
   it('toggles column visibility via the View dropdown', async () => {
     renderWithClient(<BookingsPage />);
     await screen.findByText('0000150');
@@ -339,5 +445,101 @@ describe('BookingsPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Export' }));
 
     expect(await screen.findByText('Export failed. Check your connection and try again.')).toBeInTheDocument();
+  });
+
+  it('does not show Record Payment without an authenticated bookings.edit user', async () => {
+    vi.spyOn(bookingsApi, 'listBookings').mockResolvedValue({
+      bookings: [{ ...BASE_ROW, id: 'p7', paymentStatus: 'pending', paymentAmount: 150, bookingType: 'New', bookingId: 'bk1' }],
+      total: 1, page: 1, pageSize: 25,
+    });
+    renderWithClient(<BookingsPage />);
+    await screen.findByText('0000150');
+    expect(screen.queryByRole('button', { name: 'Record payment' })).not.toBeInTheDocument();
+  });
+
+  describe('as an admin (bookings.edit)', () => {
+    beforeEach(() => {
+      useAuthStore.setState({
+        accessToken: 't',
+        user: { id: 'u1', name: 'Admin User', email: 'admin@alamo.test', role: 'admin' },
+      });
+    });
+
+    afterEach(() => {
+      // Unmount before resetting the store: BookingsTable subscribes to useAuthStore
+      // directly, so resetting the store while it's still mounted (RTL's automatic
+      // cleanup runs after this hook, since it's registered outside any describe)
+      // would otherwise update it outside of an act() wrapper.
+      cleanup();
+      useAuthStore.setState({ accessToken: null, user: null });
+    });
+
+    it('shows Record Payment only on pending rows, and routes a New row to the booking payment endpoint', async () => {
+      vi.spyOn(bookingsApi, 'listBookings').mockResolvedValue({
+        bookings: [{ ...BASE_ROW, id: 'p8', paymentStatus: 'pending', paymentAmount: 150, bookingType: 'New', bookingId: 'bk1' }],
+        total: 1, page: 1, pageSize: 25,
+      });
+      const updateSpy = vi.spyOn(bookingsApi, 'updateBookingPayment').mockResolvedValue(undefined);
+      renderWithClient(<BookingsPage />);
+
+      await screen.findByText('0000150');
+      await userEvent.click(screen.getByRole('button', { name: 'Record payment' }));
+      await userEvent.clear(screen.getByLabelText('Amount owed'));
+      await userEvent.type(screen.getByLabelText('Amount owed'), '50');
+      await userEvent.click(screen.getByRole('button', { name: 'Save payment' }));
+
+      await waitFor(() => {
+        expect(updateSpy).toHaveBeenCalledWith('bk1', { status: 'pending', type: 'card', amount: 50 });
+      });
+    });
+
+    it('routes a Reissue/Refund row to the passenger payment endpoint', async () => {
+      vi.spyOn(bookingsApi, 'listBookings').mockResolvedValue({
+        bookings: [{ ...BASE_ROW, id: 'p9', paymentStatus: 'pending', paymentAmount: 80, bookingType: 'Reissue', bookingId: undefined }],
+        total: 1, page: 1, pageSize: 25,
+      });
+      const updateSpy = vi.spyOn(bookingsApi, 'updatePassengerPayment').mockResolvedValue(undefined);
+      renderWithClient(<BookingsPage />);
+
+      await screen.findByText('0000150');
+      await userEvent.click(screen.getByRole('button', { name: 'Record payment' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Save payment' }));
+
+      await waitFor(() => {
+        expect(updateSpy).toHaveBeenCalledWith('p9', { status: 'pending', type: 'card', amount: 80 });
+      });
+    });
+
+    it('does not show Record Payment on a Paid row', async () => {
+      renderWithClient(<BookingsPage />);
+      await screen.findByText('0000150');
+      expect(screen.queryByRole('button', { name: 'Record payment' })).not.toBeInTheDocument();
+    });
+
+    it('pre-fills Payment type and Paid on from the row, and submits the edited values', async () => {
+      vi.spyOn(bookingsApi, 'listBookings').mockResolvedValue({
+        bookings: [{
+          ...BASE_ROW, id: 'p10', paymentStatus: 'pending', paymentAmount: 150,
+          paymentType: 'cash', paymentPaidOn: '2026-05-01', bookingType: 'New', bookingId: 'bk1',
+        }],
+        total: 1, page: 1, pageSize: 25,
+      });
+      const updateSpy = vi.spyOn(bookingsApi, 'updateBookingPayment').mockResolvedValue(undefined);
+      renderWithClient(<BookingsPage />);
+
+      await screen.findByText('0000150');
+      await userEvent.click(screen.getByRole('button', { name: 'Record payment' }));
+
+      expect(screen.getByRole('combobox', { name: 'Payment type' })).toHaveTextContent('Cash');
+      expect(screen.getByLabelText('Paid on')).toHaveValue('2026-05-01');
+
+      await userEvent.click(screen.getByRole('combobox', { name: 'Payment type' }));
+      await userEvent.click(await screen.findByRole('option', { name: 'Check' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Save payment' }));
+
+      await waitFor(() => {
+        expect(updateSpy).toHaveBeenCalledWith('bk1', { status: 'pending', type: 'check', amount: 150, paidOn: '2026-05-01' });
+      });
+    });
   });
 });
