@@ -21,7 +21,7 @@ export default function SalesPage() {
   return (
     <div className="mx-auto max-w-[1800px] space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-xl font-semibold">Sales</h2>
+        <h2 className="text-2xl font-bold tracking-tight">Sales</h2>
         <MonthToggle value={period} onChange={setPeriod} />
       </div>
 

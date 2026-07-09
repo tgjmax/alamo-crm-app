@@ -13,7 +13,7 @@ export default function BookingsPage() {
   return (
     <div className="mx-auto max-w-[1800px] space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-xl font-semibold">Bookings</h2>
+        <h2 className="text-2xl font-bold tracking-tight">Bookings</h2>
         <div className="flex gap-2">
           <Button type="button" variant="outline" size="sm" onClick={() => setShowExport(true)}>
             Export

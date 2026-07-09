@@ -92,7 +92,7 @@ export default function DashboardPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Dashboard</h2>
+        <h2 className="text-2xl font-bold tracking-tight">Dashboard</h2>
         <Button asChild variant="outline" size="sm">
           <Link to="/dashboard/widgets/new">New widget</Link>
         </Button>
