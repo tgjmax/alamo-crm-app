@@ -14,7 +14,9 @@ export function DataTableColumnHeader<TData, TValue>({
   className,
 }: DataTableColumnHeaderProps<TData, TValue>) {
   if (!column.getCanSort()) {
-    return <div className={cn('text-sm', className)}>{title}</div>;
+    // No hardcoded text size — inherits the table's (responsive) header size so sortable
+    // and non-sortable headers always match.
+    return <div className={cn(className)}>{title}</div>;
   }
 
   const sorted = column.getIsSorted();

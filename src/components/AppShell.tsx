@@ -169,11 +169,14 @@ export default function AppShell() {
         </SidebarFooter>
         <SidebarRail />
       </Sidebar>
-      <SidebarInset>
+      {/* min-w-0 lets the inset shrink below its content's min-content width on small screens
+          (MacBook-size viewports), so wide tables scroll inside their own overflow wrapper
+          instead of stretching the whole page and pushing the toolbar buttons off-screen. */}
+      <SidebarInset className="min-w-0">
         <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
         </header>
-        <div className="flex-1 p-4">
+        <div className="min-w-0 flex-1 p-4">
           <Outlet />
         </div>
       </SidebarInset>

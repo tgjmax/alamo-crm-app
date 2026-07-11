@@ -64,7 +64,7 @@ export function buildCustomerColumns({
     {
       id: 'dob',
       accessorKey: 'dob',
-      header: () => <span className="text-sm">Date of Birth</span>,
+      header: () => <span>Date of Birth</span>,
       meta: { label: 'Date of Birth' },
       enableSorting: false,
       cell: ({ getValue }) => {
@@ -75,7 +75,7 @@ export function buildCustomerColumns({
     {
       id: 'paxType',
       accessorKey: 'paxType',
-      header: () => <div className="text-center text-sm">PAX Type</div>,
+      header: () => <div className="text-center">PAX Type</div>,
       meta: { label: 'PAX Type' },
       enableSorting: false,
       cell: ({ getValue }) => <div className="text-center">{getValue<string>()}</div>,
@@ -83,7 +83,7 @@ export function buildCustomerColumns({
     {
       id: 'gender',
       accessorKey: 'gender',
-      header: () => <div className="text-center text-sm">Gender</div>,
+      header: () => <div className="text-center">Gender</div>,
       meta: { label: 'Gender' },
       enableSorting: false,
       cell: ({ row }) => {
@@ -116,7 +116,7 @@ export function buildCustomerColumns({
     {
       id: 'email',
       accessorFn: (c) => c.email ?? '',
-      header: () => <span className="text-sm">Email</span>,
+      header: () => <span>Email</span>,
       meta: { label: 'Email' },
       enableSorting: false,
       cell: ({ getValue }) => <CopyableText value={getValue<string>()} maxChars={30} />,
@@ -124,7 +124,7 @@ export function buildCustomerColumns({
     {
       id: 'phone',
       accessorKey: 'phone',
-      header: () => <span className="text-sm">Phone</span>,
+      header: () => <span>Phone</span>,
       meta: { label: 'Phone' },
       enableSorting: false,
       cell: ({ getValue }) => <CopyableText value={getValue<string>()} />,
@@ -132,22 +132,22 @@ export function buildCustomerColumns({
     {
       id: 'status',
       accessorFn: (c) => (c.verified ? 'verified' : 'unverified'),
-      header: () => <div className="text-center text-sm">Verified</div>,
+      header: () => <div className="text-center">Verified</div>,
       meta: { label: 'Verified' },
       enableSorting: false,
       cell: ({ row }) => (
         <div className="flex justify-center">
           {row.original.verified ? (
-            <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" aria-label="Verified" />
+            <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" aria-label="Verified" />
           ) : (
-            <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" aria-label="Not verified" />
+            <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" aria-label="Not verified" />
           )}
         </div>
       ),
     },
     {
       id: 'passport',
-      header: () => <div className="text-center text-sm">Passport</div>,
+      header: () => <div className="text-center">Passport</div>,
       meta: { label: 'Passport' },
       enableSorting: false,
       cell: ({ row }) => (

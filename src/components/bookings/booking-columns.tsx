@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { BookingRow } from '@/api/bookings.api';
 import { formatDisplayDate } from '@/utils/dateFormat';
+import { CopyableText } from '@/components/data-table/copyable-text';
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header';
 
 function formatCurrency(n: number): string {
@@ -29,83 +30,83 @@ function PaymentStatusBadge({ status, amount }: { status?: 'paid' | 'pending'; a
 }
 
 interface BuildBookingColumnsArgs {
-  onAdjust: (passengerId: string) => void;
   onRecordPayment: (row: BookingRow) => void;
   canEditPayment: boolean;
 }
 
-export function buildBookingColumns({ onAdjust, onRecordPayment, canEditPayment }: BuildBookingColumnsArgs): ColumnDef<BookingRow>[] {
+export function buildBookingColumns({ onRecordPayment, canEditPayment }: BuildBookingColumnsArgs): ColumnDef<BookingRow>[] {
   return [
     {
       id: 'date',
       accessorKey: 'bookingDate',
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
-      meta: { label: 'Date' },
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Booking Date" />,
+      meta: { label: 'Booking Date', widthClass: '2xl:w-32' },
       cell: ({ getValue }) => formatDisplayDate(getValue<string>()),
     },
     {
       id: 'invoiceNumber',
       accessorKey: 'invoiceNumber',
       header: ({ column }) => <DataTableColumnHeader column={column} title="Invoice#" />,
-      meta: { label: 'Invoice#' },
+      meta: { label: 'Invoice#', widthClass: '2xl:w-24' },
       cell: ({ getValue }) => <span className="font-medium">{getValue<string>()}</span>,
     },
     {
       id: 'passengerName',
       accessorKey: 'passengerName',
       header: ({ column }) => <DataTableColumnHeader column={column} title="Name of PAX" />,
-      meta: { label: 'Name of PAX' },
+      meta: { label: 'Name of PAX', widthClass: '2xl:w-56' },
+      cell: ({ getValue }) => <CopyableText value={getValue<string>()} maxChars={30} />,
     },
     {
       id: 'amount',
       accessorKey: 'amount',
       header: ({ column }) => <DataTableColumnHeader column={column} title="Amount" />,
-      meta: { label: 'Amount' },
+      meta: { label: 'Amount', widthClass: '2xl:w-24' },
       cell: ({ getValue }) => `$${getValue<number>()}`,
     },
     {
       id: 'pnr',
       accessorFn: (b) => b.pnr ?? '',
       header: ({ column }) => <DataTableColumnHeader column={column} title="PNR" />,
-      meta: { label: 'PNR' },
+      meta: { label: 'PNR', widthClass: '2xl:w-20' },
     },
     {
       id: 'airlineCode',
       accessorFn: (b) => b.airlineCode ?? '',
       header: ({ column }) => <DataTableColumnHeader column={column} title="Airlines" />,
-      meta: { label: 'Airlines' },
+      meta: { label: 'Airlines', widthClass: '2xl:w-16' },
     },
     {
       id: 'depCity',
       accessorFn: (b) => b.depCity ?? '',
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Departure City" />,
-      meta: { label: 'Departure City' },
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Dep City" />,
+      meta: { label: 'Departure City', widthClass: '2xl:w-20' },
     },
     {
       id: 'arrCity',
       accessorFn: (b) => b.arrCity ?? '',
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Arrival City" />,
-      meta: { label: 'Arrival City' },
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Arr City" />,
+      meta: { label: 'Arrival City', widthClass: '2xl:w-20' },
     },
     {
       id: 'depDate',
       accessorKey: 'depDate',
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Departure Date" />,
-      meta: { label: 'Departure Date' },
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Dep Date" />,
+      meta: { label: 'Departure Date', widthClass: '2xl:w-32' },
       cell: ({ getValue }) => formatDisplayDate(getValue<string | undefined>()),
     },
     {
       id: 'arrDate',
       accessorKey: 'arrDate',
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Arrival Date" />,
-      meta: { label: 'Arrival Date' },
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Arr Date" />,
+      meta: { label: 'Arrival Date', widthClass: '2xl:w-32' },
       cell: ({ getValue }) => formatDisplayDate(getValue<string | undefined>()),
     },
     {
       id: 'paymentStatus',
       accessorFn: (b) => b.paymentStatus ?? '',
-      header: () => <div className="text-center text-sm">Payment Status</div>,
-      meta: { label: 'Payment Status' },
+      header: () => <div className="text-center">Payment</div>,
+      meta: { label: 'Payment Status', widthClass: '2xl:w-28' },
       enableSorting: false,
       cell: ({ row }) => (
         <div className="flex justify-center">
@@ -116,10 +117,20 @@ export function buildBookingColumns({ onAdjust, onRecordPayment, canEditPayment 
     {
       id: 'remark',
       accessorFn: (b) => b.remark ?? '',
-      header: () => <span className="text-sm">Remark</span>,
+      header: () => <span>Remark</span>,
       meta: { label: 'Remark' },
       enableSorting: false,
-      cell: ({ getValue }) => <span className="text-muted-foreground">{getValue<string>()}</span>,
+      cell: ({ getValue }) => {
+        const remark = getValue<string>();
+        return (
+          <span
+            className="inline-block max-w-[18ch] overflow-hidden text-ellipsis whitespace-nowrap align-bottom text-muted-foreground"
+            title={remark || undefined}
+          >
+            {remark}
+          </span>
+        );
+      },
     },
     {
       id: 'actions',
@@ -128,15 +139,6 @@ export function buildBookingColumns({ onAdjust, onRecordPayment, canEditPayment 
       enableHiding: false,
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="link"
-            size="sm"
-            className="h-auto p-0 text-xs"
-            onClick={() => onAdjust(row.original.id)}
-          >
-            Reissue/Refund
-          </Button>
           {canEditPayment && row.original.paymentStatus === 'pending' && (
             <Button
               type="button"

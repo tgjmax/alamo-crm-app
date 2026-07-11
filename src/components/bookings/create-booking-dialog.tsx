@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { createBooking } from '@/api/bookings.api';
 import { searchCustomers } from '@/api/customers.api';
+import { AddEditCustomerDialog } from '@/components/customers/add-edit-customer-dialog';
+import { AdjustmentBookingForm } from './adjustment-booking-form';
 
 interface CreateBookingDialogProps {
   open: boolean;
@@ -35,12 +37,16 @@ const emptyForm = {
 export function CreateBookingDialog({ open, onOpenChange }: CreateBookingDialogProps) {
   const [form, setForm] = useState(emptyForm);
   const [nameQuery, setNameQuery] = useState('');
+  const [bookingKind, setBookingKind] = useState<'New' | 'Reissue' | 'Refund'>('New');
+  const [addCustomerOpen, setAddCustomerOpen] = useState(false);
   const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!open) return;
     setForm(emptyForm);
     setNameQuery('');
+    setBookingKind('New');
+    setAddCustomerOpen(false);
   }, [open]);
 
   const { data: matches = [] } = useQuery({
@@ -95,8 +101,24 @@ export function CreateBookingDialog({ open, onOpenChange }: CreateBookingDialogP
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create booking</DialogTitle>
+          <DialogTitle>
+            {bookingKind === 'New' ? 'Create booking' : bookingKind === 'Reissue' ? 'Record reissue' : 'Record refund'}
+          </DialogTitle>
         </DialogHeader>
+        <div className="flex items-center gap-2">
+          <Label>Booking type</Label>
+          <Select value={bookingKind} onValueChange={(v) => setBookingKind(v as 'New' | 'Reissue' | 'Refund')}>
+            <SelectTrigger aria-label="Booking type" className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="New">New</SelectItem>
+              <SelectItem value="Reissue">Reissue</SelectItem>
+              <SelectItem value="Refund">Refund</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {bookingKind === 'New' ? (
         <form onSubmit={handleSubmit} className="space-y-3">
           <Input
             aria-label="Invoice number"
@@ -169,7 +191,7 @@ export function CreateBookingDialog({ open, onOpenChange }: CreateBookingDialogP
               placeholder="Type at least 3 letters to search existing customers"
               required
             />
-            {matches.length > 0 && (
+            {nameQuery.trim().length >= 3 && (
               <ul className="mt-1 rounded-md border bg-popover text-popover-foreground shadow">
                 {matches.map((m) => (
                   <li
@@ -180,6 +202,17 @@ export function CreateBookingDialog({ open, onOpenChange }: CreateBookingDialogP
                     {m.firstName} {m.lastName}
                   </li>
                 ))}
+                <li>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => setAddCustomerOpen(true)}
+                  >
+                    + Add new customer
+                  </Button>
+                </li>
               </ul>
             )}
           </div>
@@ -258,6 +291,22 @@ export function CreateBookingDialog({ open, onOpenChange }: CreateBookingDialogP
             </Button>
           </DialogFooter>
         </form>
+        ) : (
+          <AdjustmentBookingForm
+            key={bookingKind}
+            bookingType={bookingKind}
+            onDone={() => onOpenChange(false)}
+            onCancel={() => onOpenChange(false)}
+          />
+        )}
+        <AddEditCustomerDialog
+          open={addCustomerOpen}
+          onOpenChange={setAddCustomerOpen}
+          onCreated={(fullName) => {
+            setForm((f) => ({ ...f, passengerName: fullName }));
+            setNameQuery('');
+          }}
+        />
       </DialogContent>
     </Dialog>
   );

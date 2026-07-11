@@ -21,6 +21,8 @@ interface AddEditCustomerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   customer?: CustomerListItem | null;
+  /** Called with the new customer's full name after a successful create (never on edit). */
+  onCreated?: (fullName: string) => void;
 }
 
 const emptyForm = {
@@ -37,7 +39,7 @@ const emptyForm = {
   passportExpiryDate: '',
 };
 
-export function AddEditCustomerDialog({ open, onOpenChange, customer }: AddEditCustomerDialogProps) {
+export function AddEditCustomerDialog({ open, onOpenChange, customer, onCreated }: AddEditCustomerDialogProps) {
   const [form, setForm] = useState(emptyForm);
   const [passportFile, setPassportFile] = useState<File | null>(null);
   const [hasExistingPhoto, setHasExistingPhoto] = useState(false);
@@ -105,6 +107,7 @@ export function AddEditCustomerDialog({ open, onOpenChange, customer }: AddEditC
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers', 'list'] });
       queryClient.invalidateQueries({ queryKey: ['customers', 'search'] });
+      if (!isEdit) onCreated?.(`${form.firstName} ${form.lastName}`);
       onOpenChange(false);
     },
   });

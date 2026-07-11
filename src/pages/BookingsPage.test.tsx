@@ -40,17 +40,27 @@ describe('BookingsPage', () => {
     });
   });
 
-  it('lists bookings with the requested columns', async () => {
+  it('lists bookings with the requested columns, with Departure City hidden by default', async () => {
     renderWithClient(<BookingsPage />);
     expect(await screen.findByText('0000150')).toBeInTheDocument();
     expect(screen.getByText(/JOSEPH\/SHINY S/)).toBeInTheDocument();
     expect(screen.getByText('GUDBFX')).toBeInTheDocument();
     expect(screen.getByText('QR')).toBeInTheDocument();
-    expect(screen.getByText('DXB')).toBeInTheDocument();
+    expect(screen.queryByText('DXB')).not.toBeInTheDocument();
     expect(screen.getByText('COK')).toBeInTheDocument();
     expect(screen.getByText('Paid')).toBeInTheDocument();
     expect(screen.getByText('Handle with care')).toBeInTheDocument();
     expect(screen.queryByText(/due/)).not.toBeInTheDocument();
+  });
+
+  it('can re-show the hidden Departure City column via the View dropdown', async () => {
+    renderWithClient(<BookingsPage />);
+    await screen.findByText('0000150');
+
+    await userEvent.click(screen.getByRole('button', { name: 'View' }));
+    await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Departure City' }));
+
+    expect(await screen.findByText('DXB')).toBeInTheDocument();
   });
 
   it('displays the booking, departure, and arrival dates as "DD Mon YYYY"', async () => {
@@ -154,6 +164,41 @@ describe('BookingsPage', () => {
     await userEvent.type(screen.getByLabelText('Passenger name'), 'Var');
     await userEvent.click(await screen.findByText('Alexander Varghese'));
     expect(screen.getByLabelText('Passenger name')).toHaveValue('Alexander Varghese');
+  });
+
+  it('offers "+ Add new customer" in the passenger autocomplete once 3+ letters are typed', async () => {
+    vi.spyOn(customersApi, 'searchCustomers').mockResolvedValue([]);
+    renderWithClient(<BookingsPage />);
+    await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));
+    await userEvent.type(screen.getByLabelText('Passenger name'), 'Zed');
+
+    expect(await screen.findByRole('button', { name: '+ Add new customer' })).toBeInTheDocument();
+  });
+
+  it('creates a customer inline and fills the passenger name, preserving typed booking fields', async () => {
+    vi.spyOn(customersApi, 'searchCustomers').mockResolvedValue([]);
+    vi.spyOn(customersApi, 'createCustomer').mockResolvedValue({ id: 'c9' });
+    renderWithClient(<BookingsPage />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));
+    await userEvent.type(screen.getByLabelText('Invoice number'), '0000300');
+    await userEvent.type(screen.getByLabelText('Passenger name'), 'Zed');
+    await userEvent.click(await screen.findByRole('button', { name: '+ Add new customer' }));
+
+    // The nested customer dialog is open
+    expect(await screen.findByText('Add customer')).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('First name'), 'Zed');
+    await userEvent.type(screen.getByLabelText('Last name'), 'Newman');
+    await userEvent.type(screen.getByLabelText('Date of birth'), '1990-01-01');
+    await userEvent.type(screen.getByLabelText('Phone'), '555-0199');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      expect(customersApi.createCustomer).toHaveBeenCalled();
+      expect(screen.getByLabelText('Passenger name')).toHaveValue('Zed Newman');
+    });
+    // Booking dialog context preserved
+    expect(screen.getByLabelText('Invoice number')).toHaveValue('0000300');
   });
 
   it('creates a booking on form submit', async () => {
@@ -318,6 +363,36 @@ describe('BookingsPage', () => {
     expect(screen.getByLabelText('Payment status')).toBeInTheDocument();
   });
 
+  it('defaults the Create Booking dialog to a New booking with the standard form', async () => {
+    renderWithClient(<BookingsPage />);
+    await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));
+
+    expect(screen.getByRole('combobox', { name: 'Booking type' })).toHaveTextContent('New');
+    expect(screen.getByLabelText('Invoice number')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Original PNR')).not.toBeInTheDocument();
+  });
+
+  it('switches to the adjustment form when Booking type is Reissue', async () => {
+    renderWithClient(<BookingsPage />);
+    await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));
+    await userEvent.click(screen.getByRole('combobox', { name: 'Booking type' }));
+    await userEvent.click(await screen.findByRole('option', { name: 'Reissue' }));
+
+    expect(screen.getByLabelText('Original PNR')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Invoice number')).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: 'Mark as voided' })).not.toBeInTheDocument();
+  });
+
+  it('switches to the adjustment form when Booking type is Refund', async () => {
+    renderWithClient(<BookingsPage />);
+    await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));
+    await userEvent.click(screen.getByRole('combobox', { name: 'Booking type' }));
+    await userEvent.click(await screen.findByRole('option', { name: 'Refund' }));
+
+    expect(screen.getByLabelText('Original PNR')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Invoice number')).not.toBeInTheDocument();
+  });
+
   it('shows a dash for Payment Status on a voided booking with no payment on file', async () => {
     vi.spyOn(bookingsApi, 'listBookings').mockResolvedValue({
       bookings: [
@@ -353,115 +428,10 @@ describe('BookingsPage', () => {
     expect(screen.getByText('$150.00 due')).toBeInTheDocument();
   });
 
-  it('creates a reissue adjustment for a passenger', async () => {
-    vi.spyOn(bookingsApi, 'createAdjustment').mockResolvedValue({
-      id: 'adj1',
-      bookingType: 'Reissue',
-      parentRef: 'p1',
-      amount: 280,
-    });
+  it('no longer offers a Reissue/Refund action on table rows', async () => {
     renderWithClient(<BookingsPage />);
-
     await screen.findByText('0000150');
-    await userEvent.click(screen.getByRole('button', { name: /Reissue\/Refund/ }));
-    await userEvent.type(screen.getByLabelText('Adjustment booking date'), '2026-09-14');
-    await userEvent.type(screen.getByLabelText('Adjustment PNR'), 'WXITNF');
-    await userEvent.type(screen.getByLabelText('Adjustment airline code'), 'AF');
-    await userEvent.type(screen.getByLabelText('Adjustment departure city'), 'DXB');
-    await userEvent.type(screen.getByLabelText('Adjustment arrival city'), 'IAH');
-    await userEvent.type(screen.getByLabelText('Adjustment departure date'), '2026-09-15');
-    await userEvent.type(screen.getByLabelText('Adjustment arrival date'), '2026-09-16');
-    await userEvent.type(screen.getByLabelText('Adjustment amount'), '280');
-    await userEvent.click(screen.getByRole('button', { name: 'Save adjustment' }));
-
-    await waitFor(() => {
-      expect(bookingsApi.createAdjustment).toHaveBeenCalled();
-      const [passengerId, payload] = vi.mocked(bookingsApi.createAdjustment).mock.calls[0];
-      expect(passengerId).toBe('p1');
-      expect(payload).toEqual(
-        expect.objectContaining({
-          bookingType: 'Reissue', bookingDate: '2026-09-14', amount: 280, pnr: 'WXITNF', airlineCode: 'AF', depCity: 'DXB',
-        })
-      );
-    });
-  });
-
-  it('creates a refund adjustment for a passenger', async () => {
-    vi.spyOn(bookingsApi, 'createAdjustment').mockResolvedValue({
-      id: 'adj2',
-      bookingType: 'Refund',
-      parentRef: 'p1',
-      amount: 150,
-    });
-    renderWithClient(<BookingsPage />);
-
-    await screen.findByText('0000150');
-    await userEvent.click(screen.getByRole('button', { name: /Reissue\/Refund/ }));
-    await userEvent.click(screen.getByRole('combobox', { name: 'Adjustment type' }));
-    await userEvent.click(await screen.findByRole('option', { name: 'Refund' }));
-    await userEvent.type(screen.getByLabelText('Adjustment booking date'), '2026-09-14');
-    await userEvent.type(screen.getByLabelText('Adjustment PNR'), 'WXITNF');
-    await userEvent.type(screen.getByLabelText('Adjustment airline code'), 'AF');
-    await userEvent.type(screen.getByLabelText('Adjustment departure city'), 'DXB');
-    await userEvent.type(screen.getByLabelText('Adjustment arrival city'), 'IAH');
-    await userEvent.type(screen.getByLabelText('Adjustment departure date'), '2026-09-15');
-    await userEvent.type(screen.getByLabelText('Adjustment arrival date'), '2026-09-16');
-    await userEvent.type(screen.getByLabelText('Adjustment amount'), '150');
-    await userEvent.click(screen.getByRole('button', { name: 'Save adjustment' }));
-
-    await waitFor(() => {
-      expect(bookingsApi.createAdjustment).toHaveBeenCalled();
-      const [passengerId, payload] = vi.mocked(bookingsApi.createAdjustment).mock.calls[0];
-      expect(passengerId).toBe('p1');
-      expect(payload).toEqual(
-        expect.objectContaining({
-          bookingType: 'Refund', bookingDate: '2026-09-14', amount: 150, pnr: 'WXITNF', airlineCode: 'AF', depCity: 'DXB',
-        })
-      );
-    });
-  });
-
-  it('lets the adjustment form set Payment status to Pending and submits its Amount owed', async () => {
-    vi.spyOn(bookingsApi, 'createAdjustment').mockResolvedValue({
-      id: 'adj3', bookingType: 'Reissue', parentRef: 'p1', amount: 280,
-    });
-    renderWithClient(<BookingsPage />);
-
-    await screen.findByText('0000150');
-    await userEvent.click(screen.getByRole('button', { name: /Reissue\/Refund/ }));
-    await userEvent.type(screen.getByLabelText('Adjustment booking date'), '2026-09-14');
-    await userEvent.type(screen.getByLabelText('Adjustment PNR'), 'WXITNF');
-    await userEvent.type(screen.getByLabelText('Adjustment amount'), '280');
-    await userEvent.click(screen.getByRole('combobox', { name: 'Adjustment payment status' }));
-    await userEvent.click(await screen.findByRole('option', { name: 'Pending' }));
-    await userEvent.type(screen.getByLabelText('Adjustment amount owed'), '80');
-    await userEvent.click(screen.getByRole('button', { name: 'Save adjustment' }));
-
-    await waitFor(() => {
-      expect(bookingsApi.createAdjustment).toHaveBeenCalled();
-      const [, payload] = vi.mocked(bookingsApi.createAdjustment).mock.calls[0];
-      expect(payload.payment).toEqual({ status: 'pending', type: 'card', amount: 80 });
-    });
-  });
-
-  it('defaults the adjustment form to Paid with amount 0 when payment status is left unset', async () => {
-    vi.spyOn(bookingsApi, 'createAdjustment').mockResolvedValue({
-      id: 'adj4', bookingType: 'Refund', parentRef: 'p1', amount: 150,
-    });
-    renderWithClient(<BookingsPage />);
-
-    await screen.findByText('0000150');
-    await userEvent.click(screen.getByRole('button', { name: /Reissue\/Refund/ }));
-    await userEvent.type(screen.getByLabelText('Adjustment booking date'), '2026-09-14');
-    await userEvent.type(screen.getByLabelText('Adjustment PNR'), 'WXITNF');
-    await userEvent.type(screen.getByLabelText('Adjustment amount'), '150');
-    expect(screen.queryByLabelText('Adjustment amount owed')).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Save adjustment' }));
-
-    await waitFor(() => {
-      const [, payload] = vi.mocked(bookingsApi.createAdjustment).mock.calls[0];
-      expect(payload.payment).toEqual({ status: 'paid', type: 'card', amount: 0 });
-    });
+    expect(screen.queryByRole('button', { name: /Reissue\/Refund/ })).not.toBeInTheDocument();
   });
 
   it('toggles column visibility via the View dropdown', async () => {

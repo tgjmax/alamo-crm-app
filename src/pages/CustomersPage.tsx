@@ -17,6 +17,7 @@ import { DeleteCustomersDialog } from '@/components/customers/delete-customers-d
 import { ImportCustomersDialog } from '@/components/customers/import-customers-dialog';
 import { ExportCustomersDialog } from '@/components/customers/export-customers-dialog';
 import { ViewPassportDialog } from '@/components/customers/view-passport-dialog';
+import { COMPACT_CELL_CLASS, COMPACT_HEAD_CLASS } from '@/components/data-table/table-density';
 import { DataTableFacetedFilter } from '@/components/data-table/data-table-faceted-filter';
 import { DataTableViewOptions } from '@/components/data-table/data-table-view-options';
 import { DataTablePagination } from '@/components/data-table/data-table-pagination';
@@ -181,7 +182,7 @@ export default function CustomersPage() {
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="whitespace-nowrap">
+                  <TableHead key={header.id} className={cn('whitespace-nowrap', COMPACT_HEAD_CLASS)}>
                     {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                   </TableHead>
                 ))}
@@ -203,7 +204,7 @@ export default function CustomersPage() {
                   className={cn('hover:!bg-muted', row.index % 2 === 1 && 'bg-muted/60')}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="whitespace-nowrap">
+                    <TableCell key={cell.id} className={cn('whitespace-nowrap', COMPACT_CELL_CLASS)}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
