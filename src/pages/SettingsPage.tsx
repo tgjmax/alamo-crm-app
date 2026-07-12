@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuthStore } from '@/stores/authStore';
 import { canEditOrganization } from '@/utils/permissions';
 import { getBranding } from '@/api/organization.api';
+import { BRANDING_QUERY_KEY } from '@/hooks/useBranding';
 import { ProfileTab } from '@/components/settings/profile-tab';
 import { OrganizationTab } from '@/components/settings/organization-tab';
 
@@ -10,7 +11,7 @@ export default function SettingsPage() {
   const user = useAuthStore((s) => s.user);
   const showOrganization = canEditOrganization(user);
   const { data: branding } = useQuery({
-    queryKey: ['organization', 'branding'],
+    queryKey: BRANDING_QUERY_KEY,
     queryFn: getBranding,
     enabled: showOrganization,
   });

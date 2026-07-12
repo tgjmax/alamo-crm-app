@@ -10,6 +10,8 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import CustomersPage from './pages/CustomersPage';
 import BookingsPage from './pages/BookingsPage';
+import EnquiriesPage from './pages/EnquiriesPage';
+import EnquiryDetailPage from './pages/EnquiryDetailPage';
 import GroupsPage from './pages/GroupsPage';
 import GroupEditorPage from './pages/GroupEditorPage';
 import WidgetEditorPage from './pages/WidgetEditorPage';
@@ -92,6 +94,18 @@ const salesRoute = createRoute({
   component: SalesPage,
 });
 
+const enquiriesRoute = createRoute({
+  getParentRoute: () => authedRoute,
+  path: '/enquiries',
+  component: EnquiriesPage,
+});
+
+const enquiryDetailRoute = createRoute({
+  getParentRoute: () => authedRoute,
+  path: '/enquiries/$enquiryId',
+  component: EnquiryDetailPage,
+});
+
 const groupsRoute = createRoute({
   getParentRoute: () => authedRoute,
   path: '/groups',
@@ -119,7 +133,7 @@ const settingsRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   loginRoute,
   indexRoute,
-  authedRoute.addChildren([dashboardRoute, widgetNewRoute, widgetEditRoute, customersRoute, bookingsRoute, salesRoute, groupsRoute, groupNewRoute, groupEditRoute, settingsRoute]),
+  authedRoute.addChildren([dashboardRoute, widgetNewRoute, widgetEditRoute, customersRoute, bookingsRoute, salesRoute, enquiriesRoute, enquiryDetailRoute, groupsRoute, groupNewRoute, groupEditRoute, settingsRoute]),
 ]);
 
 export function createAppRouter(history?: RouterHistory) {

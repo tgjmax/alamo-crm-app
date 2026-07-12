@@ -13,7 +13,7 @@ import {
   SidebarRail,
   SidebarTrigger,
 } from '@/components/ui/sidebar';
-import { LayoutDashboard, Users, BookOpen, TrendingUp, Filter, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, BookOpen, TrendingUp, Filter, Settings, LogOut, MessageSquareText } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -84,24 +84,36 @@ export default function AppShell() {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
-                  isActive={isActive('/customers')}
-                  className="h-10 text-base font-medium [&>svg]:size-5 data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground data-[active=true]:hover:bg-sidebar-primary data-[active=true]:hover:text-sidebar-primary-foreground"
-                >
-                  <Link to="/customers">
-                    <Users />
-                    <span>Customers</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
                   isActive={isActive('/bookings')}
                   className="h-10 text-base font-medium [&>svg]:size-5 data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground data-[active=true]:hover:bg-sidebar-primary data-[active=true]:hover:text-sidebar-primary-foreground"
                 >
                   <Link to="/bookings">
                     <BookOpen />
                     <span>Bookings</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive('/enquiries')}
+                  className="h-10 text-base font-medium [&>svg]:size-5 data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground data-[active=true]:hover:bg-sidebar-primary data-[active=true]:hover:text-sidebar-primary-foreground"
+                >
+                  <Link to="/enquiries">
+                    <MessageSquareText />
+                    <span>Enquiries</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive('/customers')}
+                  className="h-10 text-base font-medium [&>svg]:size-5 data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground data-[active=true]:hover:bg-sidebar-primary data-[active=true]:hover:text-sidebar-primary-foreground"
+                >
+                  <Link to="/customers">
+                    <Users />
+                    <span>Customers</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

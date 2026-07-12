@@ -172,7 +172,7 @@ describe('SettingsPage', () => {
   });
 
   it('shows the Organization tab for an admin', async () => {
-    vi.spyOn(organizationApi, 'getBranding').mockResolvedValue({ name: 'Alamo Travels', tagline: 'Internal CRM', logoUrl: null });
+    vi.spyOn(organizationApi, 'getBranding').mockResolvedValue({ name: 'Alamo Travels', tagline: 'Internal CRM', logoUrl: null, invoiceTerms: null });
     useAuthStore.setState({ accessToken: 't', user: ADMIN_USER });
     renderWithClient(<SettingsPage />);
     expect(await screen.findByRole('tab', { name: 'Organization' })).toBeInTheDocument();
@@ -186,7 +186,7 @@ describe('SettingsPage', () => {
   });
 
   it('saves organization branding, uploading a new logo when one is chosen', async () => {
-    vi.spyOn(organizationApi, 'getBranding').mockResolvedValue({ name: 'Alamo Travels', tagline: 'Internal CRM', logoUrl: null });
+    vi.spyOn(organizationApi, 'getBranding').mockResolvedValue({ name: 'Alamo Travels', tagline: 'Internal CRM', logoUrl: null, invoiceTerms: null });
     const upload = vi.spyOn(organizationApi, 'uploadLogoFile').mockResolvedValue('branding/new-logo.png');
     const update = vi.spyOn(organizationApi, 'updateBranding').mockResolvedValue({ name: 'New Co', tagline: 'New Tag', logoS3Key: 'branding/new-logo.png' });
     useAuthStore.setState({ accessToken: 't', user: ADMIN_USER });
@@ -204,7 +204,42 @@ describe('SettingsPage', () => {
 
     await waitFor(() => {
       expect(upload).toHaveBeenCalledWith(file);
-      expect(update).toHaveBeenCalledWith({ name: 'New Co', tagline: 'Internal CRM', logoS3Key: 'branding/new-logo.png' });
+      expect(update).toHaveBeenCalledWith({
+        name: 'New Co',
+        tagline: 'Internal CRM',
+        invoiceTerms: '',
+        logoS3Key: 'branding/new-logo.png',
+      });
+    });
+  });
+
+  it('loads and saves the organization invoice terms', async () => {
+    vi.spyOn(organizationApi, 'getBranding').mockResolvedValue({
+      name: 'Alamo Travels',
+      tagline: 'Internal CRM',
+      logoUrl: null,
+      invoiceTerms: 'Old terms.',
+    });
+    const update = vi.spyOn(organizationApi, 'updateBranding').mockResolvedValue({
+      name: 'Alamo Travels',
+      tagline: 'Internal CRM',
+      logoS3Key: null,
+    });
+    useAuthStore.setState({ accessToken: 't', user: ADMIN_USER });
+    renderWithClient(<SettingsPage />);
+
+    await userEvent.click(await screen.findByRole('tab', { name: 'Organization' }));
+    const terms = await screen.findByLabelText('Invoice terms & conditions');
+    expect(terms).toHaveValue('Old terms.');
+
+    await userEvent.clear(terms);
+    await userEvent.type(terms, 'All sales are final.');
+    await userEvent.click(screen.getByRole('button', { name: 'Save organization' }));
+
+    await waitFor(() => {
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({ invoiceTerms: 'All sales are final.' })
+      );
     });
   });
 });

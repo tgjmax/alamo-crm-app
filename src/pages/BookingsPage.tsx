@@ -5,12 +5,14 @@ import { CreateBookingDialog } from '@/components/bookings/create-booking-dialog
 import { ImportBookingsDialog } from '@/components/bookings/import-bookings-dialog';
 import { ExportBookingsDialog } from '@/components/bookings/export-bookings-dialog';
 import { VoidedInvoicesDialog } from '@/components/bookings/voided-invoices-dialog';
+import { SendInvoiceDialog } from '@/components/bookings/send-invoice-dialog';
 
 export default function BookingsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showVoided, setShowVoided] = useState(false);
+  const [showSendInvoice, setShowSendInvoice] = useState(false);
 
   return (
     <div className="mx-auto max-w-[1800px] space-y-4">
@@ -19,6 +21,9 @@ export default function BookingsPage() {
         <div className="flex gap-2">
           <Button type="button" variant="outline" size="sm" onClick={() => setShowVoided(true)}>
             Voided Invoices
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => setShowSendInvoice(true)}>
+            Send Invoice
           </Button>
           <Button type="button" variant="outline" size="sm" onClick={() => setShowExport(true)}>
             Export
@@ -38,6 +43,7 @@ export default function BookingsPage() {
       <ImportBookingsDialog open={showImport} onOpenChange={setShowImport} />
       <ExportBookingsDialog open={showExport} onOpenChange={setShowExport} />
       <VoidedInvoicesDialog open={showVoided} onOpenChange={setShowVoided} />
+      <SendInvoiceDialog open={showSendInvoice} onOpenChange={setShowSendInvoice} />
     </div>
   );
 }

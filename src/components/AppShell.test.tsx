@@ -27,7 +27,7 @@ describe('AppShell', () => {
   beforeEach(() => {
     useAuthStore.setState({ accessToken: null, user: null, sessionRestoreAttempted: false });
     vi.spyOn(authApi, 'refreshRequest').mockRejectedValue(new Error('no session'));
-    vi.spyOn(organizationApi, 'getBranding').mockResolvedValue({ name: 'Alamo Travels', tagline: 'Internal CRM', logoUrl: null });
+    vi.spyOn(organizationApi, 'getBranding').mockResolvedValue({ name: 'Alamo Travels', tagline: 'Internal CRM', logoUrl: null, invoiceTerms: null });
   });
 
   it('shows sidebar links and the signed-in user', async () => {

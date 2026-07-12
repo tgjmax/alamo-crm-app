@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Branding, updateBranding, uploadLogoFile } from '@/api/organization.api';
+import { BRANDING_QUERY_KEY } from '@/hooks/useBranding';
 
 interface OrganizationTabProps {
   branding: Branding;
@@ -14,6 +16,7 @@ export function OrganizationTab({ branding }: OrganizationTabProps) {
   const queryClient = useQueryClient();
   const [name, setName] = useState(branding.name);
   const [tagline, setTagline] = useState(branding.tagline);
+  const [invoiceTerms, setInvoiceTerms] = useState(branding.invoiceTerms ?? '');
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(branding.logoUrl);
   const [error, setError] = useState<string | null>(null);
@@ -36,8 +39,8 @@ export function OrganizationTab({ branding }: OrganizationTabProps) {
       if (logoFile) {
         logoS3Key = await uploadLogoFile(logoFile);
       }
-      await updateBranding({ name, tagline, ...(logoS3Key ? { logoS3Key } : {}) });
-      await queryClient.invalidateQueries({ queryKey: ['organization', 'branding'] });
+      await updateBranding({ name, tagline, invoiceTerms, ...(logoS3Key ? { logoS3Key } : {}) });
+      await queryClient.invalidateQueries({ queryKey: BRANDING_QUERY_KEY });
       setSuccess(true);
     } catch {
       setError('Could not save organization branding. Please try again.');
@@ -64,7 +67,18 @@ export function OrganizationTab({ branding }: OrganizationTabProps) {
           <div className="space-y-2">
             <Label htmlFor="org-logo">Logo</Label>
             {previewUrl && <img src={previewUrl} alt="Logo preview" className="h-16 w-16 rounded object-cover" />}
-            <Input id="org-logo" type="file" accept="image/*" onChange={handleFileChange} />
+            {/* PNG/JPEG only — the invoice PDF generator (pdfkit) can't embed other image formats. */}
+            <Input id="org-logo" type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" onChange={handleFileChange} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="org-invoice-terms">Invoice terms & conditions</Label>
+            <Textarea
+              id="org-invoice-terms"
+              value={invoiceTerms}
+              onChange={(e) => setInvoiceTerms(e.target.value)}
+              rows={4}
+              placeholder="Shown at the bottom of emailed invoices"
+            />
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           {success && <p className="text-sm text-muted-foreground">Organization branding saved.</p>}

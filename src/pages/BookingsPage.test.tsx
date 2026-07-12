@@ -5,6 +5,8 @@ import { vi } from 'vitest';
 import BookingsPage from './BookingsPage';
 import * as bookingsApi from '../api/bookings.api';
 import * as customersApi from '../api/customers.api';
+import * as flightDataApi from '../api/flightData.api';
+import * as organizationApi from '../api/organization.api';
 import { useAuthStore } from '../stores/authStore';
 
 function renderWithClient(ui: React.ReactElement) {
@@ -38,6 +40,10 @@ describe('BookingsPage', () => {
       page: 1,
       pageSize: 25,
     });
+    // The airport/airline autocomplete fields fire server searches while typing city/airline
+    // values in Create Booking tests — stub them to keep those tests offline.
+    vi.spyOn(flightDataApi, 'searchAirports').mockResolvedValue([]);
+    vi.spyOn(flightDataApi, 'searchAirlines').mockResolvedValue([]);
   });
 
   it('lists bookings with the requested columns, with Departure City hidden by default', async () => {
@@ -215,8 +221,8 @@ describe('BookingsPage', () => {
     await userEvent.type(screen.getByLabelText('Airline code'), 'QR');
     await userEvent.type(screen.getByLabelText('Departure city'), 'DXB');
     await userEvent.type(screen.getByLabelText('Arrival city'), 'COK');
-    await userEvent.type(screen.getByLabelText('Departure date'), '2026-06-01');
-    await userEvent.type(screen.getByLabelText('Arrival date'), '2026-06-10');
+    await userEvent.type(screen.getByLabelText('Departure Date'), '2026-06-01');
+    await userEvent.type(screen.getByLabelText('Arrival Date'), '2026-06-10');
     await userEvent.type(screen.getByLabelText('Passenger name'), 'NEW/PAX');
     await userEvent.type(screen.getByLabelText('Amount'), '500');
     await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));
@@ -235,6 +241,73 @@ describe('BookingsPage', () => {
         })
       );
     });
+  });
+
+  it('suggests airlines/airports while typing and stores the picked code', async () => {
+    vi.spyOn(flightDataApi, 'searchAirlines').mockResolvedValue([{ code: 'QR', label: 'Qatar Airways' }]);
+    vi.spyOn(flightDataApi, 'searchAirports').mockResolvedValue([
+      { code: 'ORD', label: "Chicago O'Hare International Airport", sublabel: 'Chicago, United States' },
+    ]);
+    renderWithClient(<BookingsPage />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));
+    await userEvent.type(screen.getByLabelText('Airline code'), 'Qatar');
+    await userEvent.click(await screen.findByText('Qatar Airways (QR)'));
+    expect(screen.getByLabelText('Airline code')).toHaveValue('QR');
+
+    await userEvent.type(screen.getByLabelText('Departure city'), 'Chicago');
+    expect(await screen.findByText('Chicago, United States')).toBeInTheDocument();
+    await userEvent.click(screen.getByText("Chicago O'Hare International Airport (ORD)"));
+    expect(screen.getByLabelText('Departure city')).toHaveValue('ORD');
+  });
+
+  it('creates a booking with multiple passengers, each with its own amount', async () => {
+    vi.spyOn(bookingsApi, 'createBooking').mockResolvedValue({
+      id: 'b7',
+      invoiceNumber: '0000210',
+      passengers: [
+        { id: 'p11', passengerName: 'JOSEPH/SHINY S', amount: 2400 },
+        { id: 'p12', passengerName: 'JOSEPH/ANTON', amount: 1800 },
+      ],
+    });
+    renderWithClient(<BookingsPage />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));
+    await userEvent.type(screen.getByLabelText('Invoice number'), '0000210');
+    await userEvent.type(screen.getByLabelText('PNR'), 'GUDBFX');
+    await userEvent.type(screen.getByLabelText('Airline code'), 'QR');
+    await userEvent.type(screen.getByLabelText('Passenger name'), 'JOSEPH/SHINY S');
+    await userEvent.type(screen.getByLabelText('Amount'), '2400');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add passenger' }));
+    await userEvent.type(screen.getByLabelText('Passenger name 2'), 'JOSEPH/ANTON');
+    await userEvent.type(screen.getByLabelText('Amount 2'), '1800');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));
+
+    await waitFor(() => {
+      const [firstCallArgs] = vi.mocked(bookingsApi.createBooking).mock.calls[0];
+      expect(firstCallArgs.passengers).toEqual([
+        { passengerName: 'JOSEPH/SHINY S', amount: 2400 },
+        { passengerName: 'JOSEPH/ANTON', amount: 1800 },
+      ]);
+    });
+  });
+
+  it('removes an added passenger row before submit', async () => {
+    vi.spyOn(bookingsApi, 'createBooking').mockResolvedValue({
+      id: 'b8',
+      invoiceNumber: '0000211',
+      passengers: [{ id: 'p13', passengerName: 'SOLO/PAX', amount: 100 }],
+    });
+    renderWithClient(<BookingsPage />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));
+    expect(screen.getByRole('button', { name: 'Remove passenger 1' })).toBeDisabled();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add passenger' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Remove passenger 2' }));
+    expect(screen.queryByLabelText('Passenger name 2')).not.toBeInTheDocument();
   });
 
   it('requires and submits an Amount owed value when Payment status is Pending', async () => {
@@ -300,8 +373,8 @@ describe('BookingsPage', () => {
     await userEvent.type(screen.getByLabelText('PNR'), 'ABC123');
     await userEvent.type(screen.getByLabelText('Airline code'), 'QR');
     await userEvent.type(screen.getByLabelText('Arrival city'), 'COK');
-    await userEvent.type(screen.getByLabelText('Departure date'), '2026-06-01');
-    await userEvent.type(screen.getByLabelText('Arrival date'), '2026-06-10');
+    await userEvent.type(screen.getByLabelText('Departure Date'), '2026-06-01');
+    await userEvent.type(screen.getByLabelText('Arrival Date'), '2026-06-10');
     await userEvent.type(screen.getByLabelText('Passenger name'), 'NEW/PAX');
     await userEvent.type(screen.getByLabelText('Amount'), '500');
     await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));
@@ -328,13 +401,14 @@ describe('BookingsPage', () => {
     expect(screen.queryByLabelText('Airline code')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Departure city')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Arrival city')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Departure date')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Arrival date')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Departure Date')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Arrival Date')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Payment status')).not.toBeInTheDocument();
+    // The Passengers section is hidden too — a placeholder VOID passenger is submitted instead.
+    expect(screen.queryByLabelText('Passenger name')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Amount')).not.toBeInTheDocument();
 
     await userEvent.type(screen.getByLabelText('Invoice number'), 'VOID-UI-1');
-    await userEvent.type(screen.getByLabelText('Passenger name'), 'VOID/PAX');
-    await userEvent.type(screen.getByLabelText('Amount'), '0');
     await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));
 
     await waitFor(() => {
@@ -351,6 +425,7 @@ describe('BookingsPage', () => {
           depDate: undefined,
           arrDate: undefined,
           payment: undefined,
+          passengers: [{ passengerName: 'VOID', amount: 0 }],
         })
       );
     });
@@ -472,6 +547,20 @@ describe('BookingsPage', () => {
     expect(await screen.findByText('VOID-100')).toBeInTheDocument();
     expect(screen.getByText('Duplicate print')).toBeInTheDocument();
     expect(vi.mocked(bookingsApi.listBookings)).toHaveBeenCalledWith(expect.objectContaining({ voided: true }));
+  });
+
+  it('opens the Send Invoice dialog from the toolbar', async () => {
+    vi.spyOn(organizationApi, 'getBranding').mockResolvedValue({
+      name: 'Alamo Travels',
+      tagline: 'Internal CRM',
+      logoUrl: null,
+      invoiceTerms: null,
+    });
+    renderWithClient(<BookingsPage />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Send Invoice' }));
+
+    expect(await screen.findByLabelText('To email')).toBeInTheDocument();
   });
 
   it('exports bookings via the Export dialog', async () => {
