@@ -8,7 +8,12 @@ import { GroupCondition, GroupFieldMeta } from '../api/groups.api';
 const FIELDS: GroupFieldMeta[] = [
   { key: 'airlineCode', label: 'Airline', type: 'string', operators: ['equals', 'contains', 'in'] },
   { key: 'amount', label: 'Amount', type: 'number', operators: ['equals', 'greaterThan', 'lessThan', 'between'] },
-  { key: 'date', label: 'Booking date', type: 'date', operators: ['equals', 'greaterThan', 'lessThan', 'between'] },
+  {
+    key: 'date',
+    label: 'Booking date',
+    type: 'date',
+    operators: ['equals', 'greaterThan', 'lessThan', 'between', 'inLastDays', 'thisMonth', 'thisYear'],
+  },
   { key: 'paymentType', label: 'Payment type', type: 'enum', enumValues: ['card', 'check', 'cash'], operators: ['equals', 'in'] },
   { key: 'customerVerified', label: 'Customer verified', type: 'boolean', operators: ['equals'] },
 ];
@@ -43,6 +48,40 @@ async function pick(name: string, option: string) {
   await userEvent.click(await screen.findByRole('option', { name: option }));
 }
 
+describe('ConditionBuilder relative-date operators', () => {
+  it('emits no value for "this year" — the range is implied, so there is nothing to type', async () => {
+    const onChange = setup([{ field: 'date', operator: 'equals', value: '2026-05-04' }]);
+
+    await pick('Condition 1 operator', 'this year');
+
+    expect(onChange).toHaveBeenCalledWith([{ field: 'date', operator: 'thisYear', value: undefined }]);
+    expect(screen.queryByLabelText('Condition 1 value')).not.toBeInTheDocument();
+  });
+
+  it('offers a day-count input for "in the last (days)", defaulting to 30', async () => {
+    const onChange = setup([{ field: 'date', operator: 'equals', value: '2026-05-04' }]);
+
+    await pick('Condition 1 operator', 'in the last (days)');
+
+    expect(onChange).toHaveBeenLastCalledWith([{ field: 'date', operator: 'inLastDays', value: 30 }]);
+    const input = screen.getByLabelText('Condition 1 value');
+    expect(input).toHaveValue(30);
+
+    await userEvent.clear(input);
+    await userEvent.type(input, '7');
+    expect(onChange).toHaveBeenLastCalledWith([{ field: 'date', operator: 'inLastDays', value: 7 }]);
+  });
+
+  it('labels operators in plain English rather than raw camelCase keys', async () => {
+    setup([{ field: 'date', operator: 'equals', value: '2026-05-04' }]);
+
+    await userEvent.click(screen.getByRole('combobox', { name: 'Condition 1 operator' }));
+
+    expect(await screen.findByRole('option', { name: 'this month' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'thisMonth' })).not.toBeInTheDocument();
+  });
+});
+
 describe('ConditionBuilder', () => {
   it('adds a default condition (first field, first operator, empty value)', async () => {
     const onChange = setup();
@@ -54,7 +93,8 @@ describe('ConditionBuilder', () => {
     const onChange = setup([{ field: 'airlineCode', operator: 'equals', value: '' }]);
     await userEvent.click(screen.getByRole('combobox', { name: 'Condition 1 operator' }));
     const options = await screen.findAllByRole('option');
-    expect(options.map((o) => o.textContent)).toEqual(['equals', 'contains', 'in']);
+    // Displayed as human labels ('in' reads as 'is one of'), though the emitted keys are unchanged.
+    expect(options.map((o) => o.textContent)).toEqual(['equals', 'contains', 'is one of']);
     await userEvent.click(options[0]);
 
     await userEvent.type(screen.getByRole('textbox', { name: 'Condition 1 value' }), 'Q');

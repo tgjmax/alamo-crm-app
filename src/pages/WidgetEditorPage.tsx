@@ -25,6 +25,29 @@ import { useAuthStore } from '../stores/authStore';
 
 type SourceMode = 'group' | 'conditions';
 type Fn = 'count' | 'sum' | 'avg';
+type MetricField = 'amount' | 'paymentAmount';
+
+/** The metric is one control, not a function picker plus a field picker — `count` takes no field,
+ * so the two-control version can represent "count of amount owed", which is meaningless. */
+type Metric = 'count' | `${'sum' | 'avg'}:${MetricField}`;
+
+const METRIC_OPTIONS: { value: Metric; label: string }[] = [
+  { value: 'count', label: 'Count' },
+  { value: 'sum:amount', label: 'Sum of amount' },
+  { value: 'avg:amount', label: 'Average of amount' },
+  { value: 'sum:paymentAmount', label: 'Sum of amount owed' },
+  { value: 'avg:paymentAmount', label: 'Average of amount owed' },
+];
+
+function toAggregation(metric: Metric): { fn: Fn; field?: MetricField } {
+  if (metric === 'count') return { fn: 'count' };
+  const [fn, field] = metric.split(':') as ['sum' | 'avg', MetricField];
+  return { fn, field };
+}
+
+function toMetric(fn: Fn, field?: MetricField): Metric {
+  return fn === 'count' ? 'count' : (`${fn}:${field ?? 'amount'}` as Metric);
+}
 type Display = 'table' | 'chart';
 const NONE = '__none__';
 
@@ -38,7 +61,7 @@ export default function WidgetEditorPage() {
   const [sourceMode, setSourceMode] = useState<SourceMode>('group');
   const [groupId, setGroupId] = useState('');
   const [conditions, setConditions] = useState<GroupCondition[]>([]);
-  const [fn, setFn] = useState<Fn>('count');
+  const [metric, setMetric] = useState<Metric>('count');
   const [groupBy, setGroupBy] = useState<string>(NONE);
   const [display, setDisplay] = useState<Display>('table');
   const [chartType, setChartType] = useState<ChartType>('bar');
@@ -69,7 +92,7 @@ export default function WidgetEditorPage() {
       setSourceMode('conditions');
       setConditions(existing.conditions ?? []);
     }
-    setFn(existing.aggregation.fn);
+    setMetric(toMetric(existing.aggregation.fn, existing.aggregation.field));
     setGroupBy(existing.aggregation.groupBy ?? NONE);
     if (existing.vizType === 'chart') {
       setDisplay('chart');
@@ -89,7 +112,7 @@ export default function WidgetEditorPage() {
       name,
       ...(sourceMode === 'group' ? { group: groupId } : { conditions }),
       vizType,
-      aggregation: { fn, field: fn === 'count' ? undefined : 'amount', groupBy: hasGroupBy ? groupBy : undefined },
+      aggregation: { ...toAggregation(metric), groupBy: hasGroupBy ? groupBy : undefined },
       chartType: vizType === 'chart' ? chartType : undefined,
       sharedWith: { mode: canShare ? shareMode : 'private', users: canShare && shareMode === 'shared' ? shareUsers : [] },
     };
@@ -99,7 +122,7 @@ export default function WidgetEditorPage() {
     return {
       ...(sourceMode === 'group' ? { group: groupId } : { conditions }),
       vizType,
-      aggregation: { fn, field: fn === 'count' ? undefined : 'amount', groupBy: hasGroupBy ? groupBy : undefined },
+      aggregation: { ...toAggregation(metric), groupBy: hasGroupBy ? groupBy : undefined },
       chartType: vizType === 'chart' ? chartType : undefined,
     };
   }
@@ -191,14 +214,16 @@ export default function WidgetEditorPage() {
 
           <div className="flex flex-wrap items-center gap-2">
             <Label>Metric</Label>
-            <Select value={fn} onValueChange={(v) => setFn(v as Fn)}>
-              <SelectTrigger aria-label="Metric" className="w-48">
+            <Select value={metric} onValueChange={(v) => setMetric(v as Metric)}>
+              <SelectTrigger aria-label="Metric" className="w-56">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="count">Count</SelectItem>
-                <SelectItem value="sum">Sum of amount</SelectItem>
-                <SelectItem value="avg">Average of amount</SelectItem>
+                {METRIC_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 

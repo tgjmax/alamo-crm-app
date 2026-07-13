@@ -1,8 +1,19 @@
 import { apiClient } from './client';
 
-export type ConditionOperator = 'equals' | 'contains' | 'in' | 'between' | 'greaterThan' | 'lessThan';
+export type ConditionOperator =
+  | 'equals'
+  | 'contains'
+  | 'in'
+  | 'between'
+  | 'greaterThan'
+  | 'lessThan'
+  // Relative-date operators. The backend resolves their range against "now" on every evaluation,
+  // so a saved "this year" widget rolls over on 1 January instead of going stale.
+  | 'inLastDays'
+  | 'thisMonth'
+  | 'thisYear';
 export type FieldType = 'string' | 'number' | 'date' | 'enum' | 'boolean' | 'user';
-export type ConditionValue = string | number | boolean | string[] | number[];
+export type ConditionValue = string | number | boolean | string[] | number[] | undefined;
 
 export interface GroupFieldMeta {
   key: string;
@@ -15,7 +26,8 @@ export interface GroupFieldMeta {
 export interface GroupCondition {
   field: string;
   operator: ConditionOperator;
-  value: ConditionValue;
+  /** Absent for the valueless relative-date operators (thisMonth, thisYear). */
+  value?: ConditionValue;
 }
 
 export interface GroupSharing {

@@ -27,7 +27,25 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** Relative-date operators whose range is entirely implied — they take no value input at all. */
+const VALUELESS_OPERATORS: ConditionOperator[] = ['thisMonth', 'thisYear'];
+
+/** Operator labels. Without these the relative ones would render as raw camelCase keys. */
+const OPERATOR_LABELS: Record<ConditionOperator, string> = {
+  equals: 'equals',
+  contains: 'contains',
+  in: 'is one of',
+  between: 'between',
+  greaterThan: 'after',
+  lessThan: 'before',
+  inLastDays: 'in the last (days)',
+  thisMonth: 'this month',
+  thisYear: 'this year',
+};
+
 function defaultValue(field: GroupFieldMeta, operator: ConditionOperator): ConditionValue {
+  if (VALUELESS_OPERATORS.includes(operator)) return undefined;
+  if (operator === 'inLastDays') return 30;
   if (operator === 'in') return [];
   if (operator === 'between') return field.type === 'number' ? [0, 0] : [todayIso(), todayIso()];
   switch (field.type) {
@@ -83,6 +101,23 @@ export default function ConditionBuilder({ fields, users, conditions, onChange }
     const field = fields.find((f) => f.key === condition.field);
     if (!field) return null;
     const label = `Condition ${index + 1} value`;
+
+    // "this month" / "this year" imply their own range — there is nothing to type.
+    if (VALUELESS_OPERATORS.includes(condition.operator)) return null;
+
+    if (condition.operator === 'inLastDays') {
+      return (
+        <Input
+          aria-label={label}
+          type="number"
+          min={1}
+          step={1}
+          value={String(condition.value ?? '')}
+          onChange={(e) => setValue(index, Number(e.target.value) as ConditionValue)}
+          className="w-24"
+        />
+      );
+    }
 
     if (condition.operator === 'between') {
       const pair = condition.value as (string | number)[];
@@ -250,13 +285,13 @@ export default function ConditionBuilder({ fields, users, conditions, onChange }
               value={condition.operator}
               onValueChange={(v) => handleOperatorChange(index, v as ConditionOperator)}
             >
-              <SelectTrigger aria-label={`Condition ${index + 1} operator`} className="w-36">
+              <SelectTrigger aria-label={`Condition ${index + 1} operator`} className="w-44">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {(field?.operators ?? []).map((op) => (
                   <SelectItem key={op} value={op}>
-                    {op}
+                    {OPERATOR_LABELS[op] ?? op}
                   </SelectItem>
                 ))}
               </SelectContent>

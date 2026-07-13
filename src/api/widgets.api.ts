@@ -6,7 +6,7 @@ export type ChartType = 'bar' | 'line' | 'pie';
 
 export interface WidgetAggregation {
   fn: 'count' | 'sum' | 'avg';
-  field?: 'amount';
+  field?: 'amount' | 'paymentAmount';
   groupBy?: string;
 }
 
