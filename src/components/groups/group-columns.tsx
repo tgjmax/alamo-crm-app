@@ -4,6 +4,9 @@ import { formatDisplayDate } from '@/utils/dateFormat';
 import { CopyableText } from '@/components/data-table/copyable-text';
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header';
 import { PaymentStatusBadge } from '@/components/data-table/payment-status-badge';
+import { RemarkCell } from '@/components/data-table/remark-cell';
+import { REMARK_WIDTH_CLASS } from '@/components/data-table/table-density';
+import { formatCurrency } from '@/utils/currency';
 
 /** Mirrors buildBookingColumns() in ../bookings/booking-columns.tsx, minus the row-actions column
  * (the group page is a read-only browser of a saved segment). Keep the two in step. */
@@ -40,7 +43,7 @@ export function buildGroupColumns(): ColumnDef<GroupResultRow>[] {
       accessorKey: 'amount',
       header: ({ column }) => <DataTableColumnHeader column={column} title="Amount" />,
       meta: { label: 'Amount', widthClass: '2xl:w-24' },
-      cell: ({ getValue }) => `$${getValue<number>()}`,
+      cell: ({ getValue }) => formatCurrency(getValue<number>()),
     },
     {
       id: 'pnr',
@@ -96,19 +99,9 @@ export function buildGroupColumns(): ColumnDef<GroupResultRow>[] {
       id: 'remark',
       accessorFn: (r) => r.remark ?? '',
       header: () => <span>Remark</span>,
-      meta: { label: 'Remark' },
+      meta: { label: 'Remark', widthClass: REMARK_WIDTH_CLASS },
       enableSorting: false,
-      cell: ({ getValue }) => {
-        const remark = getValue<string>();
-        return (
-          <span
-            className="inline-block max-w-[18ch] overflow-hidden text-ellipsis whitespace-nowrap align-bottom text-muted-foreground"
-            title={remark || undefined}
-          >
-            {remark}
-          </span>
-        );
-      },
+      cell: ({ getValue }) => <RemarkCell remark={getValue<string>()} />,
     },
   ];
 }

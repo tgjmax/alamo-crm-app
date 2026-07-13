@@ -4,6 +4,9 @@ import { formatDisplayDate } from '@/utils/dateFormat';
 import { CopyableText } from '@/components/data-table/copyable-text';
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header';
 import { PaymentStatusBadge } from '@/components/data-table/payment-status-badge';
+import { RemarkCell } from '@/components/data-table/remark-cell';
+import { REMARK_WIDTH_CLASS } from '@/components/data-table/table-density';
+import { formatCurrency } from '@/utils/currency';
 import { BookingRowActions } from './booking-row-actions';
 
 interface BuildBookingColumnsArgs {
@@ -50,7 +53,7 @@ export function buildBookingColumns({
       accessorKey: 'amount',
       header: ({ column }) => <DataTableColumnHeader column={column} title="Amount" />,
       meta: { label: 'Amount', widthClass: '2xl:w-24' },
-      cell: ({ getValue }) => `$${getValue<number>()}`,
+      cell: ({ getValue }) => formatCurrency(getValue<number>()),
     },
     {
       id: 'pnr',
@@ -106,19 +109,9 @@ export function buildBookingColumns({
       id: 'remark',
       accessorFn: (b) => b.remark ?? '',
       header: () => <span>Remark</span>,
-      meta: { label: 'Remark' },
+      meta: { label: 'Remark', widthClass: REMARK_WIDTH_CLASS },
       enableSorting: false,
-      cell: ({ getValue }) => {
-        const remark = getValue<string>();
-        return (
-          <span
-            className="inline-block max-w-[18ch] overflow-hidden text-ellipsis whitespace-nowrap align-bottom text-muted-foreground"
-            title={remark || undefined}
-          >
-            {remark}
-          </span>
-        );
-      },
+      cell: ({ getValue }) => <RemarkCell remark={getValue<string>()} />,
     },
     {
       id: 'actions',

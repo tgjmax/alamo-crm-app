@@ -16,3 +16,15 @@ export const COMPACT_CELL_CLASS = 'p-1.5 text-xs 2xl:p-2 2xl:text-sm';
 export function columnWidthClass<TData>(column: Column<TData, unknown>): string | undefined {
   return (column.columnDef.meta as { widthClass?: string } | undefined)?.widthClass;
 }
+
+/** The Remark column's width class — pairs with <RemarkCell> (./remark-cell.tsx).
+ *
+ * `w-full` + `max-w-0` is the standard trick for "take every pixel the fixed columns above don't
+ * want, then let the child truncate at whatever that turns out to be". Without it the cell sizes to
+ * its content and the table leaves dead space to the right on a wide screen. Both classes are
+ * needed: `w-full` claims the slack, `max-w-0` stops the text from setting a minimum width (which
+ * would push the table into a horizontal scroll instead of truncating).
+ *
+ * 2xl-gated like every other width class here — below 2xl the columns hug their content, and
+ * RemarkCell's own 18ch cap keeps a long remark from blowing the table out. */
+export const REMARK_WIDTH_CLASS = '2xl:w-full 2xl:max-w-0';

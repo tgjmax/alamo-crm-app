@@ -527,6 +527,18 @@ describe('BookingsPage', () => {
     expect(await screen.findByLabelText('Booking import file')).toBeInTheDocument();
   });
 
+  it('pads a whole-number amount to two decimals', async () => {
+    vi.spyOn(bookingsApi, 'listBookings').mockResolvedValue({
+      bookings: [{ ...BASE_ROW, amount: 1234 }],
+      total: 1,
+      page: 1,
+      pageSize: 25,
+    });
+    renderWithClient(<BookingsPage />);
+
+    expect(await screen.findByText('$1234.00')).toBeInTheDocument();
+  });
+
   it('opens the Voided Invoices dialog and lists only voided invoices', async () => {
     vi.spyOn(bookingsApi, 'listBookings').mockImplementation((params = {}) => {
       if (params.voided) {

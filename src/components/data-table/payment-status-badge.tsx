@@ -1,8 +1,5 @@
 import { Badge } from '@/components/ui/badge';
-
-function formatCurrency(n: number): string {
-  return `$${n.toFixed(2)}`;
-}
+import { formatCurrency } from '@/utils/currency';
 
 /** Shared by the Bookings ledger and the Groups results table, so the two cannot drift.
  * `amount` is the row's outstanding balance and renders as a caption under a Pending badge. */

@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatCurrency } from '@/utils/currency';
 
 /** Shape this component needs — matches (and is structurally satisfied by) the backend's SalesSummary. */
 export interface SalesSummaryLike {
@@ -12,10 +13,6 @@ export interface SalesSummaryLike {
   avgBookingValue: number;
   pendingCount: number;
   pendingAmount: number;
-}
-
-function formatCurrency(n: number): string {
-  return `$${n.toFixed(2)}`;
 }
 
 function formatPct(pct: number | null): string {
