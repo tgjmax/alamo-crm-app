@@ -233,6 +233,23 @@ describe('BookingImportWizard', () => {
     });
   });
 
+  it('reports a flagged_duplicate row instead of silently dropping it, in the dry-run preview', async () => {
+    vi.spyOn(bookingsApi, 'importBookings').mockResolvedValueOnce([
+      { index: 0, status: 'flagged_duplicate', reason: 'John Smith is already on invoice 000005' },
+      { index: 1, status: 'would_import' },
+    ]);
+    render(<BookingImportWizard onClose={() => {}} />);
+
+    await userEvent.upload(screen.getByLabelText('Booking import file'), buildTestFile());
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Map Booking Date' })).toBeInTheDocument());
+    await mapAllColumns();
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
+
+    expect(await screen.findByText(/already on invoice 000005/i)).toBeInTheDocument();
+    expect(screen.getByText('Already imported')).toBeInTheDocument();
+    expect(await screen.findByText(/1 of 2 row\(s\) ready to import\./)).toBeInTheDocument();
+  });
+
   it('shows an error and re-enables Preview when the import request fails', async () => {
     vi.spyOn(bookingsApi, 'importBookings').mockRejectedValueOnce(new Error('network down'));
     render(<BookingImportWizard onClose={() => {}} />);

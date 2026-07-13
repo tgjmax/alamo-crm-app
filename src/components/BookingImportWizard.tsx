@@ -34,6 +34,14 @@ const TARGET_FIELDS: TargetField[] = [
 const BLANK_AMOUNT_VALUES = new Set(['', 'null', '--']);
 const TRUTHY_VOIDED_VALUES = new Set(['true', 'yes', 'y', '1', 't']);
 
+const ISSUE_STATUS_LABELS: Partial<Record<ImportBookingResult['status'], string>> = {
+  flagged_duplicate: 'Already imported',
+};
+
+function issueStatusLabel(status: ImportBookingResult['status']): string {
+  return ISSUE_STATUS_LABELS[status] ?? status;
+}
+
 function parseAmount(raw: string | undefined): number {
   const trimmed = (raw ?? '').trim();
   if (BLANK_AMOUNT_VALUES.has(trimmed.toLowerCase())) return 0;
@@ -139,7 +147,12 @@ export default function BookingImportWizard({ onClose }: BookingImportWizardProp
     }
   }
 
-  const issueRows = report.filter((r) => r.status === 'needs_manual_linking' || r.status === 'failed');
+  // flagged_duplicate belongs with the issues: the row was NOT imported (the passenger is already
+  // on that invoice), and a user re-running a spreadsheet must be able to see that is why nothing
+  // landed — a report that showed neither an import nor a problem would be a lie.
+  const issueRows = report.filter(
+    (r) => r.status === 'needs_manual_linking' || r.status === 'failed' || r.status === 'flagged_duplicate'
+  );
   const okRows = report.filter((r) => r.status === 'imported' || r.status === 'would_import');
 
   return (
@@ -220,7 +233,7 @@ export default function BookingImportWizard({ onClose }: BookingImportWizardProp
               {issueRows.map((r) => (
                 <TableRow key={r.index}>
                   <TableCell>{r.index + 1}</TableCell>
-                  <TableCell>{r.status}</TableCell>
+                  <TableCell>{issueStatusLabel(r.status)}</TableCell>
                   <TableCell>{r.reason ?? ''}</TableCell>
                 </TableRow>
               ))}

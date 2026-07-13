@@ -286,16 +286,20 @@ describe('EditBookingDialog', () => {
   });
 
   // FIX 4: this dialog used to render "Save failed. Check your connection and try again." for
-  // EVERY backend failure, even a semantic one the user can actually fix (a retyped invoice
-  // number that collides with another invoice). The user would be told to check their
-  // connection and retry forever instead of just picking a different invoice number.
-  it('surfaces the backend INVOICE_NUMBER_IN_USE message instead of a generic connection error', async () => {
+  // EVERY backend failure, even a semantic one the user can actually fix. The user would be told
+  // to check their connection and retry forever instead of being told the real problem.
+  // (Re-fixtured 2026-07-13 on HAS_ADJUSTMENTS: the backend deleted INVOICE_NUMBER_IN_USE the same
+  // day `invoiceNumber` stopped being unique — a repeated invoice number is now a dismissible 409
+  // DUPLICATE_BOOKING_WARNING with its own dedicated UI panel, not a generic error line. This test
+  // genuinely exercises errorMessage()'s generic extraction for any OTHER 409, so it is re-pointed
+  // at a code the API can still actually return rather than deleted.)
+  it('surfaces the backend HAS_ADJUSTMENTS message instead of a generic connection error', async () => {
     const user = userEvent.setup();
     vi.mocked(bookingsApi.updateBooking).mockRejectedValue({
       isAxiosError: true,
       response: {
         status: 409,
-        data: { error: { code: 'INVOICE_NUMBER_IN_USE', message: 'Invoice number 99999 is already in use.' } },
+        data: { error: { code: 'HAS_ADJUSTMENTS', message: 'Cannot delete: 1 reissue recorded against this booking — delete those first.' } },
       },
     } as unknown as AxiosError);
     renderDialog();
@@ -303,7 +307,9 @@ describe('EditBookingDialog', () => {
     await screen.findByDisplayValue('10432');
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
 
-    expect(await screen.findByText('Invoice number 99999 is already in use.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Cannot delete: 1 reissue recorded against this booking — delete those first.')
+    ).toBeInTheDocument();
     expect(screen.queryByText(/check your connection/i)).not.toBeInTheDocument();
   });
 });

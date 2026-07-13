@@ -14,6 +14,8 @@ interface DateFieldProps {
   value: string;
   onChange: (iso: string) => void;
   id?: string;
+  /** Blocks submit when empty, via the hidden native input's own validation. */
+  required?: boolean;
 }
 
 function toIso(date: Date): string {
@@ -26,7 +28,7 @@ function toIso(date: Date): string {
 /** A date input that DISPLAYS 'DD-MMM-YYYY' (native `<input type="date">` display format is
  * locale-controlled and can't be changed) — a popover calendar for sighted users, backed by a
  * visually-hidden native date input that keeps the accessible name, form value, and tests. */
-export function DateField({ ariaLabel, value, onChange, id }: DateFieldProps) {
+export function DateField({ ariaLabel, value, onChange, id, required }: DateFieldProps) {
   const [open, setOpen] = useState(false);
   const selected = value ? new Date(`${value}T00:00:00`) : undefined;
 
@@ -38,6 +40,7 @@ export function DateField({ ariaLabel, value, onChange, id }: DateFieldProps) {
         aria-label={ariaLabel}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        required={required}
         className="absolute h-px w-px opacity-0"
         tabIndex={-1}
       />

@@ -8,14 +8,15 @@ import { DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { BookingDetail, createBooking, updateBooking, UpdateBookingInput, UpdatePassengerInput } from '@/api/bookings.api';
+import { BookingDetail, createBooking, DuplicateInvoice, updateBooking, UpdateBookingInput, UpdatePassengerInput } from '@/api/bookings.api';
 import { searchCustomers } from '@/api/customers.api';
 import { AddEditCustomerDialog } from '@/components/customers/add-edit-customer-dialog';
 import { CodeSearchField } from '@/components/code-search-field';
 import { DateField } from '@/components/date-field';
 import { searchAirports, searchAirlines } from '@/api/flightData.api';
 import { useListNavigation } from '@/hooks/useListNavigation';
-import { errorMessage } from '@/utils/apiError';
+import { duplicateInvoice, errorMessage } from '@/utils/apiError';
+import { formatDisplayDate } from '@/utils/dateFormat';
 import { cn } from '@/lib/utils';
 
 const emptyForm = {
@@ -110,6 +111,9 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
   // Which passenger row an inline "add new customer" should fill on success.
   const [addCustomerIndex, setAddCustomerIndex] = useState(0);
   const [addCustomerOpen, setAddCustomerOpen] = useState(false);
+  // The payload the backend warned about, held so "Save anyway" can re-send exactly it with
+  // confirmDuplicate set. Non-null iff the warning panel is showing.
+  const [pendingDuplicate, setPendingDuplicate] = useState<{ input: UpdateBookingInput; duplicate: DuplicateInvoice } | null>(null);
   const queryClient = useQueryClient();
 
   const searchQuery = search?.query ?? '';
@@ -126,6 +130,11 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
       } else {
         await createBooking(input);
       }
+    },
+    onMutate: () => setPendingDuplicate(null),
+    onError: (err, input) => {
+      const duplicate = duplicateInvoice(err);
+      if (duplicate) setPendingDuplicate({ input, duplicate });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bookings'] });
@@ -237,11 +246,17 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
   return (
     <>
     <form onSubmit={handleSubmit} className="space-y-3">
-      {/* Row: Booking Type | Invoice# | Mark as voided — the create dialog passes a typeSelector
-          for the first cell; the edit dialog passes none (a New booking can't become a Reissue),
-          so that cell is dropped entirely and the grid collapses to 2 columns rather than leaving
-          a blank leading column. */}
-      <div className={cn('grid items-end gap-3', typeSelector ? 'grid-cols-3' : 'grid-cols-2')}>
+      {/* Row: Booking Type | Invoice# | Booking Date | Mark as voided — the create dialog passes a
+          typeSelector for the first cell; the edit dialog passes none (a New booking can't become a
+          Reissue), so that cell is dropped entirely and the grid collapses by one column rather than
+          leaving a blank leading column.
+
+          Booking Date defaults to today but MUST be editable: an invoice is routinely entered days
+          after it was raised, and the ledger is largely back-filled historical data. It is also the
+          field the duplicate-invoice warning keys on (invoice# + booking date + PNR), so leaving it
+          silently pinned to today — as this form did until 2026-07-13 — both mis-dates the row and
+          skews that check. */}
+      <div className={cn('grid items-end gap-3', typeSelector ? 'grid-cols-4' : 'grid-cols-3')}>
         {typeSelector && <div className="space-y-1">{typeSelector}</div>}
         <div className="space-y-1">
           <Label htmlFor="booking-invoice-number">Invoice#</Label>
@@ -250,6 +265,16 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
             aria-label="Invoice number"
             value={form.invoiceNumber}
             onChange={(e) => setForm({ ...form, invoiceNumber: e.target.value })}
+            required
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="booking-date">Booking Date</Label>
+          <DateField
+            id="booking-date"
+            ariaLabel="Booking Date"
+            value={form.bookingDate}
+            onChange={(iso) => setForm({ ...form, bookingDate: iso })}
             required
           />
         </div>
@@ -533,7 +558,46 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
           )}
         </div>
       )}
-      {saveMutation.isError && (
+      {pendingDuplicate && (
+        <div className="rounded-md border border-amber-500/50 bg-amber-50 p-3 text-sm dark:bg-amber-950/30">
+          <p className="font-medium">
+            Invoice {pendingDuplicate.duplicate.invoiceNumber} already exists with the same date and PNR.
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            {formatDisplayDate(pendingDuplicate.duplicate.bookingDate)}
+            {pendingDuplicate.duplicate.pnr ? ` · ${pendingDuplicate.duplicate.pnr}` : ''}
+            {pendingDuplicate.duplicate.passengerNames.length > 0
+              ? ` · ${pendingDuplicate.duplicate.passengerNames.join(', ')}`
+              : ''}
+          </p>
+          <p className="mt-2">Is this a different invoice?</p>
+          <div className="mt-3 flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setPendingDuplicate(null);
+                // Also clears saveMutation's own error state, not just the panel above — without
+                // this the generic error line re-renders right underneath with the SAME "already
+                // exists" text the panel just showed, once `pendingDuplicate` goes back to null.
+                saveMutation.reset();
+              }}
+            >
+              Go back
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={saveMutation.isPending}
+              onClick={() => saveMutation.mutate({ ...pendingDuplicate.input, confirmDuplicate: true })}
+            >
+              Save anyway
+            </Button>
+          </div>
+        </div>
+      )}
+      {saveMutation.isError && !pendingDuplicate && (
         <p className="text-sm text-destructive">
           {errorMessage(saveMutation.error, 'Save failed. Check your connection and try again.')}
         </p>

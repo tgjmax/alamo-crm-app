@@ -14,6 +14,15 @@ export interface PassengerInput {
   customer?: string;
 }
 
+/** The booking a save collided with, returned on a 409 DUPLICATE_BOOKING_WARNING. */
+export interface DuplicateInvoice {
+  id: string;
+  invoiceNumber: string;
+  bookingDate: string;
+  pnr: string | null;
+  passengerNames: string[];
+}
+
 export interface CreateBookingInput {
   invoiceNumber: string;
   bookingDate: string;
@@ -27,6 +36,8 @@ export interface CreateBookingInput {
   remark?: string;
   payment?: PaymentInput;
   passengers: PassengerInput[];
+  /** Send `true` to save despite a duplicate-invoice warning the user has already seen. */
+  confirmDuplicate?: boolean;
 }
 
 export interface PassengerListItem {
@@ -188,7 +199,8 @@ export interface PaymentDefault {
 
 export interface ImportBookingResult {
   index: number;
-  status: 'imported' | 'would_import' | 'needs_manual_linking' | 'failed';
+  /** `flagged_duplicate`: the passenger is already on that invoice — the row was NOT imported. */
+  status: 'imported' | 'would_import' | 'needs_manual_linking' | 'flagged_duplicate' | 'failed';
   reason?: string;
 }
 
