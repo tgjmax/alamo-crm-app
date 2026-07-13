@@ -47,7 +47,9 @@ describe('CustomersPage', () => {
     expect(await screen.findByText('Varghese/Alexander Reginald')).toBeInTheDocument();
     expect(screen.getByText('Alexander Reginald')).toBeInTheDocument();
     expect(screen.getByText('Varghese')).toBeInTheDocument();
-    expect(screen.getByText('01-Jan-1980')).toBeInTheDocument();
+    // Stored as '01-Jan-1980', displayed as '01 Jan 1980' — the same 'DD Mon YYYY' every other
+    // date in the app uses. The clipboard value stays the dash-stripped form (see below).
+    expect(screen.getByText('01 Jan 1980')).toBeInTheDocument();
     expect(screen.getByText('ADT')).toBeInTheDocument();
     expect(screen.getByText('Male')).toBeInTheDocument();
     expect(screen.getByText('alex@example.com')).toBeInTheDocument();
@@ -178,7 +180,7 @@ describe('CustomersPage', () => {
     });
     const writeText = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
     renderWithClient(<CustomersPage />);
-    await screen.findByText('01-Jan-1980');
+    await screen.findByText('01 Jan 1980');
 
     await userEvent.click(screen.getByRole('button', { name: 'Copy 01Jan1980' }));
     expect(writeText).toHaveBeenLastCalledWith('01Jan1980');
@@ -298,11 +300,12 @@ describe('CustomersPage', () => {
     });
   });
 
-  it('the Add Customer dialog disables passport view/download (no customer id yet)', async () => {
+  it('the Add Customer dialog disables the passport view button (no customer id yet)', async () => {
     renderWithClient(<CustomersPage />);
     await userEvent.click(screen.getByRole('button', { name: 'Add Customer' }));
     expect(screen.getByRole('button', { name: 'View passport document' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Download passport document' })).toBeDisabled();
+    // Downloading belongs to the read-only ViewPassportDialog, not to the upload form.
+    expect(screen.queryByRole('button', { name: 'Download passport document' })).not.toBeInTheDocument();
   });
 
   it('rejects a partially filled passport section', async () => {
@@ -392,7 +395,6 @@ describe('CustomersPage', () => {
     await userEvent.click(await screen.findByText('Edit'));
     expect(await screen.findByLabelText('Passport #')).toHaveValue('P1234567');
     expect(screen.getByRole('button', { name: 'View passport document' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Download passport document' })).toBeEnabled();
   });
 
   it('deletes a single customer via the row actions menu', async () => {

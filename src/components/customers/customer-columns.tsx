@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { CustomerListItem } from '@/api/customers.api';
 import { CopyableText } from '@/components/data-table/copyable-text';
-import { dobToDigits } from '@/utils/dateFormat';
+import { dobToDigits, dobToIso, formatDisplayDate } from '@/utils/dateFormat';
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header';
 import { CustomerRowActions } from './customer-row-actions';
 
@@ -69,7 +69,7 @@ export function buildCustomerColumns({
       enableSorting: false,
       cell: ({ getValue }) => {
         const dob = getValue<string>();
-        return <CopyableText value={dob} copyValue={dobToDigits(dob)} />;
+        return <CopyableText value={formatDisplayDate(dobToIso(dob))} copyValue={dobToDigits(dob)} />;
       },
     },
     {

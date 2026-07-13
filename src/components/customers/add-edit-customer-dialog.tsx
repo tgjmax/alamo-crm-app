@@ -1,9 +1,11 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Download, Eye } from 'lucide-react';
+import { Eye, Globe, IdCard, Mail, Phone, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { DateField } from '@/components/date-field';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { IconInput } from '@/components/icon-input';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -128,11 +130,11 @@ export function AddEditCustomerDialog({ open, onOpenChange, customer, onCreated 
     mutation.mutate();
   }
 
-  async function handleViewPassport(download: boolean) {
+  async function handleViewPassport() {
     if (!customer) return;
     setPassportActionError(null);
     try {
-      const url = await getPassportDownloadUrl(customer.id, download);
+      const url = await getPassportDownloadUrl(customer.id, false);
       window.open(url, '_blank');
     } catch {
       setPassportActionError('Could not load the passport document. Check your connection and try again.');
@@ -151,27 +153,33 @@ export function AddEditCustomerDialog({ open, onOpenChange, customer, onCreated 
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="customer-first-name">First name</Label>
-                <Input
+                <IconInput
                   id="customer-first-name"
+                  icon={<User />}
                   value={form.firstName}
                   onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+                  placeholder="e.g. Shiny"
                   required
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="customer-middle-name">Middle name</Label>
-                <Input
+                <IconInput
                   id="customer-middle-name"
+                  icon={<User />}
                   value={form.middleName}
                   onChange={(e) => setForm({ ...form, middleName: e.target.value })}
+                  placeholder="Optional"
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="customer-last-name">Last name</Label>
-                <Input
+                <IconInput
                   id="customer-last-name"
+                  icon={<User />}
                   value={form.lastName}
                   onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+                  placeholder="e.g. Joseph"
                   required
                 />
               </div>
@@ -179,11 +187,11 @@ export function AddEditCustomerDialog({ open, onOpenChange, customer, onCreated 
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="customer-dob">Date of birth</Label>
-                <Input
+                <DateField
                   id="customer-dob"
-                  type="date"
+                  ariaLabel="Date of birth"
                   value={form.dob}
-                  onChange={(e) => setForm({ ...form, dob: e.target.value })}
+                  onChange={(dob) => setForm({ ...form, dob })}
                   required
                 />
               </div>
@@ -214,20 +222,24 @@ export function AddEditCustomerDialog({ open, onOpenChange, customer, onCreated 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="customer-phone">Phone</Label>
-                <Input
+                <IconInput
                   id="customer-phone"
+                  icon={<Phone />}
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  placeholder="e.g. +1 555 123 4567"
                   required
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="customer-email">Email</Label>
-                <Input
+                <IconInput
                   id="customer-email"
+                  icon={<Mail />}
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  placeholder="name@example.com (optional)"
                 />
               </div>
             </div>
@@ -238,27 +250,31 @@ export function AddEditCustomerDialog({ open, onOpenChange, customer, onCreated 
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="customer-passport-number">Passport #</Label>
-                <Input
+                <IconInput
                   id="customer-passport-number"
+                  icon={<IdCard />}
                   value={form.passportNumber}
                   onChange={(e) => setForm({ ...form, passportNumber: e.target.value })}
+                  placeholder="e.g. Z1234567"
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="customer-passport-country">Issuing Country</Label>
-                <Input
+                <IconInput
                   id="customer-passport-country"
+                  icon={<Globe />}
                   value={form.passportIssuingCountry}
                   onChange={(e) => setForm({ ...form, passportIssuingCountry: e.target.value })}
+                  placeholder="e.g. India"
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="customer-passport-expiry">Expiry Date</Label>
-                <Input
+                <DateField
                   id="customer-passport-expiry"
-                  type="date"
+                  ariaLabel="Expiry Date"
                   value={form.passportExpiryDate}
-                  onChange={(e) => setForm({ ...form, passportExpiryDate: e.target.value })}
+                  onChange={(passportExpiryDate) => setForm({ ...form, passportExpiryDate })}
                 />
               </div>
             </div>
@@ -278,19 +294,9 @@ export function AddEditCustomerDialog({ open, onOpenChange, customer, onCreated 
                   size="icon"
                   disabled={!isEdit || !hasExistingPhoto}
                   aria-label="View passport document"
-                  onClick={() => handleViewPassport(false)}
+                  onClick={handleViewPassport}
                 >
                   <Eye className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  disabled={!isEdit || !hasExistingPhoto}
-                  aria-label="Download passport document"
-                  onClick={() => handleViewPassport(true)}
-                >
-                  <Download className="h-4 w-4" />
                 </Button>
               </div>
               {passportActionError && <p className="text-sm text-destructive">{passportActionError}</p>}
