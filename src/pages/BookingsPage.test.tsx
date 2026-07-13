@@ -589,7 +589,11 @@ describe('BookingsPage', () => {
     });
     renderWithClient(<BookingsPage />);
     await screen.findByText('0000150');
-    expect(screen.queryByRole('button', { name: 'Record payment' })).not.toBeInTheDocument();
+    // "Record payment" is a menuitem that isn't mounted until the row-actions dropdown opens, so
+    // asserting it's absent proves nothing on its own. The real invariant for a user with neither
+    // canEdit nor canDelete is that the row-actions trigger itself never renders at all
+    // (booking-row-actions.tsx returns null in that case).
+    expect(screen.queryByRole('button', { name: /Row actions for/ })).not.toBeInTheDocument();
   });
 
   describe('as an admin (bookings.edit)', () => {
@@ -618,7 +622,8 @@ describe('BookingsPage', () => {
       renderWithClient(<BookingsPage />);
 
       await screen.findByText('0000150');
-      await userEvent.click(screen.getByRole('button', { name: 'Record payment' }));
+      await userEvent.click(screen.getByRole('button', { name: /Row actions for/ }));
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'Record payment' }));
       await userEvent.clear(screen.getByLabelText('Amount owed'));
       await userEvent.type(screen.getByLabelText('Amount owed'), '50');
       await userEvent.click(screen.getByRole('button', { name: 'Save payment' }));
@@ -637,7 +642,8 @@ describe('BookingsPage', () => {
       renderWithClient(<BookingsPage />);
 
       await screen.findByText('0000150');
-      await userEvent.click(screen.getByRole('button', { name: 'Record payment' }));
+      await userEvent.click(screen.getByRole('button', { name: /Row actions for/ }));
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'Record payment' }));
       await userEvent.click(screen.getByRole('button', { name: 'Save payment' }));
 
       await waitFor(() => {
@@ -648,7 +654,12 @@ describe('BookingsPage', () => {
     it('does not show Record Payment on a Paid row', async () => {
       renderWithClient(<BookingsPage />);
       await screen.findByText('0000150');
-      expect(screen.queryByRole('button', { name: 'Record payment' })).not.toBeInTheDocument();
+      // BASE_ROW is paymentStatus: 'paid' — open the menu (this admin CAN see it, unlike the
+      // unauthenticated-user test above) and assert the "pending only" item is missing from it,
+      // rather than asserting on a button that was never going to render regardless of the gate.
+      await userEvent.click(screen.getByRole('button', { name: /Row actions for/ }));
+      expect(await screen.findByRole('menuitem', { name: 'Edit' })).toBeInTheDocument();
+      expect(screen.queryByRole('menuitem', { name: 'Record payment' })).not.toBeInTheDocument();
     });
 
     it('pre-fills Payment type and Paid on from the row, and submits the edited values', async () => {
@@ -663,7 +674,8 @@ describe('BookingsPage', () => {
       renderWithClient(<BookingsPage />);
 
       await screen.findByText('0000150');
-      await userEvent.click(screen.getByRole('button', { name: 'Record payment' }));
+      await userEvent.click(screen.getByRole('button', { name: /Row actions for/ }));
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'Record payment' }));
 
       expect(screen.getByRole('combobox', { name: 'Payment type' })).toHaveTextContent('Cash');
       expect(screen.getByLabelText('Paid on')).toHaveValue('2026-05-01');
@@ -674,6 +686,121 @@ describe('BookingsPage', () => {
 
       await waitFor(() => {
         expect(updateSpy).toHaveBeenCalledWith('bk1', { status: 'pending', type: 'check', amount: 150, paidOn: '2026-05-01' });
+      });
+    });
+
+    // The table is one row per PASSENGER, not one per invoice. On a New row: Edit opens the
+    // WHOLE invoice (routed by bookingId), "Delete passenger" removes ONLY that passenger
+    // (routed by the passenger's own id), and "Delete invoice" removes the header + every
+    // passenger (routed by bookingId again). On a Reissue/Refund row, Edit and Delete both act
+    // on the adjustment itself (routed by the passenger id, since an adjustment has no bookingId).
+    // Fixture below uses a passenger id ('p8') that is clearly distinct from the booking id
+    // ('bk1') so routing the wrong one is unmistakable.
+    describe('row-action id routing (New vs Reissue/Refund)', () => {
+      it('"Delete passenger" on a New row calls deletePassenger with the passenger id, not deleteBooking', async () => {
+        vi.spyOn(bookingsApi, 'listBookings').mockResolvedValue({
+          bookings: [{ ...BASE_ROW, id: 'p8', bookingId: 'bk1', bookingType: 'New' }],
+          total: 1, page: 1, pageSize: 25,
+        });
+        const deletePassengerSpy = vi.spyOn(bookingsApi, 'deletePassenger').mockResolvedValue(undefined);
+        const deleteBookingSpy = vi.spyOn(bookingsApi, 'deleteBooking').mockResolvedValue(undefined);
+        renderWithClient(<BookingsPage />);
+
+        await screen.findByText('0000150');
+        await userEvent.click(screen.getByRole('button', { name: /Row actions for/ }));
+        await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete passenger' }));
+        await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+
+        await waitFor(() => {
+          expect(deletePassengerSpy).toHaveBeenCalledWith('p8');
+        });
+        expect(deleteBookingSpy).not.toHaveBeenCalled();
+      });
+
+      it('"Delete invoice #N" on a New row calls deleteBooking with the booking id, not deletePassenger', async () => {
+        vi.spyOn(bookingsApi, 'listBookings').mockResolvedValue({
+          bookings: [{ ...BASE_ROW, id: 'p8', bookingId: 'bk1', bookingType: 'New' }],
+          total: 1, page: 1, pageSize: 25,
+        });
+        const deletePassengerSpy = vi.spyOn(bookingsApi, 'deletePassenger').mockResolvedValue(undefined);
+        const deleteBookingSpy = vi.spyOn(bookingsApi, 'deleteBooking').mockResolvedValue(undefined);
+        renderWithClient(<BookingsPage />);
+
+        await screen.findByText('0000150');
+        await userEvent.click(screen.getByRole('button', { name: /Row actions for/ }));
+        await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete invoice #0000150' }));
+        await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+
+        await waitFor(() => {
+          expect(deleteBookingSpy).toHaveBeenCalledWith('bk1');
+        });
+        expect(deletePassengerSpy).not.toHaveBeenCalled();
+      });
+
+      it('Edit on a New row calls getBooking with the booking id (the whole invoice), not getAdjustment', async () => {
+        vi.spyOn(bookingsApi, 'listBookings').mockResolvedValue({
+          bookings: [{ ...BASE_ROW, id: 'p8', bookingId: 'bk1', bookingType: 'New' }],
+          total: 1, page: 1, pageSize: 25,
+        });
+        const getBookingSpy = vi.spyOn(bookingsApi, 'getBooking').mockResolvedValue({
+          booking: { id: 'bk1', invoiceNumber: '0000150', bookingDate: '2026-05-04', voided: false },
+          passengers: [{ id: 'p8', passengerName: 'JOSEPH/SHINY S', amount: 2400.02 }],
+        });
+        const getAdjustmentSpy = vi.spyOn(bookingsApi, 'getAdjustment');
+        renderWithClient(<BookingsPage />);
+
+        await screen.findByText('0000150');
+        await userEvent.click(screen.getByRole('button', { name: /Row actions for/ }));
+        await userEvent.click(await screen.findByRole('menuitem', { name: 'Edit' }));
+
+        await waitFor(() => {
+          expect(getBookingSpy).toHaveBeenCalledWith('bk1');
+        });
+        expect(getAdjustmentSpy).not.toHaveBeenCalled();
+      });
+
+      it('Edit on a Reissue row calls getAdjustment with the passenger id, not getBooking', async () => {
+        vi.spyOn(bookingsApi, 'listBookings').mockResolvedValue({
+          bookings: [{ ...BASE_ROW, id: 'p8', bookingType: 'Reissue', bookingId: undefined }],
+          total: 1, page: 1, pageSize: 25,
+        });
+        const getAdjustmentSpy = vi.spyOn(bookingsApi, 'getAdjustment').mockResolvedValue({
+          id: 'p8',
+          bookingType: 'Reissue',
+          passengerName: 'JOSEPH/SHINY S',
+          parentRef: 'bk1',
+          bookingDate: '2026-05-04',
+          amount: 2400.02,
+          pnr: 'GUDBFX',
+          payment: { status: 'paid', type: 'card', amount: 0 },
+        });
+        const getBookingSpy = vi.spyOn(bookingsApi, 'getBooking');
+        renderWithClient(<BookingsPage />);
+
+        await screen.findByText('0000150');
+        await userEvent.click(screen.getByRole('button', { name: /Row actions for/ }));
+        await userEvent.click(await screen.findByRole('menuitem', { name: 'Edit' }));
+
+        await waitFor(() => {
+          expect(getAdjustmentSpy).toHaveBeenCalledWith('p8');
+        });
+        expect(getBookingSpy).not.toHaveBeenCalled();
+      });
+
+      it('does not offer "Delete invoice" on a Reissue row\'s menu', async () => {
+        vi.spyOn(bookingsApi, 'listBookings').mockResolvedValue({
+          bookings: [{ ...BASE_ROW, id: 'p8', bookingType: 'Reissue', bookingId: undefined }],
+          total: 1, page: 1, pageSize: 25,
+        });
+        renderWithClient(<BookingsPage />);
+
+        await screen.findByText('0000150');
+        await userEvent.click(screen.getByRole('button', { name: /Row actions for/ }));
+
+        // Its own delete item is labeled "Delete reissue" (row-scoped) — confirm the menu did
+        // open and rendered, so the absence check below isn't vacuous.
+        expect(await screen.findByRole('menuitem', { name: 'Delete reissue' })).toBeInTheDocument();
+        expect(screen.queryByRole('menuitem', { name: /Delete invoice/ })).not.toBeInTheDocument();
       });
     });
   });

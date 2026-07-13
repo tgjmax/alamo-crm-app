@@ -1,0 +1,147 @@
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+export interface AdjustmentSharedValue {
+  bookingDate: string;
+  pnr: string;
+  airlineCode: string;
+  depCity: string;
+  arrCity: string;
+  depDate: string;
+  arrDate: string;
+  remark: string;
+  paymentStatus: 'paid' | 'pending';
+  paymentType: 'card' | 'check' | 'cash';
+  pendingAmount: string;
+}
+
+interface AdjustmentSharedFieldsProps {
+  bookingType: 'Reissue' | 'Refund';
+  value: AdjustmentSharedValue;
+  onChange: (patch: Partial<AdjustmentSharedValue>) => void;
+}
+
+/** The fields shared by both create (`AdjustmentBookingForm`) and edit (`EditAdjustmentDialog`)
+ * flows for a Reissue/Refund adjustment: booking date, PNR, airline code, the Reissue-only
+ * city/date inputs, a remark, and the payment status/type/pending-amount block. Extracted
+ * verbatim out of `adjustment-booking-form.tsx` — every `aria-label` here is queried by existing
+ * tests, so none of them may change. */
+export function AdjustmentSharedFields({ bookingType, value, onChange }: AdjustmentSharedFieldsProps) {
+  return (
+    <>
+      <div className="space-y-2">
+        <Label htmlFor="adjustment-booking-date">Adjustment booking date</Label>
+        <Input
+          id="adjustment-booking-date"
+          aria-label="Adjustment booking date"
+          type="date"
+          value={value.bookingDate}
+          onChange={(e) => onChange({ bookingDate: e.target.value })}
+          required
+        />
+      </div>
+      <Input
+        aria-label="Adjustment PNR"
+        value={value.pnr}
+        onChange={(e) => onChange({ pnr: e.target.value })}
+        placeholder="PNR"
+        required
+      />
+      <Input
+        aria-label="Adjustment airline code"
+        value={value.airlineCode}
+        onChange={(e) => onChange({ airlineCode: e.target.value })}
+        placeholder="Airline code (optional)"
+      />
+      {bookingType === 'Reissue' && (
+        <>
+          <Input
+            aria-label="Adjustment departure city"
+            value={value.depCity}
+            onChange={(e) => onChange({ depCity: e.target.value })}
+            placeholder="Departure city (optional)"
+          />
+          <Input
+            aria-label="Adjustment arrival city"
+            value={value.arrCity}
+            onChange={(e) => onChange({ arrCity: e.target.value })}
+            placeholder="Arrival city (optional)"
+          />
+          <div className="space-y-2">
+            <Label htmlFor="adjustment-dep-date">Departure date</Label>
+            <Input
+              id="adjustment-dep-date"
+              aria-label="Adjustment departure date"
+              type="date"
+              value={value.depDate}
+              onChange={(e) => onChange({ depDate: e.target.value })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="adjustment-arr-date">Arrival date</Label>
+            <Input
+              id="adjustment-arr-date"
+              aria-label="Adjustment arrival date"
+              type="date"
+              value={value.arrDate}
+              onChange={(e) => onChange({ arrDate: e.target.value })}
+            />
+          </div>
+        </>
+      )}
+      <div className="space-y-2">
+        <Label htmlFor="adjustment-remark">Remark</Label>
+        <Input
+          id="adjustment-remark"
+          aria-label="Adjustment remark"
+          value={value.remark}
+          onChange={(e) => onChange({ remark: e.target.value })}
+        />
+      </div>
+      <div className="flex items-center gap-6">
+        <div className="flex items-center gap-2">
+          <Label>Payment status</Label>
+          <Select
+            value={value.paymentStatus}
+            onValueChange={(v) => onChange({ paymentStatus: v as 'paid' | 'pending' })}
+          >
+            <SelectTrigger aria-label="Adjustment payment status" className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="paid">Paid</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-2">
+          <Label>Payment type</Label>
+          <Select
+            value={value.paymentType}
+            onValueChange={(v) => onChange({ paymentType: v as 'card' | 'check' | 'cash' })}
+          >
+            <SelectTrigger aria-label="Adjustment payment type" className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="card">Card</SelectItem>
+              <SelectItem value="check">Check</SelectItem>
+              <SelectItem value="cash">Cash</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      {value.paymentStatus === 'pending' && (
+        <Input
+          aria-label="Adjustment amount owed"
+          type="number"
+          value={value.pendingAmount}
+          onChange={(e) => onChange({ pendingAmount: e.target.value })}
+          placeholder="Amount owed"
+          required
+        />
+      )}
+    </>
+  );
+}

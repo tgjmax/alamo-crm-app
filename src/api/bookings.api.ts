@@ -208,3 +208,91 @@ export async function importBookings(
 export async function exportBookings(): Promise<void> {
   await downloadFile('/bookings/export', 'bookings.xlsx');
 }
+
+/** One passenger on an invoice, as returned by GET /bookings/:id. `id` is present for a stored
+ * passenger and omitted for one the user has just added in the edit dialog. */
+export interface BookingDetailPassenger {
+  id: string;
+  passengerName: string;
+  amount: number;
+  customer?: string;
+}
+
+export interface BookingDetail {
+  booking: {
+    id: string;
+    invoiceNumber: string;
+    bookingDate: string;
+    voided: boolean;
+    pnr?: string;
+    airlineCode?: string;
+    depCity?: string;
+    arrCity?: string;
+    depDate?: string;
+    arrDate?: string;
+    remark?: string;
+    payment?: PaymentInput;
+  };
+  passengers: BookingDetailPassenger[];
+}
+
+/** Omit `id` to create a new passenger on this invoice; include it to update a stored one.
+ * A stored passenger left out of the array entirely is deleted by the backend. */
+export interface UpdatePassengerInput {
+  id?: string;
+  passengerName: string;
+  amount: number;
+  customer?: string;
+}
+
+export interface UpdateBookingInput extends Omit<CreateBookingInput, 'passengers'> {
+  passengers: UpdatePassengerInput[];
+}
+
+export async function getBooking(id: string): Promise<BookingDetail> {
+  const res = await apiClient.get<BookingDetail>(`/bookings/${id}`);
+  return res.data;
+}
+
+export async function updateBooking(id: string, input: UpdateBookingInput): Promise<BookingDetail> {
+  const res = await apiClient.patch<BookingDetail>(`/bookings/${id}`, input);
+  return res.data;
+}
+
+export async function deleteBooking(id: string): Promise<void> {
+  await apiClient.delete(`/bookings/${id}`);
+}
+
+export interface AdjustmentDetail {
+  id: string;
+  bookingType: 'Reissue' | 'Refund';
+  passengerName: string;
+  parentRef: string;
+  bookingDate: string;
+  amount: number;
+  pnr: string;
+  airlineCode?: string;
+  depCity?: string;
+  arrCity?: string;
+  depDate?: string;
+  arrDate?: string;
+  remark?: string;
+  payment: PaymentInput;
+}
+
+/** No `bookingType`: a Reissue cannot be converted into a Refund (delete and re-create instead). */
+export type UpdateAdjustmentInput = Omit<AdjustmentInput, 'bookingType'>;
+
+export async function getAdjustment(id: string): Promise<AdjustmentDetail> {
+  const res = await apiClient.get<AdjustmentDetail>(`/passengers/${id}`);
+  return res.data;
+}
+
+export async function updateAdjustment(id: string, input: UpdateAdjustmentInput): Promise<AdjustmentDetail> {
+  const res = await apiClient.patch<AdjustmentDetail>(`/passengers/${id}`, input);
+  return res.data;
+}
+
+export async function deletePassenger(id: string): Promise<void> {
+  await apiClient.delete(`/passengers/${id}`);
+}

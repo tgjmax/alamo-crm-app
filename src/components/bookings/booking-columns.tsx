@@ -1,10 +1,10 @@
 import { ColumnDef } from '@tanstack/react-table';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { BookingRow } from '@/api/bookings.api';
 import { formatDisplayDate } from '@/utils/dateFormat';
 import { CopyableText } from '@/components/data-table/copyable-text';
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header';
+import { BookingRowActions } from './booking-row-actions';
 
 function formatCurrency(n: number): string {
   return `$${n.toFixed(2)}`;
@@ -31,10 +31,21 @@ function PaymentStatusBadge({ status, amount }: { status?: 'paid' | 'pending'; a
 
 interface BuildBookingColumnsArgs {
   onRecordPayment: (row: BookingRow) => void;
-  canEditPayment: boolean;
+  onEdit: (row: BookingRow) => void;
+  onDelete: (row: BookingRow) => void;
+  onDeleteInvoice: (row: BookingRow) => void;
+  canEdit: boolean;
+  canDelete: boolean;
 }
 
-export function buildBookingColumns({ onRecordPayment, canEditPayment }: BuildBookingColumnsArgs): ColumnDef<BookingRow>[] {
+export function buildBookingColumns({
+  onRecordPayment,
+  onEdit,
+  onDelete,
+  onDeleteInvoice,
+  canEdit,
+  canDelete,
+}: BuildBookingColumnsArgs): ColumnDef<BookingRow>[] {
   return [
     {
       id: 'date',
@@ -138,19 +149,15 @@ export function buildBookingColumns({ onRecordPayment, canEditPayment }: BuildBo
       enableSorting: false,
       enableHiding: false,
       cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          {canEditPayment && row.original.paymentStatus === 'pending' && (
-            <Button
-              type="button"
-              variant="link"
-              size="sm"
-              className="h-auto p-0 text-xs"
-              onClick={() => onRecordPayment(row.original)}
-            >
-              Record payment
-            </Button>
-          )}
-        </div>
+        <BookingRowActions
+          row={row.original}
+          onRecordPayment={onRecordPayment}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onDeleteInvoice={onDeleteInvoice}
+          canEdit={canEdit}
+          canDelete={canDelete}
+        />
       ),
     },
   ];

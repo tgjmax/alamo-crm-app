@@ -8,12 +8,15 @@ import { BOOKING_PAGE_SIZES, BookingRow, BookingSortBy, listBookings } from '@/a
 import { buildBookingColumns } from './booking-columns';
 import { BookingFiltersPopover, BookingCustomFilters } from './booking-filters-popover';
 import { RecordPaymentDialog } from './record-payment-dialog';
+import { EditBookingDialog } from './edit-booking-dialog';
+import { EditAdjustmentDialog } from './edit-adjustment-dialog';
+import { DeleteBookingDialog, DeleteTarget } from './delete-booking-dialog';
 import { COMPACT_CELL_CLASS, COMPACT_HEAD_CLASS } from '@/components/data-table/table-density';
 import { DataTableFacetedFilter } from '@/components/data-table/data-table-faceted-filter';
 import { DataTableViewOptions } from '@/components/data-table/data-table-view-options';
 import { DataTablePagination } from '@/components/data-table/data-table-pagination';
 import { useAuthStore } from '@/stores/authStore';
-import { canEditBookings } from '@/utils/permissions';
+import { canDeleteBookings, canEditBookings } from '@/utils/permissions';
 
 const PAYMENT_STATUS_OPTIONS = [
   { label: 'Paid', value: 'paid' },
@@ -54,6 +57,9 @@ export function BookingsTable({ scope, defaultPageSize = 25, queryKeyPrefix }: B
   const [pageSize, setPageSize] = useState<number>(defaultPageSize);
 
   const [recordPaymentRow, setRecordPaymentRow] = useState<BookingRow | null>(null);
+  const [editBookingId, setEditBookingId] = useState<string | null>(null);
+  const [editAdjustmentId, setEditAdjustmentId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const user = useAuthStore((s) => s.user);
 
   useEffect(() => {
@@ -96,7 +102,40 @@ export function BookingsTable({ scope, defaultPageSize = 25, queryKeyPrefix }: B
     () =>
       buildBookingColumns({
         onRecordPayment: setRecordPaymentRow,
-        canEditPayment: canEditBookings(user),
+        // A New row edits its WHOLE invoice (shared trip data can't sensibly be edited per-passenger),
+        // so it routes by bookingId. An adjustment carries its own trip data and edits alone.
+        // Branches explicitly on bookingType rather than falling through on a falsy bookingId —
+        // a New row missing its bookingId (a data anomaly) must NOT silently fall into the
+        // adjustment editor, which would PATCH it as a Reissue/Refund.
+        onEdit: (row) => {
+          if (row.bookingType === 'New') {
+            if (row.bookingId) setEditBookingId(row.bookingId);
+            return;
+          }
+          setEditAdjustmentId(row.id);
+        },
+        // Delete is row-scoped: the table is one row per passenger, so this is what the user is
+        // pointing at. The whole invoice has its own separate menu item.
+        onDelete: (row) =>
+          setDeleteTarget({
+            scope: 'passenger',
+            id: row.id,
+            passengerName: row.passengerName,
+            invoiceNumber: row.invoiceNumber,
+            bookingType: row.bookingType,
+          }),
+        onDeleteInvoice: (row) => {
+          if (!row.bookingId) return;
+          setDeleteTarget({
+            scope: 'invoice',
+            id: row.bookingId,
+            passengerName: row.passengerName,
+            invoiceNumber: row.invoiceNumber,
+            bookingType: row.bookingType,
+          });
+        },
+        canEdit: canEditBookings(user),
+        canDelete: canDeleteBookings(user),
       }),
     [user]
   );
@@ -182,6 +221,9 @@ export function BookingsTable({ scope, defaultPageSize = 25, queryKeyPrefix }: B
       />
 
       <RecordPaymentDialog row={recordPaymentRow} onOpenChange={(open) => !open && setRecordPaymentRow(null)} queryKeyPrefix={queryKeyPrefix} />
+      <EditBookingDialog bookingId={editBookingId} onOpenChange={(open) => !open && setEditBookingId(null)} queryKeyPrefix={queryKeyPrefix} />
+      <EditAdjustmentDialog adjustmentId={editAdjustmentId} onOpenChange={(open) => !open && setEditAdjustmentId(null)} queryKeyPrefix={queryKeyPrefix} />
+      <DeleteBookingDialog target={deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)} queryKeyPrefix={queryKeyPrefix} />
     </>
   );
 }

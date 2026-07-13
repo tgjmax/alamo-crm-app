@@ -21,8 +21,8 @@ interface AddEditCustomerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   customer?: CustomerListItem | null;
-  /** Called with the new customer's full name after a successful create (never on edit). */
-  onCreated?: (fullName: string) => void;
+  /** Called with the new customer's full name and id after a successful create (never on edit). */
+  onCreated?: (fullName: string, customerId: string) => void;
 }
 
 const emptyForm = {
@@ -104,10 +104,10 @@ export function AddEditCustomerDialog({ open, onOpenChange, customer, onCreated 
       };
       return isEdit ? updateCustomer(customer!.id, payload) : createCustomer(payload);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['customers', 'list'] });
       queryClient.invalidateQueries({ queryKey: ['customers', 'search'] });
-      if (!isEdit) onCreated?.(`${form.firstName} ${form.lastName}`);
+      if (!isEdit) onCreated?.(`${form.firstName} ${form.lastName}`, data.id);
       onOpenChange(false);
     },
   });

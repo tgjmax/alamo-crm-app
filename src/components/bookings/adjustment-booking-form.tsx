@@ -5,8 +5,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BookingRow, createAdjustment, listBookings } from '@/api/bookings.api';
+import { AdjustmentSharedFields } from './adjustment-shared-fields';
 
 interface AdjustmentBookingFormProps {
   bookingType: 'Reissue' | 'Refund';
@@ -35,6 +35,7 @@ export function AdjustmentBookingForm({ bookingType, onDone, onCancel }: Adjustm
     arrCity: '',
     depDate: '',
     arrDate: '',
+    remark: '',
     paymentStatus: 'paid' as 'paid' | 'pending',
     paymentType: 'card' as 'card' | 'check' | 'cash',
     pendingAmount: '',
@@ -123,6 +124,7 @@ export function AdjustmentBookingForm({ bookingType, onDone, onCancel }: Adjustm
                 arrDate: shared.arrDate || undefined,
               }
             : {}),
+          remark: shared.remark || undefined,
           payment: {
             status: shared.paymentStatus,
             type: shared.paymentType,
@@ -211,109 +213,11 @@ export function AdjustmentBookingForm({ bookingType, onDone, onCancel }: Adjustm
             ))}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="adjustment-booking-date">Adjustment booking date</Label>
-            <Input
-              id="adjustment-booking-date"
-              aria-label="Adjustment booking date"
-              type="date"
-              value={shared.bookingDate}
-              onChange={(e) => setShared({ ...shared, bookingDate: e.target.value })}
-              required
-            />
-          </div>
-          <Input
-            aria-label="Adjustment PNR"
-            value={shared.pnr}
-            onChange={(e) => setShared({ ...shared, pnr: e.target.value })}
-            placeholder="PNR"
-            required
+          <AdjustmentSharedFields
+            bookingType={bookingType}
+            value={shared}
+            onChange={(patch) => setShared({ ...shared, ...patch })}
           />
-          <Input
-            aria-label="Adjustment airline code"
-            value={shared.airlineCode}
-            onChange={(e) => setShared({ ...shared, airlineCode: e.target.value })}
-            placeholder="Airline code (optional)"
-          />
-          {bookingType === 'Reissue' && (
-            <>
-              <Input
-                aria-label="Adjustment departure city"
-                value={shared.depCity}
-                onChange={(e) => setShared({ ...shared, depCity: e.target.value })}
-                placeholder="Departure city (optional)"
-              />
-              <Input
-                aria-label="Adjustment arrival city"
-                value={shared.arrCity}
-                onChange={(e) => setShared({ ...shared, arrCity: e.target.value })}
-                placeholder="Arrival city (optional)"
-              />
-              <div className="space-y-2">
-                <Label htmlFor="adjustment-dep-date">Departure date</Label>
-                <Input
-                  id="adjustment-dep-date"
-                  aria-label="Adjustment departure date"
-                  type="date"
-                  value={shared.depDate}
-                  onChange={(e) => setShared({ ...shared, depDate: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="adjustment-arr-date">Arrival date</Label>
-                <Input
-                  id="adjustment-arr-date"
-                  aria-label="Adjustment arrival date"
-                  type="date"
-                  value={shared.arrDate}
-                  onChange={(e) => setShared({ ...shared, arrDate: e.target.value })}
-                />
-              </div>
-            </>
-          )}
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <Label>Payment status</Label>
-              <Select
-                value={shared.paymentStatus}
-                onValueChange={(v) => setShared({ ...shared, paymentStatus: v as 'paid' | 'pending' })}
-              >
-                <SelectTrigger aria-label="Adjustment payment status" className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="paid">Paid</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-2">
-              <Label>Payment type</Label>
-              <Select
-                value={shared.paymentType}
-                onValueChange={(v) => setShared({ ...shared, paymentType: v as 'card' | 'check' | 'cash' })}
-              >
-                <SelectTrigger aria-label="Adjustment payment type" className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="card">Card</SelectItem>
-                  <SelectItem value="check">Check</SelectItem>
-                  <SelectItem value="cash">Cash</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          {shared.paymentStatus === 'pending' && (
-            <Input
-              aria-label="Adjustment amount owed"
-              type="number"
-              value={shared.pendingAmount}
-              onChange={(e) => setShared({ ...shared, pendingAmount: e.target.value })}
-              placeholder="Amount owed"
-              required
-            />
-          )}
         </>
       )}
 

@@ -11,3 +11,7 @@ export function canEditBookings(user: AuthUser | null): boolean {
 export function canEditOrganization(user: AuthUser | null): boolean {
   return user?.role === 'admin';
 }
+
+export function canDeleteBookings(user: AuthUser | null): boolean {
+  return user?.role === 'admin' || Boolean(user?.permissions?.bookings.delete);
+}

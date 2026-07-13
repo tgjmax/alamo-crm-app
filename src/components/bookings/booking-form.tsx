@@ -1,0 +1,560 @@
+import { FormEvent, ReactNode, useState } from 'react';
+import { X } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { BookingDetail, createBooking, updateBooking, UpdateBookingInput, UpdatePassengerInput } from '@/api/bookings.api';
+import { searchCustomers } from '@/api/customers.api';
+import { AddEditCustomerDialog } from '@/components/customers/add-edit-customer-dialog';
+import { CodeSearchField } from '@/components/code-search-field';
+import { DateField } from '@/components/date-field';
+import { searchAirports, searchAirlines } from '@/api/flightData.api';
+import { useListNavigation } from '@/hooks/useListNavigation';
+import { errorMessage } from '@/utils/apiError';
+import { cn } from '@/lib/utils';
+
+const emptyForm = {
+  invoiceNumber: '',
+  bookingDate: new Date().toISOString().slice(0, 10),
+  voided: false,
+  pnr: '',
+  airlineCode: '',
+  depCity: '',
+  arrCity: '',
+  depDate: '',
+  arrDate: '',
+  remark: '',
+  paymentStatus: 'paid' as 'paid' | 'pending',
+  paymentType: 'card' as 'card' | 'check' | 'cash',
+  pendingAmount: '',
+  // Never rendered — neither this form nor its `paymentStatus`/`paymentType`/`pendingAmount`
+  // siblings expose a "paid on" control. It only exists so an existing booking's `payment.paidOn`
+  // (set via record-payment-dialog.tsx) survives a wholesale `PATCH /bookings/:id`, which replaces
+  // `payment` as a whole object — any field this form doesn't send is erased server-side. On
+  // CREATE there is nothing to preserve, so this stays '' and is never submitted (see handleSubmit).
+  paidOn: '',
+};
+
+interface PassengerRow {
+  /** Present only for a passenger already stored on the invoice. A row the user just added has
+   * no id, which is exactly how the backend tells "create" from "update" in its diff. */
+  id?: string;
+  name: string;
+  amount: string;
+  customer?: string;
+}
+
+const EMPTY_PASSENGER: PassengerRow = { name: '', amount: '' };
+
+function formStateFrom(initial?: BookingDetail): typeof emptyForm {
+  if (!initial) return emptyForm;
+  const b = initial.booking;
+  return {
+    invoiceNumber: b.invoiceNumber,
+    bookingDate: b.bookingDate,
+    voided: b.voided,
+    pnr: b.pnr ?? '',
+    airlineCode: b.airlineCode ?? '',
+    depCity: b.depCity ?? '',
+    arrCity: b.arrCity ?? '',
+    depDate: b.depDate ?? '',
+    arrDate: b.arrDate ?? '',
+    remark: b.remark ?? '',
+    paymentStatus: b.payment?.status ?? 'paid',
+    paymentType: b.payment?.type ?? 'card',
+    // `!= null` (not truthy) so a pending payment stored with amount 0 still seeds '0', not ''
+    // into this `required` input.
+    pendingAmount: b.payment?.amount != null ? String(b.payment.amount) : '',
+    paidOn: b.payment?.paidOn ?? '',
+  };
+}
+
+function passengerRowsFrom(initial?: BookingDetail): PassengerRow[] {
+  if (!initial || initial.passengers.length === 0) return [{ ...EMPTY_PASSENGER }];
+  return initial.passengers.map((p) => ({
+    id: p.id,
+    name: p.passengerName,
+    amount: String(p.amount),
+    customer: p.customer,
+  }));
+}
+
+interface BookingFormProps {
+  /** Absent = create a new booking. Present = edit this one. */
+  initial?: BookingDetail;
+  /** Rendered into the form's first grid cell. The create dialog passes its Booking Type
+   * <Select> here; the edit dialog passes nothing (a New booking can't become a Reissue). */
+  typeSelector?: ReactNode;
+  onDone: () => void;
+  onCancel: () => void;
+}
+
+export function BookingForm({ initial, typeSelector, onDone, onCancel }: BookingFormProps) {
+  // No reset-on-`initial`-change effect here on purpose: `initial` comes from a TanStack Query in
+  // the edit dialog, and this form's own `onSuccess` invalidates ['bookings'] — a background
+  // refetch mid-edit would hand this component a new `initial` object identity and (if an effect
+  // watched it) silently wipe whatever the user had typed. Both callers instead remount this
+  // component on open/close (`EditBookingDialog` keys it by `data.booking.id`, `CreateBookingDialog`
+  // keys it by `open ? 'open' : 'closed'`), so these lazy initializers already re-seed correctly
+  // without any effect. (This exact class of bug was fixed once already in this codebase — see
+  // send-quote-dialog.tsx's `wasOpen`-gated reset effect — so don't reintroduce it here.)
+  const [form, setForm] = useState(() => formStateFrom(initial));
+  const [passengers, setPassengers] = useState<PassengerRow[]>(() => passengerRowsFrom(initial));
+  // Which passenger row's autocomplete is active, and what it has typed.
+  const [search, setSearch] = useState<{ index: number; query: string } | null>(null);
+  // Which passenger row an inline "add new customer" should fill on success.
+  const [addCustomerIndex, setAddCustomerIndex] = useState(0);
+  const [addCustomerOpen, setAddCustomerOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  const searchQuery = search?.query ?? '';
+  const { data: matches = [] } = useQuery({
+    queryKey: ['customers', 'search', searchQuery],
+    queryFn: () => searchCustomers(searchQuery),
+    enabled: searchQuery.trim().length >= 3,
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: async (input: UpdateBookingInput): Promise<void> => {
+      if (initial) {
+        await updateBooking(initial.booking.id, input);
+      } else {
+        await createBooking(input);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['sales'] });
+      onDone();
+    },
+  });
+
+  function updatePassenger(index: number, patch: Partial<PassengerRow>) {
+    setPassengers((rows) => rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+  }
+
+  function handleNameChange(index: number, value: string) {
+    // Typing does NOT unlink `customer` — passengerName is always free text and is the source of
+    // truth, while `customer` is an optional ref, so a soft mismatch between them is tolerable and
+    // user-correctable. This used to clear `customer` on every keystroke, which silently destroyed
+    // a stored passenger's customer link the moment someone fixed a one-character typo in their
+    // name, with no indication a link had ever existed. The "Linked" badge + unlink control below
+    // make the link (and losing it) visible instead; picking a different autocomplete match or
+    // inline-creating a customer still re-points `customer`, which is what actually prevents a
+    // mismatch when the user genuinely changes who the passenger is.
+    updatePassenger(index, { name: value });
+    setSearch({ index, query: value });
+  }
+
+  function selectMatch(index: number, name: string, customerId: string) {
+    updatePassenger(index, { name, customer: customerId });
+    setSearch(null);
+  }
+
+  /** The suggestion list is open for a row when that row is the one being searched and the
+   * query is long enough — the same condition that renders it. */
+  function isNameListOpen(index: number): boolean {
+    return search?.index === index && search.query.trim().length >= 3;
+  }
+
+  const {
+    activeIndex: nameActiveIndex,
+    setActiveIndex: setNameActiveIndex,
+    handleKeyDown: handleNameKeyDown,
+  } = useListNavigation({
+    items: matches,
+    onSelect: (m) => {
+      if (search) selectMatch(search.index, `${m.firstName} ${m.lastName}`, m.id);
+    },
+    onClose: () => setSearch(null),
+  });
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    saveMutation.mutate({
+      invoiceNumber: form.invoiceNumber,
+      bookingDate: form.bookingDate,
+      voided: form.voided,
+      pnr: form.voided ? undefined : form.pnr || undefined,
+      airlineCode: form.voided ? undefined : form.airlineCode || undefined,
+      depCity: form.voided ? undefined : form.depCity || undefined,
+      arrCity: form.voided ? undefined : form.arrCity || undefined,
+      depDate: form.voided ? undefined : form.depDate || undefined,
+      arrDate: form.voided ? undefined : form.arrDate || undefined,
+      remark: form.remark || undefined,
+      payment: form.voided
+        ? undefined
+        : {
+            status: form.paymentStatus,
+            type: form.paymentType,
+            amount: form.paymentStatus === 'pending' ? Number(form.pendingAmount) : 0,
+            // Round-tripped invisibly: this form has no "paid on" control of its own. On CREATE,
+            // `form.paidOn` is always '' (never seeded from anything), so this is always
+            // `undefined` there and the field is simply absent from the payload, matching
+            // pre-existing CREATE behavior exactly. On EDIT, it carries through whatever
+            // record-payment-dialog.tsx already set, so saving an unrelated field here (a remark
+            // typo fix, say) doesn't silently erase it via the wholesale PATCH.
+            paidOn: form.paidOn || undefined,
+          },
+      // A voided invoice hides the Passengers section, but the `VOID` placeholder is CREATE-only
+      // (`!initial`): the backend requires >=1 passenger on every booking, and a brand-new voided
+      // invoice has no stored passengers yet, so it needs a dummy row to satisfy that. In EDIT
+      // mode there ARE stored passengers, and `PATCH /bookings/:id` treats `passengers[]` as the
+      // complete desired end state — a stored passenger omitted from the array is DELETED, and an
+      // entry with no `id` is indistinguishable from "start fresh". Submitting the id-less VOID
+      // placeholder here would delete every real passenger on the invoice. `voided` only relaxes
+      // the backend's pnr/airlineCode requirement; it does not require a dummy passenger, so in
+      // edit mode we send the stored rows with their ids, exactly like the non-voided path — don't
+      // collapse these two branches back together.
+      passengers:
+        form.voided && !initial
+          ? [{ passengerName: 'VOID', amount: 0 }]
+          : passengers
+              // A blank row (no stored id, no typed name) must never be submitted. On the
+              // non-voided path `required` already blocks this in the browser, but ticking
+              // "Mark as voided" hides the whole Passengers section — its `required` attribute
+              // can no longer fire — while the row is still sitting in this component's state, so
+              // without this filter a blank row silently becomes `passengerName: ''` in the
+              // payload and the backend 400s. A row with a stored `id` is always kept even if its
+              // name was blanked out, since that's a real edit for the user to fix, not a
+              // never-typed placeholder.
+              .filter((p) => Boolean(p.id) || p.name.trim().length > 0)
+              .map<UpdatePassengerInput>((p) => ({
+                // A row with no id is a passenger the user just added — the backend creates it.
+                ...(p.id ? { id: p.id } : {}),
+                passengerName: p.name,
+                amount: Number(p.amount),
+                ...(p.customer ? { customer: p.customer } : {}),
+              })),
+    });
+  }
+
+  return (
+    <>
+    <form onSubmit={handleSubmit} className="space-y-3">
+      {/* Row: Booking Type | Invoice# | Mark as voided — the create dialog passes a typeSelector
+          for the first cell; the edit dialog passes none (a New booking can't become a Reissue),
+          so that cell is dropped entirely and the grid collapses to 2 columns rather than leaving
+          a blank leading column. */}
+      <div className={cn('grid items-end gap-3', typeSelector ? 'grid-cols-3' : 'grid-cols-2')}>
+        {typeSelector && <div className="space-y-1">{typeSelector}</div>}
+        <div className="space-y-1">
+          <Label htmlFor="booking-invoice-number">Invoice#</Label>
+          <Input
+            id="booking-invoice-number"
+            aria-label="Invoice number"
+            value={form.invoiceNumber}
+            onChange={(e) => setForm({ ...form, invoiceNumber: e.target.value })}
+            required
+          />
+        </div>
+        <div className="flex items-center gap-2 pb-2.5">
+          <Checkbox
+            id="booking-voided"
+            checked={form.voided}
+            onCheckedChange={(checked) => setForm({ ...form, voided: checked === true })}
+          />
+          <Label htmlFor="booking-voided">Mark as voided</Label>
+        </div>
+      </div>
+
+      {/* Passengers: one row per passenger — hidden entirely when voided (a placeholder
+          VOID passenger is submitted instead, since the backend requires ≥1 passenger). */}
+      {!form.voided && (
+      <div className="space-y-2 rounded-md border p-3">
+        <p className="text-sm font-medium">Passengers</p>
+        {passengers.map((passenger, index) => (
+          <div key={index} className="flex items-start gap-2">
+            <div className="relative flex-1">
+              <Input
+                aria-label={index === 0 ? 'Passenger name' : `Passenger name ${index + 1}`}
+                value={passenger.name}
+                onChange={(e) => handleNameChange(index, e.target.value)}
+                onKeyDown={search?.index === index ? handleNameKeyDown : undefined}
+                placeholder="Passenger Name (type 3+ letters to search)"
+                required
+                role="combobox"
+                aria-expanded={isNameListOpen(index)}
+                aria-controls={`passenger-listbox-${index}`}
+                aria-autocomplete="list"
+                aria-activedescendant={
+                  isNameListOpen(index) && nameActiveIndex >= 0
+                    ? `passenger-listbox-${index}-${nameActiveIndex}`
+                    : undefined
+                }
+              />
+              {/* Makes an existing customer link visible instead of silently dropping it — typing
+                  in the name field above no longer clears `customer` (see handleNameChange). */}
+              {passenger.customer && (
+                <div className="mt-1 flex items-center gap-1">
+                  <Badge variant="secondary">Linked</Badge>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5"
+                    aria-label={`Unlink customer from passenger ${index + 1}`}
+                    onClick={() => updatePassenger(index, { customer: undefined })}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+              {isNameListOpen(index) && (
+                <div className="absolute left-0 right-0 top-full z-10 mt-1 rounded-md border bg-popover text-popover-foreground shadow">
+                  {/* "+ Add new customer" pinned above the (scrollable) matches so it never sinks
+                      below a long result list; max-h-48 ≈ 6 rows visible, the rest scroll. */}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start border-b font-medium"
+                    onClick={() => {
+                      setAddCustomerIndex(index);
+                      setAddCustomerOpen(true);
+                    }}
+                  >
+                    + Add new customer
+                  </Button>
+                  {matches.length > 0 && (
+                    <ul id={`passenger-listbox-${index}`} role="listbox" className="max-h-48 overflow-y-auto">
+                      {matches.map((m, matchIndex) => (
+                        <li
+                          key={m.id}
+                          id={`passenger-listbox-${index}-${matchIndex}`}
+                          role="option"
+                          aria-selected={matchIndex === nameActiveIndex}
+                          className={cn(
+                            'cursor-pointer px-3 py-1',
+                            matchIndex === nameActiveIndex && 'bg-accent'
+                          )}
+                          onMouseEnter={() => setNameActiveIndex(matchIndex)}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => selectMatch(index, `${m.firstName} ${m.lastName}`, m.id)}
+                        >
+                          {m.firstName} {m.lastName}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="relative w-32 shrink-0">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-foreground">
+                $
+              </span>
+              <Input
+                aria-label={index === 0 ? 'Amount' : `Amount ${index + 1}`}
+                type="number"
+                className="pl-6"
+                value={passenger.amount}
+                onChange={(e) => updatePassenger(index, { amount: e.target.value })}
+                placeholder="Amount"
+                required
+              />
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={`Remove passenger ${index + 1}`}
+              disabled={passengers.length === 1}
+              className="h-9 w-9 shrink-0 rounded-md bg-red-100 text-red-600 hover:bg-red-200 hover:text-red-700 disabled:bg-muted disabled:text-muted-foreground dark:bg-red-950 dark:text-red-300"
+              onClick={() => setPassengers((rows) => rows.filter((_, i) => i !== index))}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ))}
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={() => setPassengers((rows) => [...rows, { ...EMPTY_PASSENGER }])}
+        >
+          Add passenger
+        </Button>
+      </div>
+      )}
+
+      {/* Row: PNR | Airline Code (hidden when voided) */}
+      {!form.voided && (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <Label htmlFor="booking-pnr">PNR</Label>
+            <Input
+              id="booking-pnr"
+              aria-label="PNR"
+              value={form.pnr}
+              onChange={(e) => setForm({ ...form, pnr: e.target.value })}
+              required
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="booking-airline">Airline Code</Label>
+            <CodeSearchField
+              id="booking-airline"
+              ariaLabel="Airline code"
+              value={form.airlineCode}
+              onChange={(airlineCode) => setForm({ ...form, airlineCode })}
+              search={searchAirlines}
+              queryKey="airlines"
+              placeholder="e.g. Qatar or QR"
+              required
+            />
+          </div>
+        </div>
+      )}
+
+      {!form.voided && (
+        <>
+          {/* Row: Departure City | Arrival City */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="booking-dep-city">Departure City</Label>
+              <CodeSearchField
+                id="booking-dep-city"
+                ariaLabel="Departure city"
+                value={form.depCity}
+                onChange={(depCity) => setForm({ ...form, depCity })}
+                search={searchAirports}
+                queryKey="airports"
+                placeholder="e.g. Chicago or ORD"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="booking-arr-city">Arrival City</Label>
+              <CodeSearchField
+                id="booking-arr-city"
+                ariaLabel="Arrival city"
+                value={form.arrCity}
+                onChange={(arrCity) => setForm({ ...form, arrCity })}
+                search={searchAirports}
+                queryKey="airports"
+                placeholder="e.g. Kochi or COK"
+              />
+            </div>
+          </div>
+
+          {/* Row: Departure Date | Arrival Date */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="booking-dep-date">Departure Date</Label>
+              <DateField
+                id="booking-dep-date"
+                ariaLabel="Departure Date"
+                value={form.depDate}
+                onChange={(iso) => setForm({ ...form, depDate: iso })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="booking-arr-date">Arrival Date</Label>
+              <DateField
+                id="booking-arr-date"
+                ariaLabel="Arrival Date"
+                value={form.arrDate}
+                onChange={(iso) => setForm({ ...form, arrDate: iso })}
+              />
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Row: Remark */}
+      <div className="space-y-1">
+        <Label htmlFor="booking-remark">Remark</Label>
+        <Input
+          id="booking-remark"
+          value={form.remark}
+          onChange={(e) => setForm({ ...form, remark: e.target.value })}
+        />
+      </div>
+
+      {/* Row: Payment Status | Payment Type (Paid only) | Pending Amount (Pending only) */}
+      {!form.voided && (
+        <div className="grid grid-cols-3 gap-3">
+          <div className="space-y-1">
+            <Label>Payment Status</Label>
+            <Select
+              value={form.paymentStatus}
+              onValueChange={(v) => setForm({ ...form, paymentStatus: v as 'paid' | 'pending' })}
+            >
+              <SelectTrigger aria-label="Payment status" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="paid">Paid</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {form.paymentStatus === 'paid' && (
+            <div className="space-y-1">
+              <Label>Payment Type</Label>
+              <Select
+                value={form.paymentType}
+                onValueChange={(v) => setForm({ ...form, paymentType: v as 'card' | 'check' | 'cash' })}
+              >
+                <SelectTrigger aria-label="Payment type" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="card">Card</SelectItem>
+                  <SelectItem value="check">Check</SelectItem>
+                  <SelectItem value="cash">Cash</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {form.paymentStatus === 'pending' && (
+            <div className="space-y-1">
+              <Label htmlFor="booking-pending-amount">Pending Amount</Label>
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-foreground">
+                  $
+                </span>
+                <Input
+                  id="booking-pending-amount"
+                  aria-label="Amount owed"
+                  type="number"
+                  className="pl-6"
+                  value={form.pendingAmount}
+                  onChange={(e) => setForm({ ...form, pendingAmount: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {saveMutation.isError && (
+        <p className="text-sm text-destructive">
+          {errorMessage(saveMutation.error, 'Save failed. Check your connection and try again.')}
+        </p>
+      )}
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={saveMutation.isPending}>
+          {saveMutation.isPending ? 'Saving…' : initial ? 'Save changes' : 'Create booking'}
+        </Button>
+      </DialogFooter>
+    </form>
+    <AddEditCustomerDialog
+      open={addCustomerOpen}
+      onOpenChange={setAddCustomerOpen}
+      onCreated={(fullName, customerId) => {
+        updatePassenger(addCustomerIndex, { name: fullName, customer: customerId });
+        setSearch(null);
+      }}
+    />
+    </>
+  );
+}

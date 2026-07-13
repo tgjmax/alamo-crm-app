@@ -1,4 +1,5 @@
-import { canViewSalesReports, canEditBookings } from './permissions';
+import { describe, expect, it } from 'vitest';
+import { canViewSalesReports, canEditBookings, canDeleteBookings } from './permissions';
 import { AuthUser } from '../stores/authStore';
 
 const AGENT_PERMISSIONS_BASE = {
@@ -6,6 +7,22 @@ const AGENT_PERMISSIONS_BASE = {
   customers: { create: false, edit: false, delete: false, viewPassport: false },
   groups: { createShared: false },
 };
+
+function agent(overrides: Partial<AuthUser['permissions']> = {}): AuthUser {
+  return {
+    id: 'u1',
+    name: 'Agent',
+    email: 'agent@alamo.test',
+    role: 'agent',
+    permissions: {
+      bookings: { create: true, edit: false, delete: false, createAdjustment: true, viewAll: true },
+      customers: { create: true, edit: false, delete: false, viewPassport: false },
+      groups: { createShared: false },
+      data: { import: false, export: false, viewReports: false },
+      ...overrides,
+    },
+  } as AuthUser;
+}
 
 describe('canViewSalesReports', () => {
   it('is true for an admin regardless of permissions', () => {
@@ -56,5 +73,27 @@ describe('canEditBookings', () => {
     };
     expect(canEditBookings(agent)).toBe(false);
     expect(canEditBookings(null)).toBe(false);
+  });
+});
+
+describe('canDeleteBookings', () => {
+  it('is true for an admin regardless of permissions', () => {
+    expect(canDeleteBookings({ id: 'a1', name: 'A', email: 'a@a', role: 'admin' } as AuthUser)).toBe(true);
+  });
+
+  it('is false for an agent without bookings.delete', () => {
+    expect(canDeleteBookings(agent())).toBe(false);
+  });
+
+  it('is true for an agent with bookings.delete', () => {
+    expect(
+      canDeleteBookings(
+        agent({ bookings: { create: true, edit: true, delete: true, createAdjustment: true, viewAll: true } })
+      )
+    ).toBe(true);
+  });
+
+  it('is false for a null user', () => {
+    expect(canDeleteBookings(null)).toBe(false);
   });
 });
