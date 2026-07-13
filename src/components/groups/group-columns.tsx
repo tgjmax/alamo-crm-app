@@ -1,39 +1,29 @@
 import { ColumnDef } from '@tanstack/react-table';
-import { BookingRow } from '@/api/bookings.api';
+import { GroupResultRow } from '@/api/groups.api';
 import { formatDisplayDate } from '@/utils/dateFormat';
 import { CopyableText } from '@/components/data-table/copyable-text';
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header';
 import { PaymentStatusBadge } from '@/components/data-table/payment-status-badge';
-import { BookingRowActions } from './booking-row-actions';
 
-interface BuildBookingColumnsArgs {
-  onRecordPayment: (row: BookingRow) => void;
-  onEdit: (row: BookingRow) => void;
-  onDelete: (row: BookingRow) => void;
-  onDeleteInvoice: (row: BookingRow) => void;
-  canEdit: boolean;
-  canDelete: boolean;
-}
-
-export function buildBookingColumns({
-  onRecordPayment,
-  onEdit,
-  onDelete,
-  onDeleteInvoice,
-  canEdit,
-  canDelete,
-}: BuildBookingColumnsArgs): ColumnDef<BookingRow>[] {
+/** Mirrors buildBookingColumns() in ../bookings/booking-columns.tsx, minus the row-actions column
+ * (the group page is a read-only browser of a saved segment). Keep the two in step. */
+export function buildGroupColumns(): ColumnDef<GroupResultRow>[] {
   return [
     {
       id: 'date',
-      accessorKey: 'bookingDate',
+      accessorKey: 'date',
       header: ({ column }) => <DataTableColumnHeader column={column} title="Booking Date" />,
       meta: { label: 'Booking Date', widthClass: '2xl:w-32' },
       cell: ({ getValue }) => formatDisplayDate(getValue<string>()),
     },
     {
       id: 'invoiceNumber',
-      accessorKey: 'invoiceNumber',
+      // A Reissue/Refund adjustment has no parent Booking, so no invoice number of its own — fall
+      // back to its bookingType (REISSUE/REFUND) so it's never visually indistinguishable from a
+      // real booking. Mirrors the backend's own uInvoiceNumber fallback in bookingQuery.service.ts;
+      // deliberately NOT done in the Groups aggregation itself (groupQuery.service.ts) since that
+      // field also backs saved Group filter conditions, where the fallback must not exist.
+      accessorFn: (r) => r.invoiceNumber ?? r.bookingType.toUpperCase(),
       header: ({ column }) => <DataTableColumnHeader column={column} title="Invoice#" />,
       meta: { label: 'Invoice#', widthClass: '2xl:w-24' },
       cell: ({ getValue }) => <span className="font-medium">{getValue<string>()}</span>,
@@ -54,25 +44,25 @@ export function buildBookingColumns({
     },
     {
       id: 'pnr',
-      accessorFn: (b) => b.pnr ?? '',
+      accessorFn: (r) => r.pnr ?? '',
       header: ({ column }) => <DataTableColumnHeader column={column} title="PNR" />,
       meta: { label: 'PNR', widthClass: '2xl:w-20' },
     },
     {
       id: 'airlineCode',
-      accessorFn: (b) => b.airlineCode ?? '',
+      accessorFn: (r) => r.airlineCode ?? '',
       header: ({ column }) => <DataTableColumnHeader column={column} title="Airlines" />,
       meta: { label: 'Airlines', widthClass: '2xl:w-16' },
     },
     {
       id: 'depCity',
-      accessorFn: (b) => b.depCity ?? '',
+      accessorFn: (r) => r.depCity ?? '',
       header: ({ column }) => <DataTableColumnHeader column={column} title="Dep City" />,
       meta: { label: 'Departure City', widthClass: '2xl:w-20' },
     },
     {
       id: 'arrCity',
-      accessorFn: (b) => b.arrCity ?? '',
+      accessorFn: (r) => r.arrCity ?? '',
       header: ({ column }) => <DataTableColumnHeader column={column} title="Arr City" />,
       meta: { label: 'Arrival City', widthClass: '2xl:w-20' },
     },
@@ -92,7 +82,7 @@ export function buildBookingColumns({
     },
     {
       id: 'paymentStatus',
-      accessorFn: (b) => b.paymentStatus ?? '',
+      accessorFn: (r) => r.paymentStatus ?? '',
       header: () => <div className="text-center">Payment</div>,
       meta: { label: 'Payment Status', widthClass: '2xl:w-28' },
       enableSorting: false,
@@ -104,7 +94,7 @@ export function buildBookingColumns({
     },
     {
       id: 'remark',
-      accessorFn: (b) => b.remark ?? '',
+      accessorFn: (r) => r.remark ?? '',
       header: () => <span>Remark</span>,
       meta: { label: 'Remark' },
       enableSorting: false,
@@ -119,23 +109,6 @@ export function buildBookingColumns({
           </span>
         );
       },
-    },
-    {
-      id: 'actions',
-      header: '',
-      enableSorting: false,
-      enableHiding: false,
-      cell: ({ row }) => (
-        <BookingRowActions
-          row={row.original}
-          onRecordPayment={onRecordPayment}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          onDeleteInvoice={onDeleteInvoice}
-          canEdit={canEdit}
-          canDelete={canDelete}
-        />
-      ),
     },
   ];
 }

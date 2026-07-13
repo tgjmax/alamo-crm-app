@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Column, SortingState, VisibilityState, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
+import { SortingState, VisibilityState, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -11,7 +11,7 @@ import { RecordPaymentDialog } from './record-payment-dialog';
 import { EditBookingDialog } from './edit-booking-dialog';
 import { EditAdjustmentDialog } from './edit-adjustment-dialog';
 import { DeleteBookingDialog, DeleteTarget } from './delete-booking-dialog';
-import { COMPACT_CELL_CLASS, COMPACT_HEAD_CLASS } from '@/components/data-table/table-density';
+import { COMPACT_CELL_CLASS, COMPACT_HEAD_CLASS, columnWidthClass } from '@/components/data-table/table-density';
 import { DataTableFacetedFilter } from '@/components/data-table/data-table-faceted-filter';
 import { DataTableViewOptions } from '@/components/data-table/data-table-view-options';
 import { DataTablePagination } from '@/components/data-table/data-table-pagination';
@@ -22,15 +22,6 @@ const PAYMENT_STATUS_OPTIONS = [
   { label: 'Paid', value: 'paid' },
   { label: 'Pending', value: 'pending' },
 ];
-
-/** Fixed Tailwind width for columns whose content length is known (dates, PNR, airline, cities…) so
- * the browser gives the leftover width to the free-flowing columns (Name of PAX, Remark) instead.
- * The classes are 2xl-gated: below 2xl (MacBook-size screens) columns hug their content so the
- * table fits without forcing a horizontal scroll. */
-function columnWidthClass(column: Column<BookingRow, unknown>): string | undefined {
-  return (column.columnDef.meta as { widthClass?: string } | undefined)?.widthClass;
-}
-
 
 export interface BookingsTableScope {
   year?: number;

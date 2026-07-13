@@ -1,13 +1,26 @@
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { OnChangeFn, SortingState, Updater, VisibilityState } from '@tanstack/react-table';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams, useRouter } from '@tanstack/react-router';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import GroupResultsTable from '@/components/GroupResultsTable';
-import { deleteGroup, getGroup, getGroupFields, getGroupResults, GroupCondition, GroupFieldMeta } from '@/api/groups.api';
+import { GroupResultsTable } from '@/components/groups/group-results-table';
+import {
+  DEFAULT_GROUP_PAGE_SIZE,
+  deleteGroup,
+  getGroup,
+  getGroupFields,
+  getGroupResults,
+  GroupCondition,
+  GroupDetail,
+  GroupFieldMeta,
+  GroupSortBy,
+} from '@/api/groups.api';
 import { OPERATOR_LABELS } from '@/utils/conditionLabels';
 import { DeleteGroupDialog } from '@/components/groups/delete-group-dialog';
+import { useAuthStore } from '@/stores/authStore';
+import { useGroupView } from '@/hooks/useGroupView';
 
 /** 'Airline equals QR' — renders a stored condition using its registry label and the shared
  * operator label map, so the header reads in plain English, in the same language as the
@@ -22,19 +35,74 @@ function describeCondition(condition: GroupCondition, fields: GroupFieldMeta[]):
   return value === undefined || value === '' ? `${label} ${operatorLabel}` : `${label} ${operatorLabel} ${value}`;
 }
 
+interface GroupResultsSectionProps {
+  group: GroupDetail;
+  canPersistView: boolean;
+}
+
+/** Owns the table's page/sort/column-visibility state, seeded ONCE from the group's saved view via
+ * lazy useState initializers. Rendered keyed by group.id at its call site, so if the group being
+ * viewed ever changes, this remounts and re-seeds cleanly instead of leaking the previous group's
+ * layout into the new one — the established "key-based remount over a reset effect" pattern. */
+function GroupResultsSection({ group, canPersistView }: GroupResultsSectionProps) {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_GROUP_PAGE_SIZE);
+  const [sorting, setSorting] = useState<SortingState>(() =>
+    group.view?.sort ? [{ id: group.view.sort.id, desc: group.view.sort.desc }] : []
+  );
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() =>
+    Object.fromEntries((group.view?.hiddenColumns ?? []).map((id) => [id, false]))
+  );
+
+  const sortBy = sorting[0]?.id as GroupSortBy | undefined;
+  const sortDir = sorting[0] ? (sorting[0].desc ? 'desc' : 'asc') : undefined;
+
+  // Page and sort/size must change together in the SAME state update, or `useQuery` fires once
+  // with the OLD page and the NEW sort/size (a wasted round trip) before a separate effect catches
+  // up and resets the page. Mirrors GroupEditorPage's handleSortingChange/onPageSizeChange.
+  function handlePageSizeChange(nextPageSize: number) {
+    setPageSize(nextPageSize);
+    setPage(1);
+  }
+
+  const handleSortingChange: OnChangeFn<SortingState> = (updater: Updater<SortingState>) => {
+    setSorting(updater);
+    setPage(1);
+  };
+
+  const { data: result, isFetching } = useQuery({
+    queryKey: ['groups', group.id, 'results', { page, pageSize, sortBy, sortDir }],
+    queryFn: () => getGroupResults(group.id, { page, pageSize, sortBy, sortDir }),
+    placeholderData: keepPreviousData,
+  });
+
+  useGroupView(group.id, canPersistView, columnVisibility, sorting);
+
+  return (
+    <GroupResultsTable
+      result={result ?? null}
+      busy={isFetching}
+      page={page}
+      pageSize={pageSize}
+      sorting={sorting}
+      columnVisibility={columnVisibility}
+      onPageChange={setPage}
+      onPageSizeChange={handlePageSizeChange}
+      onSortingChange={handleSortingChange}
+      onColumnVisibilityChange={setColumnVisibility}
+    />
+  );
+}
+
 export default function GroupResultsPage() {
   const { groupId } = useParams({ strict: false }) as { groupId: string };
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [page, setPage] = useState(1);
+  const user = useAuthStore((s) => s.user);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const { data: group } = useQuery({ queryKey: ['groups', groupId], queryFn: () => getGroup(groupId) });
   const { data: fields = [] } = useQuery({ queryKey: ['groups', 'fields'], queryFn: getGroupFields });
-  const { data: result, isFetching } = useQuery({
-    queryKey: ['groups', groupId, 'results', page],
-    queryFn: () => getGroupResults(groupId, page),
-  });
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteGroup(groupId),
@@ -44,8 +112,10 @@ export default function GroupResultsPage() {
     },
   });
 
+  const canPersistView = Boolean(group && user && (user.role === 'admin' || user.id === group.owner.id));
+
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="mx-auto max-w-[1800px] space-y-6">
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
           <div className="space-y-1">
@@ -85,7 +155,7 @@ export default function GroupResultsPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {result && <GroupResultsTable result={result} busy={isFetching} onPageChange={setPage} />}
+          {group && <GroupResultsSection key={group.id} group={group} canPersistView={canPersistView} />}
         </CardContent>
       </Card>
 

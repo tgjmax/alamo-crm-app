@@ -53,11 +53,22 @@ describe('GroupEditorPage', () => {
     const preview = vi.spyOn(groupsApi, 'previewGroup').mockResolvedValue({
       rows: [
         {
-          id: 'p1', date: '2026-05-04T00:00:00.000Z', invoiceNumber: '0000150', passengerName: 'JOSEPH/SHINY S',
-          bookingType: 'New', pnr: 'GUDBFX', airlineCode: 'QR', arrCity: 'COK', amount: 2400.02, paymentStatus: 'paid',
+          id: 'p1',
+          date: '2026-05-04T00:00:00.000Z',
+          invoiceNumber: '0000150',
+          passengerName: 'JOSEPH/SHINY S',
+          bookingType: 'New',
+          pnr: 'GUDBFX',
+          airlineCode: 'QR',
+          depCity: 'DXB',
+          arrCity: 'COK',
+          depDate: '2026-05-08T00:00:00.000Z',
+          arrDate: '2026-05-28T00:00:00.000Z',
+          amount: 2400.02,
+          paymentStatus: 'paid',
         },
       ],
-      total: 1, page: 1, pageSize: 50,
+      total: 1, page: 1, pageSize: 25,
     });
     renderAt('/groups/new', ADMIN);
 
@@ -67,10 +78,43 @@ describe('GroupEditorPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
 
     await waitFor(() =>
-      expect(preview).toHaveBeenCalledWith([{ field: 'airlineCode', operator: 'equals', value: 'QR' }], 1)
+      expect(preview).toHaveBeenCalledWith(
+        [{ field: 'airlineCode', operator: 'equals', value: 'QR' }],
+        { page: 1, pageSize: 25, sortBy: undefined, sortDir: undefined }
+      )
     );
     expect(await screen.findByText('JOSEPH/SHINY S')).toBeInTheDocument();
     expect(screen.getByText(/1 result/)).toBeInTheDocument();
+  });
+
+  it('re-runs the preview with the new sort when a column header is clicked', async () => {
+    const preview = vi.spyOn(groupsApi, 'previewGroup').mockResolvedValue({
+      rows: [
+        {
+          id: 'p1', date: '2026-05-04T00:00:00.000Z', invoiceNumber: '0000150',
+          passengerName: 'JOSEPH/SHINY S', bookingType: 'New', pnr: 'GUDBFX', airlineCode: 'QR',
+          amount: 2400.02, paymentStatus: 'paid',
+        },
+      ],
+      total: 1, page: 1, pageSize: 25,
+    });
+    renderAt('/groups/new', ADMIN);
+
+    await screen.findByRole('button', { name: 'Add condition' });
+    await userEvent.click(screen.getByRole('button', { name: 'Add condition' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Condition 1 value' }), 'QR');
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
+
+    expect(await screen.findByText('JOSEPH/SHINY S')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /Name of PAX/ }));
+
+    await waitFor(() =>
+      expect(preview).toHaveBeenLastCalledWith(
+        [{ field: 'airlineCode', operator: 'equals', value: 'QR' }],
+        { page: 1, pageSize: 25, sortBy: 'passengerName', sortDir: 'asc' }
+      )
+    );
   });
 
   it('saves a new shared group (admin sees share controls) and navigates to /groups', async () => {
@@ -144,5 +188,31 @@ describe('GroupEditorPage', () => {
         sharedWith: { mode: 'private', users: [] },
       });
     });
+  });
+
+  it('shows a working View menu on the live preview', async () => {
+    vi.spyOn(groupsApi, 'previewGroup').mockResolvedValue({
+      rows: [
+        {
+          id: 'p1', date: '2026-05-04T00:00:00.000Z', invoiceNumber: '0000150',
+          passengerName: 'JOSEPH/SHINY S', bookingType: 'New', pnr: 'GUDBFX', airlineCode: 'QR',
+          amount: 2400.02, paymentStatus: 'paid', remark: 'Aisle seat',
+        },
+      ],
+      total: 1, page: 1, pageSize: 25,
+    });
+    renderAt('/groups/new', ADMIN);
+
+    await screen.findByRole('button', { name: 'Add condition' });
+    await userEvent.click(screen.getByRole('button', { name: 'Add condition' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Condition 1 value' }), 'QR');
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
+
+    expect(await screen.findByText('Aisle seat')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'View' }));
+    await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Remark' }));
+
+    await waitFor(() => expect(screen.queryByText('Aisle seat')).not.toBeInTheDocument());
   });
 });

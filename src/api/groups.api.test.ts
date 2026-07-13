@@ -1,7 +1,9 @@
 import { vi } from 'vitest';
 import { apiClient } from './client';
+import * as groupsApi from './groups.api';
 import {
   getGroupFields, listGroups, getGroup, createGroup, updateGroup, deleteGroup, getGroupResults, previewGroup,
+  updateGroupView,
 } from './groups.api';
 
 describe('groups.api', () => {
@@ -34,13 +36,26 @@ describe('groups.api', () => {
     expect(patch).toHaveBeenCalledWith('/groups/g1', input);
   });
 
-  it('results and preview carry paging', async () => {
-    const get = vi.spyOn(apiClient, 'get').mockResolvedValueOnce({ data: { rows: [], total: 0, page: 2, pageSize: 50 } });
-    await getGroupResults('g1', 2);
-    expect(get).toHaveBeenCalledWith('/groups/g1/results', { params: { page: 2 } });
-    const post = vi.spyOn(apiClient, 'post').mockResolvedValueOnce({ data: { rows: [], total: 0, page: 1, pageSize: 50 } });
+  it('results and preview carry paging and sorting', async () => {
+    const get = vi.spyOn(apiClient, 'get').mockResolvedValueOnce({ data: { rows: [], total: 0, page: 2, pageSize: 25 } });
+    await getGroupResults('g1', { page: 2, pageSize: 25, sortBy: 'passengerName', sortDir: 'asc' });
+    expect(get).toHaveBeenCalledWith('/groups/g1/results', {
+      params: { page: 2, pageSize: 25, sortBy: 'passengerName', sortDir: 'asc' },
+    });
+
+    const post = vi.spyOn(apiClient, 'post').mockResolvedValueOnce({ data: { rows: [], total: 0, page: 1, pageSize: 10 } });
     const conditions = [{ field: 'amount', operator: 'greaterThan' as const, value: 5 }];
-    await previewGroup(conditions, 1);
-    expect(post).toHaveBeenCalledWith('/groups/preview', { conditions, page: 1 });
+    await previewGroup(conditions, { page: 1, pageSize: 10 });
+    expect(post).toHaveBeenCalledWith('/groups/preview', {
+      conditions, page: 1, pageSize: 10, sortBy: undefined, sortDir: undefined,
+    });
+  });
+
+  it('saves a view and returns it', async () => {
+    const view: groupsApi.GroupView = { hiddenColumns: ['remark'], sort: { id: 'amount', desc: true } };
+    const patch = vi.spyOn(apiClient, 'patch').mockResolvedValueOnce({ data: { view } });
+    const result = await updateGroupView('g1', view);
+    expect(patch).toHaveBeenCalledWith('/groups/g1/view', view);
+    expect(result).toEqual(view);
   });
 });

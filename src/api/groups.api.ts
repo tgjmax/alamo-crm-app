@@ -50,6 +50,26 @@ export interface GroupDetail {
   owner: { id: string; name: string };
   sharedWith: GroupSharing;
   conditions: GroupCondition[];
+  view?: GroupView;
+}
+
+export const GROUP_PAGE_SIZES = [10, 25, 50, 100] as const;
+export const DEFAULT_GROUP_PAGE_SIZE = 25;
+
+export type GroupSortBy =
+  | 'date' | 'invoiceNumber' | 'passengerName' | 'amount' | 'pnr' | 'airlineCode'
+  | 'depCity' | 'arrCity' | 'depDate' | 'arrDate';
+
+export interface GroupResultParams {
+  page: number;
+  pageSize: number;
+  sortBy?: GroupSortBy;
+  sortDir?: 'asc' | 'desc';
+}
+
+export interface GroupView {
+  hiddenColumns: string[];
+  sort?: { id: GroupSortBy; desc: boolean };
 }
 
 export interface GroupResultRow {
@@ -60,9 +80,14 @@ export interface GroupResultRow {
   bookingType: string;
   pnr?: string;
   airlineCode?: string;
+  depCity?: string;
   arrCity?: string;
+  depDate?: string;
+  arrDate?: string;
   amount: number;
-  paymentStatus?: string;
+  paymentStatus?: 'paid' | 'pending';
+  paymentAmount?: number;
+  remark?: string;
 }
 
 export interface GroupQueryResult {
@@ -93,6 +118,11 @@ export async function getGroup(id: string): Promise<GroupDetail> {
   return res.data;
 }
 
+export async function updateGroupView(id: string, view: GroupView): Promise<GroupView> {
+  const res = await apiClient.patch<{ view: GroupView }>(`/groups/${id}/view`, view);
+  return res.data.view;
+}
+
 export async function createGroup(input: GroupInput): Promise<{ id: string }> {
   const res = await apiClient.post<{ id: string }>('/groups', input);
   return res.data;
@@ -107,12 +137,15 @@ export async function deleteGroup(id: string): Promise<void> {
   await apiClient.delete(`/groups/${id}`);
 }
 
-export async function getGroupResults(id: string, page: number): Promise<GroupQueryResult> {
-  const res = await apiClient.get<GroupQueryResult>(`/groups/${id}/results`, { params: { page } });
+export async function getGroupResults(id: string, params: GroupResultParams): Promise<GroupQueryResult> {
+  const res = await apiClient.get<GroupQueryResult>(`/groups/${id}/results`, { params });
   return res.data;
 }
 
-export async function previewGroup(conditions: GroupCondition[], page: number): Promise<GroupQueryResult> {
-  const res = await apiClient.post<GroupQueryResult>('/groups/preview', { conditions, page });
+export async function previewGroup(
+  conditions: GroupCondition[],
+  params: GroupResultParams
+): Promise<GroupQueryResult> {
+  const res = await apiClient.post<GroupQueryResult>('/groups/preview', { conditions, ...params });
   return res.data;
 }

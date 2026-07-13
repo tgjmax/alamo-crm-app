@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
+import { SortingState, Updater, VisibilityState } from '@tanstack/react-table';
 import { useQuery } from '@tanstack/react-query';
 import { useParams, useRouter } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
@@ -22,15 +23,18 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import ConditionBuilder from '../components/ConditionBuilder';
-import GroupResultsTable from '../components/GroupResultsTable';
+import { GroupResultsTable } from '../components/groups/group-results-table';
 import {
   createGroup,
+  DEFAULT_GROUP_PAGE_SIZE,
   getGroup,
   getGroupFields,
   previewGroup,
   updateGroup,
   GroupCondition,
   GroupQueryResult,
+  GroupResultParams,
+  GroupSortBy,
 } from '../api/groups.api';
 import { getUserDirectory } from '../api/users.api';
 import { useAuthStore } from '../stores/authStore';
@@ -46,6 +50,13 @@ export default function GroupEditorPage() {
   const [shareMode, setShareMode] = useState<'private' | 'shared'>('private');
   const [shareUsers, setShareUsers] = useState<string[]>([]);
   const [result, setResult] = useState<GroupQueryResult | null>(null);
+  // null means "no preview has been run yet" — the table renders nothing until the user asks for one.
+  const [previewParams, setPreviewParams] = useState<GroupResultParams | null>(null);
+  const [sorting, setSorting] = useState<SortingState>([]);
+  // Ephemeral, session-only — the editor's preview has no saved group to attach a view to yet.
+  // Exists only because GroupResultsTable's columnVisibility prop is required, not because the
+  // editor's own scope asked for a View menu.
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [saveOpen, setSaveOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,19 +78,51 @@ export default function GroupEditorPage() {
     }
   }, [existing]);
 
-  async function runPreview(page: number) {
-    setError(null);
-    setBusy(true);
-    try {
-      setResult(await previewGroup(conditions, page));
-    } catch (err) {
-      const reason = axios.isAxiosError(err)
-        ? (err.response?.data as { error?: { message?: string } } | undefined)?.error?.message
-        : undefined;
-      setError(reason ?? 'Preview failed. Check the conditions and try again.');
-    } finally {
-      setBusy(false);
+  useEffect(() => {
+    if (!previewParams) return;
+    let cancelled = false;
+
+    async function run(params: GroupResultParams) {
+      setError(null);
+      setBusy(true);
+      try {
+        const next = await previewGroup(conditions, params);
+        if (!cancelled) setResult(next);
+      } catch (err) {
+        if (cancelled) return;
+        const reason = axios.isAxiosError(err)
+          ? (err.response?.data as { error?: { message?: string } } | undefined)?.error?.message
+          : undefined;
+        setError(reason ?? 'Preview failed. Check the conditions and try again.');
+      } finally {
+        if (!cancelled) setBusy(false);
+      }
     }
+
+    void run(previewParams);
+    return () => {
+      cancelled = true;
+    };
+    // `conditions` is deliberately NOT a dependency: editing one must not re-run a half-built
+    // preview on every keystroke. It is still read LIVE when the effect does fire, so re-arming
+    // via Preview OR via a sort/page/pageSize click always previews the conditions as they stand
+    // now — never a frozen snapshot, which would sort results for a filter the user already changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewParams]);
+
+  function handleSortingChange(updater: Updater<SortingState>) {
+    const next = typeof updater === 'function' ? updater(sorting) : updater;
+    setSorting(next);
+    setPreviewParams((prev) =>
+      prev
+        ? {
+            ...prev,
+            page: 1,
+            sortBy: next[0]?.id as GroupSortBy | undefined,
+            sortDir: next[0] ? (next[0].desc ? 'desc' : 'asc') : undefined,
+          }
+        : prev
+    );
   }
 
   async function handleSave() {
@@ -108,7 +151,7 @@ export default function GroupEditorPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-[1800px] space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="text-xl">
@@ -128,7 +171,14 @@ export default function GroupEditorPage() {
               type="button"
               variant="outline"
               disabled={busy || conditions.length === 0}
-              onClick={() => runPreview(1)}
+              onClick={() =>
+                setPreviewParams({
+                  page: 1,
+                  pageSize: previewParams?.pageSize ?? DEFAULT_GROUP_PAGE_SIZE,
+                  sortBy: sorting[0]?.id as GroupSortBy | undefined,
+                  sortDir: sorting[0] ? (sorting[0].desc ? 'desc' : 'asc') : undefined,
+                })
+              }
             >
               {busy ? 'Working…' : 'Preview'}
             </Button>
@@ -139,7 +189,18 @@ export default function GroupEditorPage() {
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 
-          <GroupResultsTable result={result} busy={busy} onPageChange={runPreview} />
+          <GroupResultsTable
+            result={result}
+            busy={busy}
+            page={previewParams?.page ?? 1}
+            pageSize={previewParams?.pageSize ?? DEFAULT_GROUP_PAGE_SIZE}
+            sorting={sorting}
+            columnVisibility={columnVisibility}
+            onPageChange={(page) => setPreviewParams((prev) => (prev ? { ...prev, page } : prev))}
+            onPageSizeChange={(pageSize) => setPreviewParams((prev) => (prev ? { ...prev, pageSize, page: 1 } : prev))}
+            onSortingChange={handleSortingChange}
+            onColumnVisibilityChange={setColumnVisibility}
+          />
         </CardContent>
       </Card>
 
