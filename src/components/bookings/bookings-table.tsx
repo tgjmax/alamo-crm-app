@@ -123,6 +123,9 @@ export function BookingsTable({ scope, defaultPageSize = 25, queryKeyPrefix }: B
             passengerName: row.passengerName,
             invoiceNumber: row.invoiceNumber,
             bookingType: row.bookingType,
+            // New rows only — lets the dialog look up how many passengers the invoice really has,
+            // so it warns about losing the invoice only when that is genuinely about to happen.
+            bookingId: row.bookingId,
           }),
         onDeleteInvoice: (row) => {
           if (!row.bookingId) return;

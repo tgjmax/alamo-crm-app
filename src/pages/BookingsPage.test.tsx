@@ -704,6 +704,16 @@ describe('BookingsPage', () => {
         });
         const deletePassengerSpy = vi.spyOn(bookingsApi, 'deletePassenger').mockResolvedValue(undefined);
         const deleteBookingSpy = vi.spyOn(bookingsApi, 'deleteBooking').mockResolvedValue(undefined);
+        // The delete dialog now asks the server how many passengers the invoice really has, so it
+        // only warns about losing the whole invoice when that is actually about to happen. Two
+        // passengers => not the last one => the confirm button stays "Delete".
+        vi.spyOn(bookingsApi, 'getBooking').mockResolvedValue({
+          booking: { id: 'bk1', invoiceNumber: '0000150', bookingDate: '2026-05-01', voided: false },
+          passengers: [
+            { id: 'p8', passengerName: 'SMITH/JOHN', amount: 300 },
+            { id: 'p9', passengerName: 'SMITH/JANE', amount: 450 },
+          ],
+        });
         renderWithClient(<BookingsPage />);
 
         await screen.findByText('0000150');

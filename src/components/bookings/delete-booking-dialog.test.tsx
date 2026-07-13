@@ -62,15 +62,64 @@ describe('DeleteBookingDialog', () => {
     expect(screen.getByText(/10432/)).toBeInTheDocument();
   });
 
-  // FIX 2: on a New passenger, the backend deletes the whole invoice when this is its last
-  // passenger (an invoice with no passengers is invisible to every list query, so it can't be
-  // left squatting on its unique invoice number) — the confirmation must say so, since the old
-  // copy ("Remove X from invoice #N? This cannot be undone.") is false on a single-passenger
-  // invoice: the invoice number, PNR, dates, remark and payment all go with it.
-  it('warns that the whole invoice goes too, on a passenger-scope target', () => {
-    renderDialog(PASSENGER_TARGET);
-    expect(screen.getByText(/last passenger on the invoice/i)).toBeInTheDocument();
-    expect(screen.getByText(/invoice itself.*is deleted too/i)).toBeInTheDocument();
+  // Deleting an invoice's LAST passenger takes the whole invoice with it (an invoice with no
+  // passengers is invisible to every list query, so it can't be left squatting on its unique
+  // invoice number). That deserves a loud warning — but ONLY when it is actually about to happen.
+  // An earlier version warned unconditionally, which meant a user removing one of three passengers
+  // was told their invoice might be destroyed. Crying wolf on the one dialog people must actually
+  // read is how they learn to click through it. So the dialog asks the server for the real
+  // passenger count (the table can't answer — it renders one filtered, paginated page, so a
+  // sibling may exist but simply not be on screen).
+  describe('last-passenger warning', () => {
+    it('warns that the invoice goes too — but only when this really is the last passenger', async () => {
+      vi.mocked(bookingsApi.getBooking).mockResolvedValue({
+        booking: { id: 'b1', invoiceNumber: '10432', bookingDate: '2026-05-01', voided: false },
+        passengers: [{ id: 'p2', passengerName: 'SMITH/JANE', amount: 450 }],
+      });
+
+      renderDialog({ ...PASSENGER_TARGET, bookingId: 'b1' });
+
+      expect(await screen.findByText(/only passenger on invoice #10432/i)).toBeInTheDocument();
+      expect(screen.getByText(/deletes the whole invoice/i)).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Delete passenger and invoice' })).toBeInTheDocument();
+      // The button says what it will actually do.
+      expect(await screen.findByRole('button', { name: 'Delete invoice' })).toBeInTheDocument();
+    });
+
+    it('does NOT warn about losing the invoice when siblings remain, and says what survives', async () => {
+      vi.mocked(bookingsApi.getBooking).mockResolvedValue({
+        booking: { id: 'b1', invoiceNumber: '10432', bookingDate: '2026-05-01', voided: false },
+        passengers: [
+          { id: 'p1', passengerName: 'SMITH/JOHN', amount: 300 },
+          { id: 'p2', passengerName: 'SMITH/JANE', amount: 450 },
+          { id: 'p3', passengerName: 'SMITH/BOB', amount: 200 },
+        ],
+      });
+
+      renderDialog({ ...PASSENGER_TARGET, bookingId: 'b1' });
+
+      expect(await screen.findByText(/other 2 passengers are not affected/i)).toBeInTheDocument();
+      expect(screen.queryByText(/deletes the whole invoice/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/only passenger/i)).not.toBeInTheDocument();
+    });
+
+    it('holds the Delete button until the count is known, so it can never destroy more than it said', async () => {
+      let resolve!: (v: bookingsApi.BookingDetail) => void;
+      vi.mocked(bookingsApi.getBooking).mockReturnValue(
+        new Promise<bookingsApi.BookingDetail>((r) => {
+          resolve = r;
+        })
+      );
+
+      renderDialog({ ...PASSENGER_TARGET, bookingId: 'b1' });
+
+      expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
+      resolve({
+        booking: { id: 'b1', invoiceNumber: '10432', bookingDate: '2026-05-01', voided: false },
+        passengers: [{ id: 'p2', passengerName: 'SMITH/JANE', amount: 450 }],
+      });
+      expect(await screen.findByRole('button', { name: 'Delete invoice' })).toBeEnabled();
+    });
   });
 
   // FIX 3: an adjustment row has no Booking header of its own — the API's list projection sets
