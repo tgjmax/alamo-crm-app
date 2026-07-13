@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PasswordInput } from '@/components/password-input';
 import { AuthUser, useAuthStore } from '@/stores/authStore';
 import { updateProfile, uploadProfilePhotoFile } from '@/api/users.api';
 
@@ -168,9 +169,9 @@ export function ProfileTab({ user }: ProfileTabProps) {
             {emailChanged && (
               <div className="space-y-2">
                 <Label htmlFor="profile-email-current-password">Current password (to confirm email change)</Label>
-                <Input
+                <PasswordInput
                   id="profile-email-current-password"
-                  type="password"
+                  fieldLabel="current password for email change"
                   value={emailCurrentPassword}
                   onChange={(e) => setEmailCurrentPassword(e.target.value)}
                   required
@@ -194,9 +195,9 @@ export function ProfileTab({ user }: ProfileTabProps) {
           <form onSubmit={handlePasswordSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="password-current">Current password</Label>
-              <Input
+              <PasswordInput
                 id="password-current"
-                type="password"
+                fieldLabel="current password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 required
@@ -204,9 +205,9 @@ export function ProfileTab({ user }: ProfileTabProps) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password-new">New password</Label>
-              <Input
+              <PasswordInput
                 id="password-new"
-                type="password"
+                fieldLabel="new password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 minLength={8}
@@ -215,9 +216,9 @@ export function ProfileTab({ user }: ProfileTabProps) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password-confirm">Confirm new password</Label>
-              <Input
+              <PasswordInput
                 id="password-confirm"
-                type="password"
+                fieldLabel="new password confirmation"
                 value={confirmNewPassword}
                 onChange={(e) => setConfirmNewPassword(e.target.value)}
                 required
