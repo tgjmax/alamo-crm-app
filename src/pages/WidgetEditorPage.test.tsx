@@ -33,23 +33,27 @@ describe('WidgetEditorPage', () => {
     vi.spyOn(widgetsApi, 'getDimensions').mockResolvedValue([
       { key: 'month', label: 'Month' }, { key: 'airlineCode', label: 'Airline' },
     ]);
-    vi.spyOn(groupsApi, 'listGroups').mockResolvedValue([
-      { id: 'g1', name: 'QR', owner: { id: 'u1', name: 'Admin' }, sharedWith: { mode: 'private', users: [] }, conditionCount: 1, updatedAt: '2026-07-06T00:00:00.000Z' },
-    ]);
     vi.spyOn(groupsApi, 'getGroupFields').mockResolvedValue([
       { key: 'airlineCode', label: 'Airline', type: 'string', operators: ['equals', 'contains', 'in'] },
     ]);
     vi.spyOn(usersApi, 'getUserDirectory').mockResolvedValue([{ id: 'u1', name: 'Admin' }]);
   });
 
-  it('creates a group-backed table widget and navigates to /dashboard', async () => {
+  it('has no source selector — every widget carries its own conditions', async () => {
+    renderAt('/dashboard/widgets/new');
+    expect(screen.queryByRole('combobox', { name: 'Source' })).not.toBeInTheDocument();
+    // The condition builder is always present now, not gated behind a source choice.
+    expect(await screen.findByRole('button', { name: 'Add condition' })).toBeInTheDocument();
+  });
+
+  it('creates a conditions-backed table widget and navigates to /dashboard', async () => {
     const create = vi.spyOn(widgetsApi, 'createWidget').mockResolvedValue({ id: 'w9' });
     vi.spyOn(widgetsApi, 'listWidgets').mockResolvedValue({ widgets: [], layout: [] });
     const router = renderAt('/dashboard/widgets/new');
 
     await userEvent.type(await screen.findByLabelText('Widget name'), 'By airline');
-    await pick('Source', 'Saved group');
-    await pick('Group', 'QR');
+    await userEvent.click(await screen.findByRole('button', { name: 'Add condition' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Condition 1 value' }), 'QR');
     await pick('Metric', 'Count');
     await pick('Group by', 'Airline');
     await pick('Display', 'Table');
@@ -60,7 +64,7 @@ describe('WidgetEditorPage', () => {
     await waitFor(() => {
       expect(create).toHaveBeenCalledWith({
         name: 'By airline',
-        group: 'g1',
+        conditions: [{ field: 'airlineCode', operator: 'equals', value: 'QR' }],
         vizType: 'table',
         aggregation: { fn: 'count', field: undefined, groupBy: 'airlineCode' },
         chartType: undefined,
@@ -75,14 +79,14 @@ describe('WidgetEditorPage', () => {
     renderAt('/dashboard/widgets/new');
 
     await userEvent.type(await screen.findByLabelText('Widget name'), 'Total');
-    await pick('Source', 'Saved group');
-    await pick('Group', 'QR');
+    await userEvent.click(await screen.findByRole('button', { name: 'Add condition' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Condition 1 value' }), 'QR');
     await pick('Metric', 'Sum of amount');
     await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
 
     await waitFor(() =>
       expect(preview).toHaveBeenCalledWith({
-        group: 'g1',
+        conditions: [{ field: 'airlineCode', operator: 'equals', value: 'QR' }],
         vizType: 'number',
         aggregation: { fn: 'sum', field: 'amount', groupBy: undefined },
         chartType: undefined,
@@ -93,7 +97,8 @@ describe('WidgetEditorPage', () => {
 
   it('loads an existing chart widget and updates it', async () => {
     vi.spyOn(widgetsApi, 'getWidget').mockResolvedValue({
-      id: 'w1', name: 'Monthly', sharedWith: { mode: 'private', users: [] }, group: 'g1',
+      id: 'w1', name: 'Monthly', sharedWith: { mode: 'private', users: [] },
+      conditions: [{ field: 'airlineCode', operator: 'equals', value: 'QR' }],
       vizType: 'chart', aggregation: { fn: 'sum', field: 'amount', groupBy: 'month' }, chartType: 'bar',
     });
     const update = vi.spyOn(widgetsApi, 'updateWidget').mockResolvedValue({ id: 'w1' });
@@ -110,7 +115,7 @@ describe('WidgetEditorPage', () => {
     await waitFor(() =>
       expect(update).toHaveBeenCalledWith('w1', {
         name: 'Monthly sales',
-        group: 'g1',
+        conditions: [{ field: 'airlineCode', operator: 'equals', value: 'QR' }],
         vizType: 'chart',
         aggregation: { fn: 'sum', field: 'amount', groupBy: 'month' },
         chartType: 'bar',

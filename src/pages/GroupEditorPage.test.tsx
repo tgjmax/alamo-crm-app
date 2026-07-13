@@ -123,12 +123,12 @@ describe('GroupEditorPage', () => {
 
   it('loads an existing group and updates it via PATCH', async () => {
     vi.spyOn(groupsApi, 'getGroup').mockResolvedValue({
-      id: 'g1', name: 'Old name', sharedWith: { mode: 'private', users: [] },
+      id: 'g1', name: 'Old name', owner: { id: 'u1', name: 'Admin' }, sharedWith: { mode: 'private', users: [] },
       conditions: [{ field: 'airlineCode', operator: 'equals', value: 'QR' }],
     });
     const update = vi.spyOn(groupsApi, 'updateGroup').mockResolvedValue({ id: 'g1' });
     vi.spyOn(groupsApi, 'listGroups').mockResolvedValue([]);
-    renderAt('/groups/g1', ADMIN);
+    renderAt('/groups/g1/edit', ADMIN);
 
     const nameInput = await screen.findByLabelText('Group name');
     await waitFor(() => expect(nameInput).toHaveValue('Old name'));

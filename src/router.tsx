@@ -13,6 +13,7 @@ import BookingsPage from './pages/BookingsPage';
 import EnquiriesPage from './pages/EnquiriesPage';
 import EnquiryDetailPage from './pages/EnquiryDetailPage';
 import GroupsPage from './pages/GroupsPage';
+import GroupResultsPage from './pages/GroupResultsPage';
 import GroupEditorPage from './pages/GroupEditorPage';
 import WidgetEditorPage from './pages/WidgetEditorPage';
 import SalesPage from './pages/SalesPage';
@@ -118,9 +119,15 @@ const groupNewRoute = createRoute({
   component: GroupEditorPage,
 });
 
-const groupEditRoute = createRoute({
+const groupResultsRoute = createRoute({
   getParentRoute: () => authedRoute,
   path: '/groups/$groupId',
+  component: GroupResultsPage,
+});
+
+const groupEditRoute = createRoute({
+  getParentRoute: () => authedRoute,
+  path: '/groups/$groupId/edit',
   component: GroupEditorPage,
 });
 
@@ -133,7 +140,7 @@ const settingsRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   loginRoute,
   indexRoute,
-  authedRoute.addChildren([dashboardRoute, widgetNewRoute, widgetEditRoute, customersRoute, bookingsRoute, salesRoute, enquiriesRoute, enquiryDetailRoute, groupsRoute, groupNewRoute, groupEditRoute, settingsRoute]),
+  authedRoute.addChildren([dashboardRoute, widgetNewRoute, widgetEditRoute, customersRoute, bookingsRoute, salesRoute, enquiriesRoute, enquiryDetailRoute, groupsRoute, groupNewRoute, groupResultsRoute, groupEditRoute, settingsRoute]),
 ]);
 
 export function createAppRouter(history?: RouterHistory) {

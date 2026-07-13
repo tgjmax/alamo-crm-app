@@ -1,22 +1,17 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { DeleteGroupDialog } from '@/components/groups/delete-group-dialog';
 import { listGroups, deleteGroup, GroupSummary } from '../api/groups.api';
 
 export default function GroupsPage() {
   const [pendingDelete, setPendingDelete] = useState<GroupSummary | null>(null);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { data: groups = [] } = useQuery({ queryKey: ['groups'], queryFn: listGroups });
 
@@ -55,7 +50,11 @@ export default function GroupsPage() {
             </TableHeader>
             <TableBody>
               {groups.map((g) => (
-                <TableRow key={g.id}>
+                <TableRow
+                  key={g.id}
+                  className="cursor-pointer"
+                  onClick={() => navigate({ to: '/groups/$groupId', params: { groupId: g.id } })}
+                >
                   <TableCell>{g.name}</TableCell>
                   <TableCell className="text-muted-foreground">{g.owner.name}</TableCell>
                   <TableCell>
@@ -66,17 +65,15 @@ export default function GroupsPage() {
                   <TableCell>{g.conditionCount}</TableCell>
                   <TableCell className="text-muted-foreground">{g.updatedAt.slice(0, 10)}</TableCell>
                   <TableCell className="space-x-1">
-                    <Button asChild variant="ghost" size="sm">
-                      <Link to="/groups/$groupId" params={{ groupId: g.id }}>
-                        Open
-                      </Link>
-                    </Button>
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
                       aria-label={`Delete ${g.name}`}
-                      onClick={() => setPendingDelete(g)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPendingDelete(g);
+                      }}
                     >
                       Delete
                     </Button>
@@ -88,29 +85,13 @@ export default function GroupsPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete group</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Delete “{pendingDelete?.name}”? This only removes the saved filter, not any bookings or customers.
-          </p>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setPendingDelete(null)}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              disabled={deleteMutation.isPending}
-              onClick={() => pendingDelete && deleteMutation.mutate(pendingDelete.id)}
-            >
-              Confirm delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeleteGroupDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+        groupName={pendingDelete?.name}
+        onConfirm={() => pendingDelete && deleteMutation.mutate(pendingDelete.id)}
+        isPending={deleteMutation.isPending}
+      />
     </div>
   );
 }

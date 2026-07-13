@@ -15,6 +15,7 @@ import {
   GroupFieldMeta,
 } from '../api/groups.api';
 import { DirectoryUser } from '../api/users.api';
+import { OPERATOR_LABELS } from '../utils/conditionLabels';
 
 interface ConditionBuilderProps {
   fields: GroupFieldMeta[];
@@ -29,19 +30,6 @@ function todayIso(): string {
 
 /** Relative-date operators whose range is entirely implied — they take no value input at all. */
 const VALUELESS_OPERATORS: ConditionOperator[] = ['thisMonth', 'thisYear'];
-
-/** Operator labels. Without these the relative ones would render as raw camelCase keys. */
-const OPERATOR_LABELS: Record<ConditionOperator, string> = {
-  equals: 'equals',
-  contains: 'contains',
-  in: 'is one of',
-  between: 'between',
-  greaterThan: 'after',
-  lessThan: 'before',
-  inLastDays: 'in the last (days)',
-  thisMonth: 'this month',
-  thisYear: 'this year',
-};
 
 function defaultValue(field: GroupFieldMeta, operator: ConditionOperator): ConditionValue {
   if (VALUELESS_OPERATORS.includes(operator)) return undefined;

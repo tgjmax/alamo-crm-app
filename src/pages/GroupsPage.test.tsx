@@ -53,8 +53,18 @@ describe('GroupsPage', () => {
     await screen.findByText('May QR bookings');
 
     await userEvent.click(screen.getByRole('button', { name: 'Delete May QR bookings' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Confirm delete' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
 
     await waitFor(() => expect(del).toHaveBeenCalledWith('g1'));
+  });
+
+  it('navigates to the results page, not the editor, when a row is clicked', async () => {
+    vi.spyOn(groupsApi, 'listGroups').mockResolvedValue(GROUPS);
+    const router = renderAtGroups();
+    await screen.findByText('May QR bookings');
+
+    await userEvent.click(screen.getByText('May QR bookings'));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/groups/g1'));
   });
 });

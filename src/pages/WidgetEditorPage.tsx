@@ -19,11 +19,10 @@ import {
   getDimensions, getWidget, createWidget, updateWidget, previewWidget,
   WidgetData, WidgetInput, WidgetPreviewInput, WidgetVizType, ChartType,
 } from '../api/widgets.api';
-import { getGroupFields, listGroups, GroupCondition } from '../api/groups.api';
+import { getGroupFields, GroupCondition } from '../api/groups.api';
 import { getUserDirectory } from '../api/users.api';
 import { useAuthStore } from '../stores/authStore';
 
-type SourceMode = 'group' | 'conditions';
 type Fn = 'count' | 'sum' | 'avg';
 type MetricField = 'amount' | 'paymentAmount';
 
@@ -58,8 +57,6 @@ export default function WidgetEditorPage() {
   const canShare = user?.role === 'admin' || user?.permissions?.groups.createShared === true;
 
   const [name, setName] = useState('');
-  const [sourceMode, setSourceMode] = useState<SourceMode>('group');
-  const [groupId, setGroupId] = useState('');
   const [conditions, setConditions] = useState<GroupCondition[]>([]);
   const [metric, setMetric] = useState<Metric>('count');
   const [groupBy, setGroupBy] = useState<string>(NONE);
@@ -73,7 +70,6 @@ export default function WidgetEditorPage() {
   const [error, setError] = useState<string | null>(null);
 
   const { data: dimensions = [] } = useQuery({ queryKey: ['widgets', 'dimensions'], queryFn: getDimensions });
-  const { data: groups = [] } = useQuery({ queryKey: ['groups'], queryFn: listGroups });
   const { data: fields = [] } = useQuery({ queryKey: ['groups', 'fields'], queryFn: getGroupFields });
   const { data: directory = [] } = useQuery({ queryKey: ['users', 'directory'], queryFn: getUserDirectory });
   const { data: existing } = useQuery({
@@ -85,13 +81,7 @@ export default function WidgetEditorPage() {
   useEffect(() => {
     if (!existing) return;
     setName(existing.name);
-    if (existing.group) {
-      setSourceMode('group');
-      setGroupId(existing.group);
-    } else {
-      setSourceMode('conditions');
-      setConditions(existing.conditions ?? []);
-    }
+    setConditions(existing.conditions ?? []);
     setMetric(toMetric(existing.aggregation.fn, existing.aggregation.field));
     setGroupBy(existing.aggregation.groupBy ?? NONE);
     if (existing.vizType === 'chart') {
@@ -110,7 +100,7 @@ export default function WidgetEditorPage() {
   function buildInput(): WidgetInput {
     return {
       name,
-      ...(sourceMode === 'group' ? { group: groupId } : { conditions }),
+      conditions,
       vizType,
       aggregation: { ...toAggregation(metric), groupBy: hasGroupBy ? groupBy : undefined },
       chartType: vizType === 'chart' ? chartType : undefined,
@@ -120,14 +110,14 @@ export default function WidgetEditorPage() {
 
   function buildPreviewInput(): WidgetPreviewInput {
     return {
-      ...(sourceMode === 'group' ? { group: groupId } : { conditions }),
+      conditions,
       vizType,
       aggregation: { ...toAggregation(metric), groupBy: hasGroupBy ? groupBy : undefined },
       chartType: vizType === 'chart' ? chartType : undefined,
     };
   }
 
-  const sourceReady = sourceMode === 'group' ? groupId.length > 0 : conditions.length > 0;
+  const sourceReady = conditions.length > 0;
 
   async function runPreview() {
     setError(null);
@@ -181,36 +171,7 @@ export default function WidgetEditorPage() {
             <Input id="widget-name" value={name} onChange={(e) => setName(e.target.value)} className="max-w-sm" />
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Label>Source</Label>
-            <Select value={sourceMode} onValueChange={(v) => setSourceMode(v as SourceMode)}>
-              <SelectTrigger aria-label="Source" className="w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="group">Saved group</SelectItem>
-                <SelectItem value="conditions">Custom conditions</SelectItem>
-              </SelectContent>
-            </Select>
-            {sourceMode === 'group' && (
-              <Select value={groupId} onValueChange={setGroupId}>
-                <SelectTrigger aria-label="Group" className="w-56">
-                  <SelectValue placeholder="Pick a group" />
-                </SelectTrigger>
-                <SelectContent>
-                  {groups.map((g) => (
-                    <SelectItem key={g.id} value={g.id}>
-                      {g.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-
-          {sourceMode === 'conditions' && (
-            <ConditionBuilder fields={fields} users={directory} conditions={conditions} onChange={setConditions} />
-          )}
+          <ConditionBuilder fields={fields} users={directory} conditions={conditions} onChange={setConditions} />
 
           <div className="flex flex-wrap items-center gap-2">
             <Label>Metric</Label>

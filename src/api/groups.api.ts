@@ -47,6 +47,7 @@ export interface GroupSummary {
 export interface GroupDetail {
   id: string;
   name: string;
+  owner: { id: string; name: string };
   sharedWith: GroupSharing;
   conditions: GroupCondition[];
 }

@@ -23,8 +23,6 @@ export interface WidgetSummary {
   vizType: WidgetVizType;
   aggregation: WidgetAggregation;
   chartType?: ChartType;
-  group?: { id: string; name: string };
-  hasInlineConditions: boolean;
   updatedAt: string;
 }
 
@@ -32,7 +30,6 @@ export interface WidgetDetail {
   id: string;
   name: string;
   sharedWith: WidgetSharing;
-  group?: string;
   conditions?: GroupCondition[];
   vizType: WidgetVizType;
   aggregation: WidgetAggregation;
@@ -56,8 +53,7 @@ export interface LayoutEntry {
 
 export interface WidgetInput {
   name: string;
-  group?: string;
-  conditions?: GroupCondition[];
+  conditions: GroupCondition[];
   vizType: WidgetVizType;
   aggregation: WidgetAggregation;
   chartType?: ChartType;
@@ -65,8 +61,7 @@ export interface WidgetInput {
 }
 
 export interface WidgetPreviewInput {
-  group?: string;
-  conditions?: GroupCondition[];
+  conditions: GroupCondition[];
   vizType: WidgetVizType;
   aggregation: WidgetAggregation;
   chartType?: ChartType;

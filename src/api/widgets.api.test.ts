@@ -32,7 +32,12 @@ describe('widgets.api', () => {
   });
 
   it('creates, updates, deletes, and saves layout', async () => {
-    const input = { name: 'w', group: 'g1', vizType: 'number' as const, aggregation: { fn: 'count' as const } };
+    const input = {
+      name: 'w',
+      conditions: [{ field: 'airlineCode', operator: 'equals' as const, value: 'QR' }],
+      vizType: 'number' as const,
+      aggregation: { fn: 'count' as const },
+    };
     const post = vi.spyOn(apiClient, 'post').mockResolvedValueOnce({ data: { id: 'w1' } });
     expect(await createWidget(input)).toEqual({ id: 'w1' });
     expect(post).toHaveBeenCalledWith('/widgets', input);
