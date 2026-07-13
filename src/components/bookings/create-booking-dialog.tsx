@@ -14,6 +14,8 @@ import { CodeSearchField } from '@/components/code-search-field';
 import { DateField } from '@/components/date-field';
 import { searchAirports, searchAirlines } from '@/api/flightData.api';
 import { AdjustmentBookingForm } from './adjustment-booking-form';
+import { useListNavigation } from '@/hooks/useListNavigation';
+import { cn } from '@/lib/utils';
 
 interface CreateBookingDialogProps {
   open: boolean;
@@ -92,6 +94,24 @@ export function CreateBookingDialog({ open, onOpenChange }: CreateBookingDialogP
     updatePassenger(index, { name });
     setSearch(null);
   }
+
+  /** The suggestion list is open for a row when that row is the one being searched and the
+   * query is long enough — the same condition that renders it. */
+  function isNameListOpen(index: number): boolean {
+    return search?.index === index && search.query.trim().length >= 3;
+  }
+
+  const {
+    activeIndex: nameActiveIndex,
+    setActiveIndex: setNameActiveIndex,
+    handleKeyDown: handleNameKeyDown,
+  } = useListNavigation({
+    items: matches,
+    onSelect: (m) => {
+      if (search) selectMatch(search.index, `${m.firstName} ${m.lastName}`);
+    },
+    onClose: () => setSearch(null),
+  });
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -178,13 +198,23 @@ export function CreateBookingDialog({ open, onOpenChange }: CreateBookingDialogP
                     aria-label={index === 0 ? 'Passenger name' : `Passenger name ${index + 1}`}
                     value={passenger.name}
                     onChange={(e) => handleNameChange(index, e.target.value)}
+                    onKeyDown={search?.index === index ? handleNameKeyDown : undefined}
                     placeholder="Passenger Name (type 3+ letters to search)"
                     required
+                    role="combobox"
+                    aria-expanded={isNameListOpen(index)}
+                    aria-controls={`passenger-listbox-${index}`}
+                    aria-autocomplete="list"
+                    aria-activedescendant={
+                      isNameListOpen(index) && nameActiveIndex >= 0
+                        ? `passenger-listbox-${index}-${nameActiveIndex}`
+                        : undefined
+                    }
                   />
-                  {search?.index === index && search.query.trim().length >= 3 && (
+                  {isNameListOpen(index) && (
                     <div className="absolute left-0 right-0 top-full z-10 mt-1 rounded-md border bg-popover text-popover-foreground shadow">
                       {/* "+ Add new customer" pinned above the (scrollable) matches so it never sinks
-                          below a long result list; max-h-80 ≈ 10 rows visible, the rest scroll. */}
+                          below a long result list; max-h-48 ≈ 6 rows visible, the rest scroll. */}
                       <Button
                         type="button"
                         variant="ghost"
@@ -198,11 +228,19 @@ export function CreateBookingDialog({ open, onOpenChange }: CreateBookingDialogP
                         + Add new customer
                       </Button>
                       {matches.length > 0 && (
-                        <ul className="max-h-80 overflow-y-auto">
-                          {matches.map((m) => (
+                        <ul id={`passenger-listbox-${index}`} role="listbox" className="max-h-48 overflow-y-auto">
+                          {matches.map((m, matchIndex) => (
                             <li
                               key={m.id}
-                              className="cursor-pointer px-3 py-1 hover:bg-accent"
+                              id={`passenger-listbox-${index}-${matchIndex}`}
+                              role="option"
+                              aria-selected={matchIndex === nameActiveIndex}
+                              className={cn(
+                                'cursor-pointer px-3 py-1',
+                                matchIndex === nameActiveIndex && 'bg-accent'
+                              )}
+                              onMouseEnter={() => setNameActiveIndex(matchIndex)}
+                              onMouseDown={(e) => e.preventDefault()}
                               onClick={() => selectMatch(index, `${m.firstName} ${m.lastName}`)}
                             >
                               {m.firstName} {m.lastName}
