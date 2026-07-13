@@ -549,6 +549,38 @@ describe('BookingsPage', () => {
     expect(vi.mocked(bookingsApi.listBookings)).toHaveBeenCalledWith(expect.objectContaining({ voided: true }));
   });
 
+  it('sorts voided invoices by booking date, newest first, and pages through them', async () => {
+    vi.spyOn(bookingsApi, 'listBookings').mockImplementation((params = {}) => {
+      if (!params.voided) {
+        return Promise.resolve({ bookings: [BASE_ROW], total: 1, page: 1, pageSize: 25 });
+      }
+      // Two pages of voided invoices; which one comes back depends on the requested page.
+      const row = params.page === 2
+        ? { ...BASE_ROW, id: 'pv2', invoiceNumber: 'VOID-200', bookingDate: '2026-05-02', voided: true }
+        : { ...BASE_ROW, id: 'pv1', invoiceNumber: 'VOID-100', bookingDate: '2026-06-01', voided: true };
+      // 20 rows at the dialog's default 15 per page = 2 pages, so Next is live.
+      return Promise.resolve({ bookings: [row], total: 20, page: params.page ?? 1, pageSize: 15 });
+    });
+    renderWithClient(<BookingsPage />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Voided Invoices' }));
+    expect(await screen.findByText('VOID-100')).toBeInTheDocument();
+
+    // Newest-first by booking date, not by invoice number or insertion order.
+    expect(vi.mocked(bookingsApi.listBookings)).toHaveBeenCalledWith(
+      expect.objectContaining({ voided: true, page: 1, sortBy: 'date', sortDir: 'desc' })
+    );
+
+    // PaginationNext's aria-label overrides its visible text, so it is a link named /next/,
+    // not a button named 'Next'.
+    await userEvent.click(screen.getByRole('link', { name: /next/i }));
+
+    expect(await screen.findByText('VOID-200')).toBeInTheDocument();
+    expect(vi.mocked(bookingsApi.listBookings)).toHaveBeenCalledWith(
+      expect.objectContaining({ voided: true, page: 2 })
+    );
+  });
+
   it('opens the Send Invoice dialog from the toolbar', async () => {
     vi.spyOn(organizationApi, 'getBranding').mockResolvedValue({
       name: 'Alamo Travels',

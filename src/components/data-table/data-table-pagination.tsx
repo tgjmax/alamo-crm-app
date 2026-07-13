@@ -38,8 +38,10 @@ interface DataTablePaginationProps {
   pageSize: number;
   pageSizes: readonly number[];
   total: number;
-  selectedCount: number;
-  currentPageRowCount: number;
+  /** Omit on a table with no row selection — the "N of M row(s) selected" caption is then
+   * dropped rather than reading a permanent, meaningless "0 of N". */
+  selectedCount?: number;
+  currentPageRowCount?: number;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
 }
@@ -60,7 +62,7 @@ export function DataTablePagination({
   return (
     <div className="flex flex-col-reverse items-center justify-between gap-4 sm:flex-row">
       <div className="flex-1 text-sm text-muted-foreground">
-        {selectedCount} of {currentPageRowCount} row(s) selected.
+        {selectedCount !== undefined && `${selectedCount} of ${currentPageRowCount} row(s) selected.`}
       </div>
       <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6 lg:gap-8">
         <div className="flex items-center gap-2">
