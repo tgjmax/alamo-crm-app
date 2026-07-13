@@ -19,14 +19,45 @@ export interface EnquiryFareOption {
   segments: EnquirySegment[];
 }
 
-export interface EnquiryTrip {
+export const TRIP_TYPES = ['oneway', 'round', 'multicity'] as const;
+export type TripType = (typeof TRIP_TYPES)[number];
+
+export const CABIN_CLASSES = ['Economy', 'Premium Economy', 'Business', 'First'] as const;
+export type CabinClass = (typeof CABIN_CLASSES)[number];
+
+export const TRIP_STOPS = ['nonstop', 'upto1', 'upto2'] as const;
+export type TripStops = (typeof TRIP_STOPS)[number];
+
+export const STOPS_LABELS: Record<TripStops, string> = {
+  nonstop: 'Nonstop',
+  upto1: 'Up to 1 stop',
+  upto2: 'Up to 2 stops',
+};
+
+/** One leg of the requested itinerary. Every field is optional — an enquiry can be
+ * "Houston to Kochi, sometime in August". Distinct from EnquirySegment (a quoted fare
+ * option's flight, which carries times and has required fields). */
+export interface EnquiryTripSegment {
   from?: string;
   to?: string;
-  tripType: 'oneway' | 'round';
-  travelDate?: string;
-  returnDate?: string;
+  date?: string; // YYYY-MM-DD
+}
+
+export interface EnquiryPax {
+  adults: number;
+  children: number;
+  infants: number;
+}
+
+export interface EnquiryTrip {
+  tripType: TripType;
+  segments: EnquiryTripSegment[];
   dateFlexibility?: string;
-  paxCount?: number;
+  pax: EnquiryPax;
+  budgetPerPax?: number; // USD
+  cabins: CabinClass[]; // [] = no preference
+  preferredAirlines: string[]; // IATA codes; [] = no preference
+  stops?: TripStops; // undefined = no preference
 }
 
 export interface Enquiry {

@@ -12,6 +12,7 @@ import { DataTableFacetedFilter } from '@/components/data-table/data-table-facet
 import { DataTablePagination } from '@/components/data-table/data-table-pagination';
 import { COMPACT_CELL_CLASS, COMPACT_HEAD_CLASS } from '@/components/data-table/table-density';
 import { formatDisplayDate } from '@/utils/dateFormat';
+import { formatItinerary, formatPax, formatSegmentDates } from '@/utils/tripFormat';
 
 const STATUS_OPTIONS = ENQUIRY_STATUSES.map((s) => ({ label: s, value: s }));
 
@@ -99,18 +100,16 @@ export default function EnquiriesPage() {
                   </TableCell>
                   <TableCell className={cn('whitespace-nowrap', COMPACT_CELL_CLASS)}>{enquiry.enquirer.phone}</TableCell>
                   <TableCell className={cn('whitespace-nowrap', COMPACT_CELL_CLASS)}>
-                    {enquiry.trip.from && enquiry.trip.to ? `${enquiry.trip.from} → ${enquiry.trip.to}` : ''}
+                    {formatItinerary(enquiry.trip.segments)}
                   </TableCell>
                   <TableCell className={cn('whitespace-nowrap', COMPACT_CELL_CLASS)}>
-                    {[formatDisplayDate(enquiry.trip.travelDate), formatDisplayDate(enquiry.trip.returnDate)]
-                      .filter(Boolean)
-                      .join(' – ')}
+                    {formatSegmentDates(enquiry.trip.segments)}
                     {enquiry.trip.dateFlexibility && (
                       <span className="ml-1 text-xs text-muted-foreground">({enquiry.trip.dateFlexibility})</span>
                     )}
                   </TableCell>
                   <TableCell className={cn('whitespace-nowrap text-center', COMPACT_CELL_CLASS)}>
-                    {enquiry.trip.paxCount ?? ''}
+                    {formatPax(enquiry.trip.pax)}
                   </TableCell>
                   <TableCell className={cn('whitespace-nowrap', COMPACT_CELL_CLASS)}>
                     <EnquiryStatusBadge status={enquiry.status} />

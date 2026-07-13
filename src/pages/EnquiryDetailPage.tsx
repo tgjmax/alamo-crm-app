@@ -12,6 +12,7 @@ import {
   EnquiryFareOption,
   EnquiryStatus,
   getEnquiry,
+  STOPS_LABELS,
   updateEnquiry,
 } from '@/api/enquiries.api';
 import { EnquiryDialog } from '@/components/enquiries/enquiry-dialog';
@@ -19,6 +20,7 @@ import { EnquiryStatusBadge } from '@/components/enquiries/enquiry-status-badge'
 import { FareOptionDialog } from '@/components/enquiries/fare-option-dialog';
 import { SendQuoteDialog } from '@/components/enquiries/send-quote-dialog';
 import { formatDisplayDate } from '@/utils/dateFormat';
+import { formatItinerary, formatPax, formatSegmentDates } from '@/utils/tripFormat';
 
 export default function EnquiryDetailPage() {
   const { enquiryId } = useParams({ from: '/authed/enquiries/$enquiryId' });
@@ -119,20 +121,44 @@ export default function EnquiryDetailPage() {
             <span className="font-medium">Received:</span> {formatDisplayDate(enquiry.createdAt)}
           </p>
           <p>
-            <span className="font-medium">Route:</span>{' '}
-            {enquiry.trip.from && enquiry.trip.to ? `${enquiry.trip.from} → ${enquiry.trip.to}` : '—'}
-            {` (${enquiry.trip.tripType === 'round' ? 'Round trip' : 'One-way'})`}
+            <span className="font-medium">Route:</span> {formatItinerary(enquiry.trip.segments) || '—'}
+            {` (${
+              enquiry.trip.tripType === 'round'
+                ? 'Round trip'
+                : enquiry.trip.tripType === 'multicity'
+                  ? 'Multi-city'
+                  : 'One-way'
+            })`}
           </p>
           <p>
-            <span className="font-medium">Dates:</span>{' '}
-            {[formatDisplayDate(enquiry.trip.travelDate), formatDisplayDate(enquiry.trip.returnDate)].filter(Boolean).join(' – ') || '—'}
+            <span className="font-medium">Dates:</span> {formatSegmentDates(enquiry.trip.segments) || '—'}
             {enquiry.trip.dateFlexibility && (
               <span className="text-muted-foreground"> ({enquiry.trip.dateFlexibility})</span>
             )}
           </p>
           <p>
-            <span className="font-medium">Passengers:</span> {enquiry.trip.paxCount ?? '—'}
+            <span className="font-medium">Passengers:</span> {formatPax(enquiry.trip.pax) || '—'}
           </p>
+          {enquiry.trip.budgetPerPax !== undefined && (
+            <p>
+              <span className="font-medium">Budget/pax:</span> ${enquiry.trip.budgetPerPax.toFixed(2)}
+            </p>
+          )}
+          {enquiry.trip.cabins.length > 0 && (
+            <p>
+              <span className="font-medium">Cabin:</span> {enquiry.trip.cabins.join(', ')}
+            </p>
+          )}
+          {enquiry.trip.preferredAirlines.length > 0 && (
+            <p>
+              <span className="font-medium">Preferred airlines:</span> {enquiry.trip.preferredAirlines.join(', ')}
+            </p>
+          )}
+          {enquiry.trip.stops && (
+            <p>
+              <span className="font-medium">Stops:</span> {STOPS_LABELS[enquiry.trip.stops]}
+            </p>
+          )}
           <p>
             <span className="font-medium">Quote sent:</span>{' '}
             {enquiry.quoteSentAt ? formatDisplayDate(enquiry.quoteSentAt) : '—'}

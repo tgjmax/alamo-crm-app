@@ -29,7 +29,19 @@ const OPTION: enquiriesApi.EnquiryFareOption = {
 const ENQUIRY: enquiriesApi.Enquiry = {
   id: 'e1',
   enquirer: { name: 'Johny Smith', phone: '555-0100', email: 'johny@example.com' },
-  trip: { from: 'IAH', to: 'LAX', tripType: 'round', travelDate: '2026-07-08', returnDate: '2026-07-12', dateFlexibility: '±3 days', paxCount: 2 },
+  trip: {
+    tripType: 'round' as const,
+    segments: [
+      { from: 'IAH', to: 'LAX', date: '2026-07-08' },
+      { from: 'LAX', to: 'IAH', date: '2026-07-12' },
+    ],
+    dateFlexibility: '±3 days',
+    pax: { adults: 2, children: 1, infants: 0 },
+    budgetPerPax: 1200,
+    cabins: ['Business' as const],
+    preferredAirlines: ['QR'],
+    stops: 'nonstop' as const,
+  },
   notes: 'Morning preferred',
   status: 'New',
   fareOptions: [OPTION],

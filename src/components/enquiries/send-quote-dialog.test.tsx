@@ -24,7 +24,19 @@ function renderDialog(enquiry: enquiriesApi.Enquiry) {
 const ENQUIRY: enquiriesApi.Enquiry = {
   id: 'e1',
   enquirer: { name: 'Johny', email: 'johny@example.com' },
-  trip: { tripType: 'round' },
+  trip: {
+    tripType: 'round' as const,
+    segments: [
+      { from: 'IAH', to: 'LAX', date: '2026-07-08' },
+      { from: 'LAX', to: 'IAH', date: '2026-07-12' },
+    ],
+    dateFlexibility: '±3 days',
+    pax: { adults: 2, children: 1, infants: 0 },
+    budgetPerPax: 1200,
+    cabins: ['Business' as const],
+    preferredAirlines: ['QR'],
+    stops: 'nonstop' as const,
+  },
   status: 'New',
   fareOptions: [
     { airlineName: 'Spirit Airlines', pricePerPax: 220, segments: [{ from: 'IAH', to: 'LAX', date: '2026-07-08' }] },
