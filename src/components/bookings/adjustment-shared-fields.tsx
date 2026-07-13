@@ -1,3 +1,5 @@
+import { Plane, PlaneLanding, PlaneTakeoff, StickyNote, Ticket } from 'lucide-react';
+import { IconInput } from '@/components/icon-input';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -41,32 +43,36 @@ export function AdjustmentSharedFields({ bookingType, value, onChange }: Adjustm
           required
         />
       </div>
-      <Input
+      <IconInput
         aria-label="Adjustment PNR"
+        icon={<Ticket />}
         value={value.pnr}
         onChange={(e) => onChange({ pnr: e.target.value })}
-        placeholder="PNR"
+        placeholder="PNR — e.g. X4F2QP"
         required
       />
-      <Input
+      <IconInput
         aria-label="Adjustment airline code"
+        icon={<Plane />}
         value={value.airlineCode}
         onChange={(e) => onChange({ airlineCode: e.target.value })}
-        placeholder="Airline code (optional)"
+        placeholder="Airline code (optional) — e.g. QR"
       />
       {bookingType === 'Reissue' && (
         <>
-          <Input
+          <IconInput
             aria-label="Adjustment departure city"
+            icon={<PlaneTakeoff />}
             value={value.depCity}
             onChange={(e) => onChange({ depCity: e.target.value })}
-            placeholder="Departure city (optional)"
+            placeholder="Departure city (optional) — e.g. ORD"
           />
-          <Input
+          <IconInput
             aria-label="Adjustment arrival city"
+            icon={<PlaneLanding />}
             value={value.arrCity}
             onChange={(e) => onChange({ arrCity: e.target.value })}
-            placeholder="Arrival city (optional)"
+            placeholder="Arrival city (optional) — e.g. COK"
           />
           <div className="space-y-2">
             <Label htmlFor="adjustment-dep-date">Departure date</Label>
@@ -92,11 +98,13 @@ export function AdjustmentSharedFields({ bookingType, value, onChange }: Adjustm
       )}
       <div className="space-y-2">
         <Label htmlFor="adjustment-remark">Remark</Label>
-        <Input
+        <IconInput
           id="adjustment-remark"
           aria-label="Adjustment remark"
+          icon={<StickyNote />}
           value={value.remark}
           onChange={(e) => onChange({ remark: e.target.value })}
+          placeholder="Optional note"
         />
       </div>
       <div className="flex items-center gap-6">

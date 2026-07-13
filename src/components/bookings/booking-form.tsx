@@ -1,5 +1,5 @@
 import { FormEvent, ReactNode, useState } from 'react';
-import { X } from 'lucide-react';
+import { Hash, Plane, PlaneLanding, PlaneTakeoff, StickyNote, Ticket, User, X } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import { searchCustomers } from '@/api/customers.api';
 import { AddEditCustomerDialog } from '@/components/customers/add-edit-customer-dialog';
 import { CodeSearchField } from '@/components/code-search-field';
 import { DateField } from '@/components/date-field';
+import { IconInput } from '@/components/icon-input';
 import { searchAirports, searchAirlines } from '@/api/flightData.api';
 import { useListNavigation } from '@/hooks/useListNavigation';
 import { duplicateInvoice, errorMessage } from '@/utils/apiError';
@@ -260,11 +261,13 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
         {typeSelector && <div className="space-y-1">{typeSelector}</div>}
         <div className="space-y-1">
           <Label htmlFor="booking-invoice-number">Invoice#</Label>
-          <Input
+          <IconInput
             id="booking-invoice-number"
             aria-label="Invoice number"
+            icon={<Hash />}
             value={form.invoiceNumber}
             onChange={(e) => setForm({ ...form, invoiceNumber: e.target.value })}
+            placeholder="e.g. 1042"
             required
           />
         </div>
@@ -296,8 +299,9 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
         {passengers.map((passenger, index) => (
           <div key={index} className="flex items-start gap-2">
             <div className="relative flex-1">
-              <Input
+              <IconInput
                 aria-label={index === 0 ? 'Passenger name' : `Passenger name ${index + 1}`}
+                icon={<User />}
                 value={passenger.name}
                 onChange={(e) => handleNameChange(index, e.target.value)}
                 onKeyDown={search?.index === index ? handleNameKeyDown : undefined}
@@ -413,11 +417,13 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
             <Label htmlFor="booking-pnr">PNR</Label>
-            <Input
+            <IconInput
               id="booking-pnr"
               aria-label="PNR"
+              icon={<Ticket />}
               value={form.pnr}
               onChange={(e) => setForm({ ...form, pnr: e.target.value })}
+              placeholder="e.g. X4F2QP"
               required
             />
           </div>
@@ -431,6 +437,7 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
               search={searchAirlines}
               queryKey="airlines"
               placeholder="e.g. Qatar or QR"
+              icon={<Plane />}
               required
             />
           </div>
@@ -451,6 +458,7 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
                 search={searchAirports}
                 queryKey="airports"
                 placeholder="e.g. Chicago or ORD"
+                icon={<PlaneTakeoff />}
               />
             </div>
             <div className="space-y-1">
@@ -463,6 +471,7 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
                 search={searchAirports}
                 queryKey="airports"
                 placeholder="e.g. Kochi or COK"
+                icon={<PlaneLanding />}
               />
             </div>
           </div>
@@ -494,10 +503,12 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
       {/* Row: Remark */}
       <div className="space-y-1">
         <Label htmlFor="booking-remark">Remark</Label>
-        <Input
+        <IconInput
           id="booking-remark"
+          icon={<StickyNote />}
           value={form.remark}
           onChange={(e) => setForm({ ...form, remark: e.target.value })}
+          placeholder={form.voided ? 'e.g. VOID' : 'Optional note'}
         />
       </div>
 
