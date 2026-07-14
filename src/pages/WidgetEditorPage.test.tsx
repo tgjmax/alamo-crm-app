@@ -92,7 +92,59 @@ describe('WidgetEditorPage', () => {
         chartType: undefined,
       })
     );
-    expect(await screen.findByText('12')).toBeInTheDocument();
+    expect(await screen.findByText('$12.00')).toBeInTheDocument();
+  });
+
+  // THE HEADLINE BUG THIS WHOLE RENDER PASS EXISTS TO KILL — it still reproduced here even after
+  // DashboardPage was fixed, because WidgetEditorPage never built or passed a keyLabel to its
+  // own preview WidgetView. Verified to fail against the unfixed code (rendered the raw
+  // directory id `u77` instead of the agent's name) before the `previewKeyLabel` fix was added.
+  it('labels a createdBy-grouped widget in the PREVIEW with the agent name, not the raw id', async () => {
+    vi.spyOn(widgetsApi, 'getDimensions').mockResolvedValue([
+      { key: 'month', label: 'Month' },
+      { key: 'airlineCode', label: 'Airline' },
+      { key: 'createdBy', label: 'Entered by (agent)' },
+    ]);
+    vi.spyOn(usersApi, 'getUserDirectory').mockResolvedValue([
+      { id: 'u1', name: 'Admin' },
+      { id: 'u77', name: 'Priya Nair' },
+    ]);
+    vi.spyOn(widgetsApi, 'previewWidget').mockResolvedValue({
+      kind: 'breakdown',
+      rows: [{ key: 'u77', value: 3 }],
+    });
+    renderAt('/dashboard/widgets/new');
+
+    await userEvent.type(await screen.findByLabelText('Widget name'), 'By agent');
+    await userEvent.click(await screen.findByRole('button', { name: 'Add condition' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Condition 1 value' }), 'QR');
+    await pick('Metric', 'Count');
+    await pick('Group by', 'Entered by (agent)');
+    await pick('Display', 'Table');
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
+
+    expect(await screen.findByText('Priya Nair')).toBeInTheDocument();
+    expect(screen.queryByText('u77')).not.toBeInTheDocument();
+  });
+
+  // Fix 3: a preview payload computed under one aggregation must never be re-rendered under a
+  // different one — e.g. a dollar sum re-read as if it were a count once Metric changes.
+  it('clears a stale preview when the metric changes without re-previewing', async () => {
+    vi.spyOn(widgetsApi, 'previewWidget').mockResolvedValue({ kind: 'scalar', value: 124500.5 });
+    renderAt('/dashboard/widgets/new');
+
+    await userEvent.type(await screen.findByLabelText('Widget name'), 'Total');
+    await userEvent.click(await screen.findByRole('button', { name: 'Add condition' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Condition 1 value' }), 'QR');
+    await pick('Metric', 'Sum of amount');
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
+
+    expect(await screen.findByText('$124,500.50')).toBeInTheDocument();
+
+    await pick('Metric', 'Count');
+
+    expect(screen.queryByText('$124,500.50')).not.toBeInTheDocument();
+    expect(screen.queryByText('124,501')).not.toBeInTheDocument();
   });
 
   it('loads an existing chart widget and updates it', async () => {

@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +15,7 @@ import { getUserDirectory } from '../api/users.api';
 import WidgetView from '../components/WidgetView';
 import { useAuthStore } from '../stores/authStore';
 import { isAdminOrAbove } from '../utils/permissions';
+import { buildKeyLabel } from '../utils/widgetFormat';
 
 function orderWidgets(
   widgets: WidgetSummary[],
@@ -42,12 +44,14 @@ export default function DashboardPage() {
   const [ids, setIds] = useState<string[]>([]);
   const [sizes, setSizes] = useState<Record<string, 'small' | 'large'>>({});
   const [pendingDelete, setPendingDelete] = useState<WidgetSummary | null>(null);
+  const confirmed = useRef<{ ids: string[]; sizes: Record<string, 'small' | 'large'> }>({ ids: [], sizes: {} });
 
   useEffect(() => {
     if (data) {
       const { ids: nextIds, sizes: nextSizes } = orderWidgets(data.widgets, data.layout);
       setIds(nextIds);
       setSizes(nextSizes);
+      confirmed.current = { ids: nextIds, sizes: nextSizes };
     }
   }, [data]);
 
@@ -55,9 +59,24 @@ export default function DashboardPage() {
     () => new Map((data?.widgets ?? []).map((w) => [w.id, w])),
     [data]
   );
-  const nameById = useMemo(() => new Map(directory.map((u) => [u.id, u.name])), [directory]);
+  // Memoised once so widgets sharing the `createdBy` dimension reuse the same id -> name Map
+  // rather than rebuilding it per card on every render.
+  const createdByKeyLabel = useMemo(() => buildKeyLabel('createdBy', directory), [directory]);
 
-  const layoutMutation = useMutation({ mutationFn: (entries: LayoutEntry[]) => saveLayout(entries) });
+  const layoutMutation = useMutation({
+    mutationFn: (entries: LayoutEntry[]) => saveLayout(entries),
+    onSuccess: (_result, entries) => {
+      confirmed.current = {
+        ids: entries.map((e) => e.widget),
+        sizes: Object.fromEntries(entries.map((e) => [e.widget, e.size])),
+      };
+    },
+    onError: () => {
+      setIds(confirmed.current.ids);
+      setSizes(confirmed.current.sizes);
+      toast.error('Could not save the dashboard layout. Your change has been undone.');
+    },
+  });
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteWidget(id),
     onSuccess: () => {
@@ -86,8 +105,7 @@ export default function DashboardPage() {
   }
 
   function keyLabelFor(widget: WidgetSummary): (key: string) => string {
-    if (widget.aggregation.groupBy === 'createdBy') return (k) => nameById.get(k) ?? k;
-    return (k) => k;
+    return widget.aggregation.groupBy === 'createdBy' ? createdByKeyLabel : (k) => k;
   }
 
   return (
@@ -207,7 +225,17 @@ function WidgetCard({ widget, index, total, size, canEdit, keyLabel, onMove, onT
         </div>
       </CardHeader>
       <CardContent>
-        <WidgetView widget={widget} data={data ?? null} error={message} keyLabel={keyLabel} />
+        <WidgetView
+          widget={{
+            name: widget.name,
+            vizType: widget.vizType,
+            chartType: widget.chartType,
+            aggregation: widget.aggregation,
+          }}
+          data={data ?? null}
+          error={message}
+          keyLabel={keyLabel}
+        />
       </CardContent>
     </Card>
   );

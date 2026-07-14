@@ -73,6 +73,88 @@ describe('DashboardPage', () => {
     );
   });
 
+  it('toasts and reverts the order when the layout save fails', async () => {
+    vi.spyOn(widgetsApi, 'listWidgets').mockResolvedValue({
+      widgets: [W1, W2],
+      layout: [{ widget: 'w1', order: 0, size: 'small' }, { widget: 'w2', order: 1, size: 'small' }],
+    });
+    vi.spyOn(widgetsApi, 'getWidgetData').mockResolvedValue({ kind: 'scalar', value: 1 });
+    vi.spyOn(widgetsApi, 'saveLayout').mockRejectedValue(new Error('network'));
+    renderAtDashboard();
+
+    await screen.findByRole('heading', { name: 'QR count' });
+    await userEvent.click(screen.getByRole('button', { name: 'Move QR count down' }));
+
+    const toastText = await screen.findByText(/could not save/i);
+    expect(toastText).toBeInTheDocument();
+    // Pins the destructive styling path structurally — jsdom never applies sonner's injected
+    // stylesheet, so this is the closest we can assert without a real browser: sonner marks an
+    // error toast with data-type="error", which is what its CSS keys the destructive palette off.
+    expect(toastText.closest('[data-sonner-toast]')).toHaveAttribute('data-type', 'error');
+
+    // The board must snap back to the order the server actually holds, not keep showing a lie.
+    await waitFor(() => {
+      const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+      expect(headings).toEqual(['QR count', 'By airline']);
+    });
+  });
+
+  it('reverts to the last server-confirmed layout (not the page-load layout) after two successful saves then a failed one', async () => {
+    vi.spyOn(widgetsApi, 'listWidgets').mockResolvedValue({
+      widgets: [W1, W2],
+      layout: [{ widget: 'w1', order: 0, size: 'small' }, { widget: 'w2', order: 1, size: 'small' }],
+    });
+    vi.spyOn(widgetsApi, 'getWidgetData').mockResolvedValue({ kind: 'scalar', value: 1 });
+    const save = vi.spyOn(widgetsApi, 'saveLayout');
+    save.mockClear();
+    save
+      .mockResolvedValueOnce(undefined) // 1st save succeeds: move QR count down -> [w2, w1]
+      .mockResolvedValueOnce(undefined) // 2nd save succeeds: resize QR count to large (order stays [w2, w1])
+      .mockRejectedValueOnce(new Error('network')); // 3rd save fails
+    renderAtDashboard();
+
+    await screen.findByRole('heading', { name: 'QR count' });
+
+    // 1st successful reorder.
+    await userEvent.click(screen.getByRole('button', { name: 'Move QR count down' }));
+    await waitFor(() =>
+      expect(save).toHaveBeenNthCalledWith(1, [
+        { widget: 'w2', order: 0, size: 'small' },
+        { widget: 'w1', order: 1, size: 'small' },
+      ])
+    );
+    await waitFor(() => {
+      const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+      expect(headings).toEqual(['By airline', 'QR count']);
+    });
+
+    // 2nd successful save: resize QR count to large. Order is unchanged ([w2, w1]) but this
+    // is the state the `confirmed` ref must hold after this point -- distinct from BOTH the
+    // page-load layout (w1 small, w2 small) and the mid-sequence state after save #1 alone.
+    await userEvent.click(screen.getByRole('button', { name: 'Resize QR count' }));
+    await waitFor(() =>
+      expect(save).toHaveBeenNthCalledWith(2, [
+        { widget: 'w2', order: 0, size: 'small' },
+        { widget: 'w1', order: 1, size: 'large' },
+      ])
+    );
+    expect(await screen.findByRole('button', { name: 'Resize QR count' })).toHaveTextContent('Small');
+
+    // 3rd save fails: move By airline down -> attempted order [w1, w2].
+    await userEvent.click(screen.getByRole('button', { name: 'Move By airline down' }));
+    expect(await screen.findByText(/could not save/i)).toBeInTheDocument();
+
+    // Must land on the last SERVER-CONFIRMED state -- order [By airline, QR count] with
+    // QR count still large -- not the page-load order [QR count, By airline] with QR count
+    // small, which is what a `confirmed` ref seeded only once at mount (i.e. a deleted
+    // onSuccess handler) would incorrectly revert to.
+    await waitFor(() => {
+      const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+      expect(headings).toEqual(['By airline', 'QR count']);
+    });
+    expect(screen.getByRole('button', { name: 'Resize QR count' })).toHaveTextContent('Small');
+  });
+
   it('deletes a widget after confirmation', async () => {
     vi.spyOn(widgetsApi, 'listWidgets').mockResolvedValue({
       widgets: [W1], layout: [{ widget: 'w1', order: 0, size: 'small' }],

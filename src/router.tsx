@@ -20,13 +20,19 @@ import SalesPage from './pages/SalesPage';
 import SettingsPage from './pages/SettingsPage';
 import UsersPage from './pages/UsersPage';
 import AppShell from './components/AppShell';
+import { Toaster } from './components/ui/sonner';
 import { useAuthStore } from './stores/authStore';
 import { canViewSalesReports, canManageUsers } from './utils/permissions';
 import { restoreSession } from './api/sessionRestore';
 
 const rootRoute = createRootRoute({
   beforeLoad: () => restoreSession(),
-  component: () => <Outlet />,
+  component: () => (
+    <>
+      <Outlet />
+      <Toaster />
+    </>
+  ),
   pendingComponent: () => <div className="flex h-svh items-center justify-center text-sm text-muted-foreground">Loading…</div>,
 });
 

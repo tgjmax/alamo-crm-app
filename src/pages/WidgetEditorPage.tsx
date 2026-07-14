@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { useQuery } from '@tanstack/react-query';
 import { useParams, useRouter } from '@tanstack/react-router';
@@ -23,6 +23,7 @@ import { getGroupFields, GroupCondition } from '../api/groups.api';
 import { getUserDirectory } from '../api/users.api';
 import { useAuthStore } from '../stores/authStore';
 import { isAdminOrAbove } from '../utils/permissions';
+import { buildKeyLabel } from '../utils/widgetFormat';
 
 type Fn = 'count' | 'sum' | 'avg';
 type MetricField = 'amount' | 'paymentAmount';
@@ -95,8 +96,22 @@ export default function WidgetEditorPage() {
     setShareUsers(existing.sharedWith.users);
   }, [existing]);
 
+  // A stale preview payload was computed under a DIFFERENT aggregation (e.g. a dollar sum) —
+  // changing metric/groupBy/display without re-previewing must never let it be re-rendered as if
+  // it matched the new one (e.g. a currency total rounded into a fake integer count).
+  useEffect(() => {
+    setPreview(null);
+  }, [metric, groupBy, display]);
+
   const hasGroupBy = groupBy !== NONE;
   const vizType: WidgetVizType = !hasGroupBy ? 'number' : display;
+
+  // Same shared mapper the dashboard uses — otherwise a `createdBy`-grouped widget's preview
+  // renders raw Mongo ObjectIds while the identical saved widget on /dashboard renders names.
+  const previewKeyLabel = useMemo(
+    () => buildKeyLabel(hasGroupBy ? groupBy : undefined, directory),
+    [hasGroupBy, groupBy, directory]
+  );
 
   function buildInput(): WidgetInput {
     return {
@@ -247,7 +262,17 @@ export default function WidgetEditorPage() {
           {preview && (
             <Card>
               <CardContent className="pt-6">
-                <WidgetView widget={{ name, vizType, chartType: vizType === 'chart' ? chartType : undefined }} data={preview} error={null} />
+                <WidgetView
+                  widget={{
+                    name,
+                    vizType,
+                    chartType: vizType === 'chart' ? chartType : undefined,
+                    aggregation: { ...toAggregation(metric), groupBy: hasGroupBy ? groupBy : undefined },
+                  }}
+                  data={preview}
+                  error={null}
+                  keyLabel={previewKeyLabel}
+                />
               </CardContent>
             </Card>
           )}
