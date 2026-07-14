@@ -14,6 +14,8 @@ function renderWithClient(ui: React.ReactElement) {
   return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
 }
 
+const SUPERADMIN = { id: 'u0', name: 'Super', email: 'super@a.test', role: 'superadmin' as const };
+
 const BASE_ROW: bookingsApi.BookingRow = {
   id: 'p1',
   invoiceNumber: '0000150',
@@ -44,6 +46,22 @@ describe('BookingsPage', () => {
     // values in Create Booking tests — stub them to keep those tests offline.
     vi.spyOn(flightDataApi, 'searchAirports').mockResolvedValue([]);
     vi.spyOn(flightDataApi, 'searchAirlines').mockResolvedValue([]);
+    // A superadmin by default so every pre-existing behavioral test below (which predates the
+    // Create Booking / Booking Type permission gating) keeps exercising the Create Booking flow
+    // unimpeded. Tests targeting the gating itself, or deliberately exercising the unauthenticated
+    // state, override this with their own useAuthStore.setState(...) before rendering.
+    useAuthStore.setState({ accessToken: 't', user: SUPERADMIN });
+  });
+
+  // Reset the auth store to a clean, unauthenticated slate after every test in this file — several
+  // tests below (export/import gating, the "as an admin" describe) authenticate a specific user,
+  // and without this, that state would leak into whichever test runs next. Unmount first (cleanup())
+  // since BookingsTable subscribes to useAuthStore directly: resetting it while still mounted would
+  // update the store outside act() (RTL's own auto-cleanup afterEach is registered outside any
+  // describe and always runs after this one, so it can't be relied on to unmount first).
+  afterEach(() => {
+    cleanup();
+    useAuthStore.setState({ accessToken: null, user: null });
   });
 
   it('lists bookings with the requested columns, with Departure City hidden by default', async () => {
@@ -522,6 +540,7 @@ describe('BookingsPage', () => {
   });
 
   it('imports bookings via the Import Bookings dialog', async () => {
+    useAuthStore.setState({ accessToken: 't', user: SUPERADMIN });
     renderWithClient(<BookingsPage />);
     await userEvent.click(screen.getByRole('button', { name: 'Import Bookings' }));
     expect(await screen.findByLabelText('Booking import file')).toBeInTheDocument();
@@ -608,6 +627,7 @@ describe('BookingsPage', () => {
   });
 
   it('exports bookings via the Export dialog', async () => {
+    useAuthStore.setState({ accessToken: 't', user: SUPERADMIN });
     vi.spyOn(bookingsApi, 'exportBookings').mockResolvedValue(undefined);
     renderWithClient(<BookingsPage />);
     await userEvent.click(screen.getByRole('button', { name: 'Export' }));
@@ -618,6 +638,7 @@ describe('BookingsPage', () => {
   });
 
   it('shows an error in the export dialog when export fails', async () => {
+    useAuthStore.setState({ accessToken: 't', user: SUPERADMIN });
     vi.spyOn(bookingsApi, 'exportBookings').mockRejectedValueOnce(new Error('network down'));
     renderWithClient(<BookingsPage />);
     await userEvent.click(screen.getByRole('button', { name: 'Export' }));
@@ -627,6 +648,9 @@ describe('BookingsPage', () => {
   });
 
   it('does not show Record Payment without an authenticated bookings.edit user', async () => {
+    // Overrides this file's default superadmin — this test's whole point is the unauthenticated
+    // (null user) state.
+    useAuthStore.setState({ accessToken: null, user: null });
     vi.spyOn(bookingsApi, 'listBookings').mockResolvedValue({
       bookings: [{ ...BASE_ROW, id: 'p7', paymentStatus: 'pending', paymentAmount: 150, bookingType: 'New', bookingId: 'bk1' }],
       total: 1, page: 1, pageSize: 25,
@@ -856,6 +880,232 @@ describe('BookingsPage', () => {
         expect(await screen.findByRole('menuitem', { name: 'Delete reissue' })).toBeInTheDocument();
         expect(screen.queryByRole('menuitem', { name: /Delete invoice/ })).not.toBeInTheDocument();
       });
+    });
+  });
+
+  describe('Export/Import permission gating', () => {
+    const ADMIN_NO_PERMS = {
+      id: 'ua2',
+      name: 'Plain Admin',
+      email: 'admin@a.test',
+      role: 'admin' as const,
+      permissions: {
+        bookings: { create: false, edit: false, delete: false, createAdjustment: false, viewAll: false, import: false, export: false, sendInvoice: false },
+        customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
+        groups: { createShared: false },
+        data: { viewReports: false },
+        enquiries: { sendQuote: false },
+      },
+    };
+    const ADMIN_WITH_EXPORT = {
+      ...ADMIN_NO_PERMS,
+      id: 'ua3',
+      permissions: {
+        ...ADMIN_NO_PERMS.permissions,
+        bookings: { ...ADMIN_NO_PERMS.permissions.bookings, export: true },
+      },
+    };
+
+    it('a superadmin sees both Export and Import Bookings buttons', async () => {
+      useAuthStore.setState({ accessToken: 't', user: SUPERADMIN });
+      renderWithClient(<BookingsPage />);
+      expect(await screen.findByRole('button', { name: 'Export' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Import Bookings' })).toBeInTheDocument();
+    });
+
+    it('an admin without bookings.import/export permissions sees neither button', async () => {
+      useAuthStore.setState({ accessToken: 't', user: ADMIN_NO_PERMS });
+      renderWithClient(<BookingsPage />);
+      await screen.findByRole('button', { name: 'Create booking' });
+      expect(screen.queryByRole('button', { name: 'Export' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Import Bookings' })).not.toBeInTheDocument();
+    });
+
+    it('an admin with bookings.export granted sees Export but not Import', async () => {
+      useAuthStore.setState({ accessToken: 't', user: ADMIN_WITH_EXPORT });
+      renderWithClient(<BookingsPage />);
+      expect(await screen.findByRole('button', { name: 'Export' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Import Bookings' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Send Invoice permission gating', () => {
+    const AGENT_NO_SEND_INVOICE = {
+      id: 'ua9',
+      name: 'No Send Agent',
+      email: 'agent-nosend@a.test',
+      role: 'agent' as const,
+      permissions: {
+        bookings: { create: false, edit: false, delete: false, createAdjustment: false, viewAll: false, import: false, export: false, sendInvoice: false },
+        customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
+        groups: { createShared: false },
+        data: { viewReports: false },
+        enquiries: { sendQuote: false },
+      },
+    };
+    const AGENT_WITH_SEND_INVOICE = {
+      ...AGENT_NO_SEND_INVOICE,
+      id: 'ua10',
+      permissions: {
+        ...AGENT_NO_SEND_INVOICE.permissions,
+        bookings: { ...AGENT_NO_SEND_INVOICE.permissions.bookings, sendInvoice: true },
+      },
+    };
+
+    it('a superadmin sees the Send Invoice button', async () => {
+      useAuthStore.setState({ accessToken: 't', user: SUPERADMIN });
+      renderWithClient(<BookingsPage />);
+      expect(await screen.findByRole('button', { name: 'Send Invoice' })).toBeInTheDocument();
+    });
+
+    it('an agent without bookings.sendInvoice does not see the Send Invoice button', async () => {
+      useAuthStore.setState({ accessToken: 't', user: AGENT_NO_SEND_INVOICE });
+      renderWithClient(<BookingsPage />);
+      await screen.findByText('0000150');
+      expect(screen.queryByRole('button', { name: 'Send Invoice' })).not.toBeInTheDocument();
+    });
+
+    it('an agent with bookings.sendInvoice sees the Send Invoice button', async () => {
+      useAuthStore.setState({ accessToken: 't', user: AGENT_WITH_SEND_INVOICE });
+      renderWithClient(<BookingsPage />);
+      expect(await screen.findByRole('button', { name: 'Send Invoice' })).toBeInTheDocument();
+    });
+  });
+
+  describe('Create Booking permission gating', () => {
+    const AGENT_NO_BOOKING_PERMS = {
+      id: 'ua4',
+      name: 'Powerless Agent',
+      email: 'agent-none@a.test',
+      role: 'agent' as const,
+      permissions: {
+        bookings: { create: false, edit: false, delete: false, createAdjustment: false, viewAll: false, import: false, export: false, sendInvoice: false },
+        customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
+        groups: { createShared: false },
+        data: { viewReports: false },
+        enquiries: { sendQuote: false },
+      },
+    };
+    const AGENT_CREATE_ONLY = {
+      ...AGENT_NO_BOOKING_PERMS,
+      id: 'ua5',
+      name: 'Create-only Agent',
+      email: 'agent-create@a.test',
+      permissions: {
+        ...AGENT_NO_BOOKING_PERMS.permissions,
+        bookings: { ...AGENT_NO_BOOKING_PERMS.permissions.bookings, create: true },
+      },
+    };
+    // The interesting case: createAdjustment WITHOUT create. This user's only route to recording a
+    // reissue/refund is the Create Booking button, so hiding it would strand them — and once inside,
+    // the Booking Type selector must offer Reissue/Refund but NOT New, and must not default to New.
+    const AGENT_ADJUSTMENT_ONLY = {
+      ...AGENT_NO_BOOKING_PERMS,
+      id: 'ua6',
+      name: 'Adjustment-only Agent',
+      email: 'agent-adj@a.test',
+      permissions: {
+        ...AGENT_NO_BOOKING_PERMS.permissions,
+        bookings: { ...AGENT_NO_BOOKING_PERMS.permissions.bookings, createAdjustment: true },
+      },
+    };
+
+    it('a superadmin sees the Create booking button', async () => {
+      useAuthStore.setState({ accessToken: 't', user: SUPERADMIN });
+      renderWithClient(<BookingsPage />);
+      expect(await screen.findByRole('button', { name: 'Create booking' })).toBeInTheDocument();
+    });
+
+    it('an agent with neither bookings.create nor bookings.createAdjustment does not see the Create booking button', async () => {
+      useAuthStore.setState({ accessToken: 't', user: AGENT_NO_BOOKING_PERMS });
+      renderWithClient(<BookingsPage />);
+      await screen.findByText('0000150');
+      expect(screen.queryByRole('button', { name: 'Create booking' })).not.toBeInTheDocument();
+    });
+
+    it('an agent with only bookings.create sees Create booking, and the type selector offers only New', async () => {
+      useAuthStore.setState({ accessToken: 't', user: AGENT_CREATE_ONLY });
+      renderWithClient(<BookingsPage />);
+      await userEvent.click(await screen.findByRole('button', { name: 'Create booking' }));
+
+      expect(screen.getByRole('combobox', { name: 'Booking type' })).toHaveTextContent('New');
+      expect(screen.getByLabelText('Invoice number')).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('combobox', { name: 'Booking type' }));
+      expect(await screen.findByRole('option', { name: 'New' })).toBeInTheDocument();
+      expect(screen.queryByRole('option', { name: 'Reissue' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('option', { name: 'Refund' })).not.toBeInTheDocument();
+    });
+
+    it('an agent with only bookings.createAdjustment sees Create booking, and the type selector offers Reissue/Refund but not New, and does not default to New', async () => {
+      useAuthStore.setState({ accessToken: 't', user: AGENT_ADJUSTMENT_ONLY });
+      renderWithClient(<BookingsPage />);
+      await userEvent.click(await screen.findByRole('button', { name: 'Create booking' }));
+
+      // Defaults to Reissue, not New — proven by the adjustment form's own field being visible
+      // and the New form's Invoice number field being absent, with no interaction yet.
+      expect(screen.getByRole('combobox', { name: 'Booking type' })).toHaveTextContent('Reissue');
+      expect(screen.getByLabelText('Original PNR')).toBeInTheDocument();
+      expect(screen.queryByLabelText('Invoice number')).not.toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('combobox', { name: 'Booking type' }));
+      expect(await screen.findByRole('option', { name: 'Reissue' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Refund' })).toBeInTheDocument();
+      expect(screen.queryByRole('option', { name: 'New' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('"+ Add new customer" permission gating (booking-form.tsx)', () => {
+    const AGENT_NO_CUSTOMER_CREATE = {
+      id: 'ua7',
+      name: 'No Customer Create Agent',
+      email: 'agent-nocust@a.test',
+      role: 'agent' as const,
+      permissions: {
+        bookings: { create: true, edit: false, delete: false, createAdjustment: false, viewAll: false, import: false, export: false, sendInvoice: false },
+        customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
+        groups: { createShared: false },
+        data: { viewReports: false },
+        enquiries: { sendQuote: false },
+      },
+    };
+    const AGENT_WITH_CUSTOMER_CREATE = {
+      ...AGENT_NO_CUSTOMER_CREATE,
+      id: 'ua8',
+      permissions: {
+        ...AGENT_NO_CUSTOMER_CREATE.permissions,
+        customers: { ...AGENT_NO_CUSTOMER_CREATE.permissions.customers, create: true },
+      },
+    };
+
+    it('a superadmin sees "+ Add new customer" in the passenger autocomplete', async () => {
+      useAuthStore.setState({ accessToken: 't', user: SUPERADMIN });
+      renderWithClient(<BookingsPage />);
+      await userEvent.click(await screen.findByRole('button', { name: 'Create booking' }));
+      await userEvent.type(screen.getByLabelText('Passenger name'), 'Zed');
+      expect(await screen.findByRole('button', { name: '+ Add new customer' })).toBeInTheDocument();
+    });
+
+    it('an agent without customers.create does not see "+ Add new customer", but existing-customer search still works', async () => {
+      vi.spyOn(customersApi, 'searchCustomers').mockResolvedValue([
+        { id: 'c1', firstName: 'Alexander', lastName: 'Varghese', phone: '555-0100' },
+      ]);
+      useAuthStore.setState({ accessToken: 't', user: AGENT_NO_CUSTOMER_CREATE });
+      renderWithClient(<BookingsPage />);
+      await userEvent.click(await screen.findByRole('button', { name: 'Create booking' }));
+      await userEvent.type(screen.getByLabelText('Passenger name'), 'Var');
+
+      expect(await screen.findByText('Alexander Varghese')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '+ Add new customer' })).not.toBeInTheDocument();
+    });
+
+    it('an agent with customers.create sees "+ Add new customer"', async () => {
+      vi.spyOn(customersApi, 'searchCustomers').mockResolvedValue([]);
+      useAuthStore.setState({ accessToken: 't', user: AGENT_WITH_CUSTOMER_CREATE });
+      renderWithClient(<BookingsPage />);
+      await userEvent.click(await screen.findByRole('button', { name: 'Create booking' }));
+      await userEvent.type(screen.getByLabelText('Passenger name'), 'Zed');
+      expect(await screen.findByRole('button', { name: '+ Add new customer' })).toBeInTheDocument();
     });
   });
 });

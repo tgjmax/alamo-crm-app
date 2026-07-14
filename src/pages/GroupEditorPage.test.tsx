@@ -16,10 +16,11 @@ const ADMIN: AuthUser = { id: 'u1', name: 'Admin', email: 'a@t.test', role: 'adm
 const AGENT_NO_SHARE: AuthUser = {
   id: 'u2', name: 'Agent', email: 'g@t.test', role: 'agent',
   permissions: {
-    bookings: { create: false, edit: false, delete: false, createAdjustment: false, viewAll: true },
-    customers: { create: false, edit: false, delete: false, viewPassport: false },
+    bookings: { create: false, edit: false, delete: false, createAdjustment: false, viewAll: true, import: false, export: false, sendInvoice: false },
+    customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
     groups: { createShared: false },
-    data: { import: false, export: false, viewReports: false },
+    data: { viewReports: false },
+    enquiries: { sendQuote: false },
   },
 };
 

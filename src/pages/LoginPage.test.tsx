@@ -78,4 +78,31 @@ describe('LoginPage', () => {
     expect(await screen.findByText('Invalid email or password')).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/login');
   });
+
+  it('tells a deactivated user their account is deactivated, not that their password is wrong', async () => {
+    vi.spyOn(authApi, 'loginRequest').mockRejectedValue({
+      isAxiosError: true,
+      response: {
+        status: 403,
+        data: {
+          error: {
+            code: 'ACCOUNT_DEACTIVATED',
+            message: 'Your account has been deactivated. Contact an administrator.',
+          },
+        },
+      },
+    });
+    const router = renderAtLogin();
+    await screen.findByRole('heading', { name: 'Sign in' });
+
+    await userEvent.type(screen.getByLabelText('Email'), 'admin@alamo.test');
+    await userEvent.type(screen.getByLabelText('Password'), 'supersecret');
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+
+    expect(
+      await screen.findByText('Your account has been deactivated. Contact an administrator.')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Invalid email or password')).not.toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/login');
+  });
 });

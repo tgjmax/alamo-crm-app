@@ -13,7 +13,7 @@ import {
   SidebarRail,
   SidebarTrigger,
 } from '@/components/ui/sidebar';
-import { LayoutDashboard, Users, BookOpen, TrendingUp, Filter, Settings, LogOut, MessageSquareText } from 'lucide-react';
+import { LayoutDashboard, Users, BookOpen, TrendingUp, Filter, Settings, LogOut, MessageSquareText, UserCog } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,7 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuthStore } from '../stores/authStore';
-import { canViewSalesReports } from '../utils/permissions';
+import { canViewSalesReports, canManageUsers } from '../utils/permissions';
 import { logoutRequest } from '../api/auth.api';
 import { useBranding } from '@/hooks/useBranding';
 
@@ -30,6 +30,7 @@ export default function AppShell() {
   const clearSession = useAuthStore((s) => s.clearSession);
   const router = useRouter();
   const showSales = canViewSalesReports(user);
+  const showUsers = canManageUsers(user);
   const branding = useBranding();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
@@ -143,6 +144,20 @@ export default function AppShell() {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              {showUsers && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive('/users')}
+                    className="h-10 text-base font-medium [&>svg]:size-5 data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground data-[active=true]:hover:bg-sidebar-primary data-[active=true]:hover:text-sidebar-primary-foreground"
+                  >
+                    <Link to="/users">
+                      <UserCog />
+                      <span>Users</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarGroup>
         </SidebarContent>

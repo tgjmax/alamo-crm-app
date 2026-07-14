@@ -19,6 +19,8 @@ import { EnquiryDialog } from '@/components/enquiries/enquiry-dialog';
 import { EnquiryStatusBadge } from '@/components/enquiries/enquiry-status-badge';
 import { FareOptionDialog } from '@/components/enquiries/fare-option-dialog';
 import { SendQuoteDialog } from '@/components/enquiries/send-quote-dialog';
+import { useAuthStore } from '@/stores/authStore';
+import { canSendQuotes } from '@/utils/permissions';
 import { formatDisplayDate } from '@/utils/dateFormat';
 import { farePriceSummary, formatItinerary, formatPax, formatSegmentDates } from '@/utils/tripFormat';
 
@@ -26,6 +28,8 @@ export default function EnquiryDetailPage() {
   const { enquiryId } = useParams({ from: '/authed/enquiries/$enquiryId' });
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const user = useAuthStore((s) => s.user);
+  const canSendQuote = canSendQuotes(user);
 
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
@@ -99,9 +103,11 @@ export default function EnquiryDetailPage() {
           <Button type="button" variant="outline" size="sm" onClick={() => setShowDelete(true)}>
             Delete
           </Button>
-          <Button type="button" size="sm" disabled={enquiry.fareOptions.length === 0} onClick={() => setShowSendQuote(true)}>
-            Send Quote
-          </Button>
+          {canSendQuote && (
+            <Button type="button" size="sm" disabled={enquiry.fareOptions.length === 0} onClick={() => setShowSendQuote(true)}>
+              Send Quote
+            </Button>
+          )}
         </div>
       </div>
 
@@ -238,7 +244,7 @@ export default function EnquiryDetailPage() {
         initial={optionDialog.index !== null ? enquiry.fareOptions[optionDialog.index] : null}
         onSave={saveOption}
       />
-      <SendQuoteDialog open={showSendQuote} onOpenChange={setShowSendQuote} enquiry={enquiry} />
+      {canSendQuote && <SendQuoteDialog open={showSendQuote} onOpenChange={setShowSendQuote} enquiry={enquiry} />}
 
       <Dialog open={showDelete} onOpenChange={setShowDelete}>
         <DialogContent>

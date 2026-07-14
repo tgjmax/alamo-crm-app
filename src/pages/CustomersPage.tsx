@@ -21,6 +21,8 @@ import { COMPACT_CELL_CLASS, COMPACT_HEAD_CLASS } from '@/components/data-table/
 import { DataTableFacetedFilter } from '@/components/data-table/data-table-faceted-filter';
 import { DataTableViewOptions } from '@/components/data-table/data-table-view-options';
 import { DataTablePagination } from '@/components/data-table/data-table-pagination';
+import { useAuthStore } from '@/stores/authStore';
+import { canCreateCustomers, canDeleteCustomers, canImportExport } from '@/utils/permissions';
 
 const STATUS_OPTIONS = [
   { label: 'Verified', value: 'verified' },
@@ -28,6 +30,11 @@ const STATUS_OPTIONS = [
 ];
 
 export default function CustomersPage() {
+  const user = useAuthStore((s) => s.user);
+  const canExport = canImportExport(user, 'customers', 'export');
+  const canImport = canImportExport(user, 'customers', 'import');
+  const canCreate = canCreateCustomers(user);
+  const canDelete = canDeleteCustomers(user);
   const [searchInput, setSearchInput] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [statusValues, setStatusValues] = useState<Set<string>>(new Set());
@@ -129,22 +136,28 @@ export default function CustomersPage() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-2xl font-bold tracking-tight">Customers</h2>
         <div className="flex gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={() => setShowExport(true)}>
-            Export
-          </Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => setShowImport(true)}>
-            Import Customers
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => {
-              setEditingCustomer(null);
-              setShowAddEdit(true);
-            }}
-          >
-            Add Customer
-          </Button>
+          {canExport && (
+            <Button type="button" variant="outline" size="sm" onClick={() => setShowExport(true)}>
+              Export
+            </Button>
+          )}
+          {canImport && (
+            <Button type="button" variant="outline" size="sm" onClick={() => setShowImport(true)}>
+              Import Customers
+            </Button>
+          )}
+          {canCreate && (
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                setEditingCustomer(null);
+                setShowAddEdit(true);
+              }}
+            >
+              Add Customer
+            </Button>
+          )}
         </div>
       </div>
 
@@ -162,7 +175,7 @@ export default function CustomersPage() {
           selectedValues={statusValues}
           onChange={setStatusValues}
         />
-        {selectedIds.length > 0 && (
+        {canDelete && selectedIds.length > 0 && (
           <Button
             type="button"
             variant="destructive"
@@ -234,8 +247,8 @@ export default function CustomersPage() {
         }}
         customer={editingCustomer}
       />
-      <ImportCustomersDialog open={showImport} onOpenChange={setShowImport} />
-      <ExportCustomersDialog open={showExport} onOpenChange={setShowExport} />
+      {canImport && <ImportCustomersDialog open={showImport} onOpenChange={setShowImport} />}
+      {canExport && <ExportCustomersDialog open={showExport} onOpenChange={setShowExport} />}
       <ViewPassportDialog
         open={viewingPassportCustomer !== null}
         onOpenChange={(open) => !open && setViewingPassportCustomer(null)}

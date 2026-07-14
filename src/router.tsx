@@ -18,9 +18,10 @@ import GroupEditorPage from './pages/GroupEditorPage';
 import WidgetEditorPage from './pages/WidgetEditorPage';
 import SalesPage from './pages/SalesPage';
 import SettingsPage from './pages/SettingsPage';
+import UsersPage from './pages/UsersPage';
 import AppShell from './components/AppShell';
 import { useAuthStore } from './stores/authStore';
-import { canViewSalesReports } from './utils/permissions';
+import { canViewSalesReports, canManageUsers } from './utils/permissions';
 import { restoreSession } from './api/sessionRestore';
 
 const rootRoute = createRootRoute({
@@ -137,10 +138,21 @@ const settingsRoute = createRoute({
   component: SettingsPage,
 });
 
+const usersRoute = createRoute({
+  getParentRoute: () => authedRoute,
+  path: '/users',
+  beforeLoad: () => {
+    if (!canManageUsers(useAuthStore.getState().user)) {
+      throw redirect({ to: '/dashboard' });
+    }
+  },
+  component: UsersPage,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
   indexRoute,
-  authedRoute.addChildren([dashboardRoute, widgetNewRoute, widgetEditRoute, customersRoute, bookingsRoute, salesRoute, enquiriesRoute, enquiryDetailRoute, groupsRoute, groupNewRoute, groupResultsRoute, groupEditRoute, settingsRoute]),
+  authedRoute.addChildren([dashboardRoute, widgetNewRoute, widgetEditRoute, customersRoute, bookingsRoute, salesRoute, enquiriesRoute, enquiryDetailRoute, groupsRoute, groupNewRoute, groupResultsRoute, groupEditRoute, settingsRoute, usersRoute]),
 ]);
 
 export function createAppRouter(history?: RouterHistory) {

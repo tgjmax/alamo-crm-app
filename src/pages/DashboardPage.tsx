@@ -13,6 +13,7 @@ import {
 import { getUserDirectory } from '../api/users.api';
 import WidgetView from '../components/WidgetView';
 import { useAuthStore } from '../stores/authStore';
+import { isAdminOrAbove } from '../utils/permissions';
 
 function orderWidgets(
   widgets: WidgetSummary[],
@@ -102,7 +103,7 @@ export default function DashboardPage() {
         {ids.map((id, index) => {
           const widget = widgetsById.get(id);
           if (!widget) return null;
-          const canEdit = user?.role === 'admin' || widget.owner.id === user?.id;
+          const canEdit = isAdminOrAbove(user) || widget.owner.id === user?.id;
           return (
             <div key={id} className={sizes[id] === 'large' ? 'md:col-span-2' : ''}>
               <WidgetCard

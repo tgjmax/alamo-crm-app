@@ -233,6 +233,25 @@ describe('GroupResultsPage', () => {
     );
   });
 
+  it('lets a superadmin persist the view of a group they do not own', async () => {
+    useAuthStore.setState({
+      accessToken: 't',
+      user: { id: 'someone-else', name: 'Sup', email: 's@t.test', role: 'superadmin' },
+    });
+    const updateView = vi.mocked(groupsApi.updateGroupView).mockResolvedValue({ hiddenColumns: ['remark'] });
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText('Jane Doe');
+
+    await user.click(screen.getByRole('button', { name: 'View' }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Remark' }));
+
+    await waitFor(
+      () => expect(updateView).toHaveBeenCalledWith('g1', { hiddenColumns: ['remark'], sort: undefined }),
+      { timeout: 2000 }
+    );
+  });
+
   it('does not persist a column toggle for a shared, non-owner viewer', async () => {
     useAuthStore.setState({ accessToken: 't', user: { id: 'u2', name: 'Bob', email: 'b@t.test', role: 'agent' } });
     const updateView = vi.mocked(groupsApi.updateGroupView).mockResolvedValue({ hiddenColumns: [] });

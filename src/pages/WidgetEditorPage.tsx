@@ -22,6 +22,7 @@ import {
 import { getGroupFields, GroupCondition } from '../api/groups.api';
 import { getUserDirectory } from '../api/users.api';
 import { useAuthStore } from '../stores/authStore';
+import { isAdminOrAbove } from '../utils/permissions';
 
 type Fn = 'count' | 'sum' | 'avg';
 type MetricField = 'amount' | 'paymentAmount';
@@ -54,7 +55,7 @@ export default function WidgetEditorPage() {
   const { widgetId } = useParams({ strict: false }) as { widgetId?: string };
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
-  const canShare = user?.role === 'admin' || user?.permissions?.groups.createShared === true;
+  const canShare = isAdminOrAbove(user) || user?.permissions?.groups.createShared === true;
 
   const [name, setName] = useState('');
   const [conditions, setConditions] = useState<GroupCondition[]>([]);

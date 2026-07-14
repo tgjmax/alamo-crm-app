@@ -4,6 +4,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi } from 'vitest';
 import CustomersPage from './CustomersPage';
 import * as customersApi from '../api/customers.api';
+import { useAuthStore } from '../stores/authStore';
+
+const SUPERADMIN = { id: 'u1', name: 'Super', email: 'super@a.test', role: 'superadmin' as const };
 
 function renderWithClient(ui: React.ReactElement) {
   const client = new QueryClient();
@@ -33,6 +36,10 @@ const BASE_CUSTOMER = {
 describe('CustomersPage', () => {
   beforeEach(() => {
     vi.spyOn(customersApi, 'listCustomers').mockResolvedValue({ customers: [], total: 0, page: 1, pageSize: 25 });
+    // A superadmin by default so every pre-existing behavioral test below (which predates the
+    // Export/Import permission gating) keeps exercising those buttons unimpeded. Tests targeting
+    // the gating itself override this with their own useAuthStore.setState(...) before rendering.
+    useAuthStore.setState({ accessToken: 't', user: SUPERADMIN });
   });
 
   it('lists a customer with every required column', async () => {
@@ -479,5 +486,177 @@ describe('CustomersPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Export' }));
 
     expect(await screen.findByText('Export failed. Check your connection and try again.')).toBeInTheDocument();
+  });
+
+  describe('Export/Import permission gating', () => {
+    const ADMIN_NO_PERMS = {
+      id: 'u2',
+      name: 'Plain Admin',
+      email: 'admin@a.test',
+      role: 'admin' as const,
+      permissions: {
+        bookings: { create: false, edit: false, delete: false, createAdjustment: false, viewAll: false, import: false, export: false, sendInvoice: false },
+        customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
+        groups: { createShared: false },
+        data: { viewReports: false },
+        enquiries: { sendQuote: false },
+      },
+    };
+    const ADMIN_WITH_EXPORT = {
+      ...ADMIN_NO_PERMS,
+      id: 'u3',
+      permissions: {
+        ...ADMIN_NO_PERMS.permissions,
+        customers: { ...ADMIN_NO_PERMS.permissions.customers, export: true },
+      },
+    };
+
+    it('a superadmin sees both Export and Import Customers buttons', async () => {
+      useAuthStore.setState({ accessToken: 't', user: SUPERADMIN });
+      renderWithClient(<CustomersPage />);
+      expect(await screen.findByRole('button', { name: 'Export' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Import Customers' })).toBeInTheDocument();
+    });
+
+    it('an admin without customers.import/export permissions sees neither button', async () => {
+      useAuthStore.setState({ accessToken: 't', user: ADMIN_NO_PERMS });
+      renderWithClient(<CustomersPage />);
+      await screen.findByRole('button', { name: 'Add Customer' });
+      expect(screen.queryByRole('button', { name: 'Export' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Import Customers' })).not.toBeInTheDocument();
+    });
+
+    it('an admin with customers.export granted sees Export but not Import', async () => {
+      useAuthStore.setState({ accessToken: 't', user: ADMIN_WITH_EXPORT });
+      renderWithClient(<CustomersPage />);
+      expect(await screen.findByRole('button', { name: 'Export' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Import Customers' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Create/Edit/Delete permission gating', () => {
+    const AGENT_NO_PERMS = {
+      id: 'u4',
+      name: 'Powerless Agent',
+      email: 'agent-none@a.test',
+      role: 'agent' as const,
+      permissions: {
+        bookings: { create: false, edit: false, delete: false, createAdjustment: false, viewAll: false, import: false, export: false, sendInvoice: false },
+        customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
+        groups: { createShared: false },
+        data: { viewReports: false },
+        enquiries: { sendQuote: false },
+      },
+    };
+    const AGENT_WITH_CREATE = {
+      ...AGENT_NO_PERMS,
+      id: 'u5',
+      permissions: { ...AGENT_NO_PERMS.permissions, customers: { ...AGENT_NO_PERMS.permissions.customers, create: true } },
+    };
+    const AGENT_WITH_DELETE = {
+      ...AGENT_NO_PERMS,
+      id: 'u6',
+      permissions: { ...AGENT_NO_PERMS.permissions, customers: { ...AGENT_NO_PERMS.permissions.customers, delete: true } },
+    };
+    const AGENT_WITH_EDIT = {
+      ...AGENT_NO_PERMS,
+      id: 'u7',
+      permissions: { ...AGENT_NO_PERMS.permissions, customers: { ...AGENT_NO_PERMS.permissions.customers, edit: true } },
+    };
+
+    it('a superadmin sees the Add Customer button', async () => {
+      useAuthStore.setState({ accessToken: 't', user: SUPERADMIN });
+      renderWithClient(<CustomersPage />);
+      expect(await screen.findByRole('button', { name: 'Add Customer' })).toBeInTheDocument();
+    });
+
+    it('an agent without customers.create does not see the Add Customer button', async () => {
+      useAuthStore.setState({ accessToken: 't', user: AGENT_NO_PERMS });
+      renderWithClient(<CustomersPage />);
+      await waitFor(() => expect(customersApi.listCustomers).toHaveBeenCalled());
+      expect(screen.queryByRole('button', { name: 'Add Customer' })).not.toBeInTheDocument();
+    });
+
+    it('an agent with customers.create sees the Add Customer button', async () => {
+      useAuthStore.setState({ accessToken: 't', user: AGENT_WITH_CREATE });
+      renderWithClient(<CustomersPage />);
+      expect(await screen.findByRole('button', { name: 'Add Customer' })).toBeInTheDocument();
+    });
+
+    describe('bulk Delete (N) button', () => {
+      beforeEach(() => {
+        vi.spyOn(customersApi, 'listCustomers').mockResolvedValue({
+          customers: [BASE_CUSTOMER, { ...BASE_CUSTOMER, id: '2', firstName: 'Bob', lastName: 'Second' }],
+          total: 2,
+          page: 1,
+          pageSize: 25,
+        });
+      });
+
+      it('a superadmin sees Delete (N) once rows are selected', async () => {
+        useAuthStore.setState({ accessToken: 't', user: SUPERADMIN });
+        renderWithClient(<CustomersPage />);
+        await userEvent.click(await screen.findByLabelText('Select Alexander Varghese'));
+        expect(await screen.findByRole('button', { name: 'Delete (1)' })).toBeInTheDocument();
+      });
+
+      it('an agent without customers.delete never sees Delete (N), even with rows selected', async () => {
+        useAuthStore.setState({ accessToken: 't', user: AGENT_NO_PERMS });
+        renderWithClient(<CustomersPage />);
+        await userEvent.click(await screen.findByLabelText('Select Alexander Varghese'));
+        expect(screen.queryByRole('button', { name: /Delete \(/ })).not.toBeInTheDocument();
+      });
+
+      it('an agent with customers.delete sees Delete (N) once rows are selected', async () => {
+        useAuthStore.setState({ accessToken: 't', user: AGENT_WITH_DELETE });
+        renderWithClient(<CustomersPage />);
+        await userEvent.click(await screen.findByLabelText('Select Alexander Varghese'));
+        expect(await screen.findByRole('button', { name: 'Delete (1)' })).toBeInTheDocument();
+      });
+    });
+
+    describe('row actions (customer-row-actions.tsx)', () => {
+      beforeEach(() => {
+        vi.spyOn(customersApi, 'listCustomers').mockResolvedValue({
+          customers: [BASE_CUSTOMER],
+          total: 1,
+          page: 1,
+          pageSize: 25,
+        });
+      });
+
+      it('a superadmin sees both Edit and Delete in the row actions menu', async () => {
+        useAuthStore.setState({ accessToken: 't', user: SUPERADMIN });
+        renderWithClient(<CustomersPage />);
+        await userEvent.click(await screen.findByRole('button', { name: 'Row actions for Alexander Varghese' }));
+        expect(await screen.findByRole('menuitem', { name: 'Edit' })).toBeInTheDocument();
+        expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeInTheDocument();
+      });
+
+      // Neither permission granted — the row-actions trigger itself must not render, not just an
+      // empty menu behind it (customer-row-actions.tsx returns null in that case).
+      it('an agent with neither customers.edit nor customers.delete sees no row actions trigger at all', async () => {
+        useAuthStore.setState({ accessToken: 't', user: AGENT_NO_PERMS });
+        renderWithClient(<CustomersPage />);
+        await screen.findByText('alex@example.com');
+        expect(screen.queryByRole('button', { name: 'Row actions for Alexander Varghese' })).not.toBeInTheDocument();
+      });
+
+      it('an agent with only customers.edit sees Edit but not Delete in the menu', async () => {
+        useAuthStore.setState({ accessToken: 't', user: AGENT_WITH_EDIT });
+        renderWithClient(<CustomersPage />);
+        await userEvent.click(await screen.findByRole('button', { name: 'Row actions for Alexander Varghese' }));
+        expect(await screen.findByRole('menuitem', { name: 'Edit' })).toBeInTheDocument();
+        expect(screen.queryByRole('menuitem', { name: 'Delete' })).not.toBeInTheDocument();
+      });
+
+      it('an agent with only customers.delete sees Delete but not Edit in the menu', async () => {
+        useAuthStore.setState({ accessToken: 't', user: AGENT_WITH_DELETE });
+        renderWithClient(<CustomersPage />);
+        await userEvent.click(await screen.findByRole('button', { name: 'Row actions for Alexander Varghese' }));
+        expect(await screen.findByRole('menuitem', { name: 'Delete' })).toBeInTheDocument();
+        expect(screen.queryByRole('menuitem', { name: 'Edit' })).not.toBeInTheDocument();
+      });
+    });
   });
 });

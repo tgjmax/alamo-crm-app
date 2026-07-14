@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAuthStore } from '@/stores/authStore';
+import { canCreateAdjustments, canCreateBookings } from '@/utils/permissions';
 import { AdjustmentBookingForm } from './adjustment-booking-form';
 import { BookingForm } from './booking-form';
 
@@ -11,11 +13,19 @@ interface CreateBookingDialogProps {
 }
 
 export function CreateBookingDialog({ open, onOpenChange }: CreateBookingDialogProps) {
-  const [bookingKind, setBookingKind] = useState<'New' | 'Reissue' | 'Refund'>('New');
+  const user = useAuthStore((s) => s.user);
+  const canNew = canCreateBookings(user);
+  const canAdjustment = canCreateAdjustments(user);
+  // New requires bookings.create; Reissue/Refund both require bookings.createAdjustment. The
+  // dialog's default kind must be one the user can actually use — hard-defaulting to 'New' would
+  // land a createAdjustment-only user on a form they can't submit, one level past the entry-point
+  // gate on BookingsPage.
+  const defaultKind: 'New' | 'Reissue' | 'Refund' = canNew ? 'New' : canAdjustment ? 'Reissue' : 'New';
+  const [bookingKind, setBookingKind] = useState<'New' | 'Reissue' | 'Refund'>(defaultKind);
 
   useEffect(() => {
-    if (open) setBookingKind('New');
-  }, [open]);
+    if (open) setBookingKind(defaultKind);
+  }, [open, defaultKind]);
 
   const typeSelector = (
     <>
@@ -25,9 +35,9 @@ export function CreateBookingDialog({ open, onOpenChange }: CreateBookingDialogP
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="New">New</SelectItem>
-          <SelectItem value="Reissue">Reissue</SelectItem>
-          <SelectItem value="Refund">Refund</SelectItem>
+          {canNew && <SelectItem value="New">New</SelectItem>}
+          {canAdjustment && <SelectItem value="Reissue">Reissue</SelectItem>}
+          {canAdjustment && <SelectItem value="Refund">Refund</SelectItem>}
         </SelectContent>
       </Select>
     </>

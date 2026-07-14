@@ -38,12 +38,13 @@ import {
 } from '../api/groups.api';
 import { getUserDirectory } from '../api/users.api';
 import { useAuthStore } from '../stores/authStore';
+import { isAdminOrAbove } from '../utils/permissions';
 
 export default function GroupEditorPage() {
   const { groupId } = useParams({ strict: false }) as { groupId?: string };
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
-  const canShare = user?.role === 'admin' || user?.permissions?.groups.createShared === true;
+  const canShare = isAdminOrAbove(user) || user?.permissions?.groups.createShared === true;
 
   const [name, setName] = useState('');
   const [conditions, setConditions] = useState<GroupCondition[]>([]);

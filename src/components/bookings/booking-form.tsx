@@ -19,6 +19,8 @@ import { useListNavigation } from '@/hooks/useListNavigation';
 import { duplicateInvoice, errorMessage } from '@/utils/apiError';
 import { formatDisplayDate } from '@/utils/dateFormat';
 import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/stores/authStore';
+import { canCreateCustomers } from '@/utils/permissions';
 
 const emptyForm = {
   invoiceNumber: '',
@@ -97,6 +99,8 @@ interface BookingFormProps {
 }
 
 export function BookingForm({ initial, typeSelector, onDone, onCancel }: BookingFormProps) {
+  const user = useAuthStore((s) => s.user);
+  const canAddCustomer = canCreateCustomers(user);
   // No reset-on-`initial`-change effect here on purpose: `initial` comes from a TanStack Query in
   // the edit dialog, and this form's own `onSuccess` invalidates ['bookings'] — a background
   // refetch mid-edit would hand this component a new `initial` object identity and (if an effect
@@ -337,19 +341,24 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
               {isNameListOpen(index) && (
                 <div className="absolute left-0 right-0 top-full z-10 mt-1 rounded-md border bg-popover text-popover-foreground shadow">
                   {/* "+ Add new customer" pinned above the (scrollable) matches so it never sinks
-                      below a long result list; max-h-48 ≈ 6 rows visible, the rest scroll. */}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="w-full justify-start border-b font-medium"
-                    onClick={() => {
-                      setAddCustomerIndex(index);
-                      setAddCustomerOpen(true);
-                    }}
-                  >
-                    + Add new customer
-                  </Button>
+                      below a long result list; max-h-48 ≈ 6 rows visible, the rest scroll.
+                      Gated on customers.create — it opens the Add-Customer dialog, so that's the
+                      permission it needs, not a bookings one. Searching/selecting an EXISTING
+                      customer below is unaffected and stays available to everyone. */}
+                  {canAddCustomer && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start border-b font-medium"
+                      onClick={() => {
+                        setAddCustomerIndex(index);
+                        setAddCustomerOpen(true);
+                      }}
+                    >
+                      + Add new customer
+                    </Button>
+                  )}
                   {matches.length > 0 && (
                     <ul id={`passenger-listbox-${index}`} role="listbox" className="max-h-48 overflow-y-auto">
                       {matches.map((m, matchIndex) => (

@@ -8,6 +8,7 @@ import { PasswordInput } from '@/components/password-input';
 import { useBranding } from '@/hooks/useBranding';
 import { loginRequest } from '../api/auth.api';
 import { useAuthStore } from '../stores/authStore';
+import { errorMessage } from '@/utils/apiError';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -24,8 +25,13 @@ export default function LoginPage() {
       const { accessToken, user } = await loginRequest(email, password);
       setSession(accessToken, user);
       await router.navigate({ to: '/dashboard' });
-    } catch {
-      setError('Invalid email or password');
+    } catch (err) {
+      // Surface the server's own message — it distinguishes a bad password (401
+      // INVALID_CREDENTIALS) from a deactivated account (403 ACCOUNT_DEACTIVATED), and
+      // telling a deactivated user their password is wrong sends them, and the admin they
+      // call, chasing a password that is perfectly correct. The generic fallback still
+      // covers a network failure, where we genuinely do not know what went wrong.
+      setError(errorMessage(err, 'Invalid email or password'));
     }
   }
 

@@ -5,6 +5,7 @@ import { vi } from 'vitest';
 import EnquiryDetailPage from './EnquiryDetailPage';
 import * as enquiriesApi from '../api/enquiries.api';
 import * as flightDataApi from '../api/flightData.api';
+import { useAuthStore } from '../stores/authStore';
 
 const navigateMock = vi.fn();
 vi.mock('@tanstack/react-router', async (importOriginal) => ({
@@ -157,6 +158,61 @@ describe('EnquiryDetailPage', () => {
     await waitFor(() => {
       expect(del).toHaveBeenCalledWith('e1');
       expect(navigateMock).toHaveBeenCalledWith({ to: '/enquiries' });
+    });
+  });
+
+  describe('Send Quote permission gating', () => {
+    const SUPERADMIN = { id: 'u0', name: 'Super', email: 'super@a.test', role: 'superadmin' as const };
+    const ADMIN = { id: 'u1', name: 'Admin', email: 'admin@a.test', role: 'admin' as const };
+    const AGENT_NO_SEND_QUOTE = {
+      id: 'u2',
+      name: 'No Quote Agent',
+      email: 'agent-noquote@a.test',
+      role: 'agent' as const,
+      permissions: {
+        bookings: { create: false, edit: false, delete: false, createAdjustment: false, viewAll: false, import: false, export: false, sendInvoice: false },
+        customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
+        groups: { createShared: false },
+        data: { viewReports: false },
+        enquiries: { sendQuote: false },
+      },
+    };
+    const AGENT_WITH_SEND_QUOTE = {
+      ...AGENT_NO_SEND_QUOTE,
+      id: 'u3',
+      permissions: {
+        ...AGENT_NO_SEND_QUOTE.permissions,
+        enquiries: { sendQuote: true },
+      },
+    };
+
+    afterEach(() => {
+      useAuthStore.setState({ accessToken: null, user: null });
+    });
+
+    it('a superadmin sees the Send Quote button', async () => {
+      useAuthStore.setState({ accessToken: 't', user: SUPERADMIN });
+      renderWithClient(<EnquiryDetailPage />);
+      expect(await screen.findByRole('button', { name: 'Send Quote' })).toBeInTheDocument();
+    });
+
+    it('an admin sees the Send Quote button with no explicit grant', async () => {
+      useAuthStore.setState({ accessToken: 't', user: ADMIN });
+      renderWithClient(<EnquiryDetailPage />);
+      expect(await screen.findByRole('button', { name: 'Send Quote' })).toBeInTheDocument();
+    });
+
+    it('an agent without enquiries.sendQuote does not see the Send Quote button', async () => {
+      useAuthStore.setState({ accessToken: 't', user: AGENT_NO_SEND_QUOTE });
+      renderWithClient(<EnquiryDetailPage />);
+      await screen.findByText('Johny Smith');
+      expect(screen.queryByRole('button', { name: 'Send Quote' })).not.toBeInTheDocument();
+    });
+
+    it('an agent with enquiries.sendQuote sees the Send Quote button', async () => {
+      useAuthStore.setState({ accessToken: 't', user: AGENT_WITH_SEND_QUOTE });
+      renderWithClient(<EnquiryDetailPage />);
+      expect(await screen.findByRole('button', { name: 'Send Quote' })).toBeInTheDocument();
     });
   });
 });

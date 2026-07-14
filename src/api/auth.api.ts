@@ -3,7 +3,11 @@ import { AuthUser } from '../stores/authStore';
 
 export interface LoginResponse {
   accessToken: string;
-  user: { id: string; name: string; email: string; role: 'admin' | 'agent' };
+  // The shared AuthUser (not a narrower inline literal) so `permissions` is part of the
+  // contract — an admin's import/export access is granted per-user via that field, and a
+  // narrower type here would let it silently disappear from the login payload with no
+  // compile error, even though canImportExport() depends on it.
+  user: AuthUser;
 }
 
 export async function loginRequest(email: string, password: string): Promise<LoginResponse> {

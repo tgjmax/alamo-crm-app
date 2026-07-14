@@ -67,10 +67,11 @@ describe('app router', () => {
       user: {
         id: '1', name: 'Agent', email: 'a@alamo.test', role: 'agent',
         permissions: {
-          bookings: { create: false, edit: false, delete: false, createAdjustment: false, viewAll: false },
-          customers: { create: false, edit: false, delete: false, viewPassport: false },
+          bookings: { create: false, edit: false, delete: false, createAdjustment: false, viewAll: false, import: false, export: false, sendInvoice: false },
+          customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
           groups: { createShared: false },
-          data: { import: false, export: false, viewReports: false },
+          data: { viewReports: false },
+          enquiries: { sendQuote: false },
         },
       },
     });

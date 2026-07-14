@@ -21,6 +21,7 @@ import { OPERATOR_LABELS } from '@/utils/conditionLabels';
 import { DeleteGroupDialog } from '@/components/groups/delete-group-dialog';
 import { useAuthStore } from '@/stores/authStore';
 import { useGroupView } from '@/hooks/useGroupView';
+import { isAdminOrAbove } from '@/utils/permissions';
 
 /** 'Airline equals QR' — renders a stored condition using its registry label and the shared
  * operator label map, so the header reads in plain English, in the same language as the
@@ -112,7 +113,7 @@ export default function GroupResultsPage() {
     },
   });
 
-  const canPersistView = Boolean(group && user && (user.role === 'admin' || user.id === group.owner.id));
+  const canPersistView = Boolean(group && user && (isAdminOrAbove(user) || user.id === group.owner.id));
 
   return (
     <div className="mx-auto max-w-[1800px] space-y-6">
