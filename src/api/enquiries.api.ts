@@ -11,10 +11,16 @@ export interface EnquirySegment {
   arriveTime?: string;
 }
 
+export interface EnquiryFarePrices {
+  adult: number;
+  child?: number;
+  infant?: number;
+}
+
 export interface EnquiryFareOption {
   airlineCode?: string;
   airlineName: string;
-  pricePerPax: number;
+  prices: EnquiryFarePrices;
   baggageNotes?: string;
   segments: EnquirySegment[];
 }

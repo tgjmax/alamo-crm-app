@@ -39,8 +39,8 @@ const ENQUIRY: enquiriesApi.Enquiry = {
   },
   status: 'New',
   fareOptions: [
-    { airlineName: 'Spirit Airlines', pricePerPax: 220, segments: [{ from: 'IAH', to: 'LAX', date: '2026-07-08' }] },
-    { airlineName: 'United Airlines', pricePerPax: 470, segments: [{ from: 'IAH', to: 'LAX', date: '2026-07-08' }] },
+    { airlineName: 'Spirit Airlines', prices: { adult: 220 }, segments: [{ from: 'IAH', to: 'LAX', date: '2026-07-08' }] },
+    { airlineName: 'United Airlines', prices: { adult: 470 }, segments: [{ from: 'IAH', to: 'LAX', date: '2026-07-08' }] },
   ],
   quoteSentAt: null,
   createdAt: '2026-07-12T10:00:00.000Z',
@@ -76,11 +76,13 @@ describe('SendQuoteDialog', () => {
     renderDialog(ENQUIRY);
     const preview = screen.getByLabelText('Email preview');
     expect(preview).toHaveTextContent('Dear Johny,');
-    expect(preview).toHaveTextContent('Spirit Airlines - USD220.00 per passenger');
-    expect(preview).toHaveTextContent('United Airlines - USD470.00 per passenger');
+    expect(preview).toHaveTextContent('Spirit Airlines');
+    expect(preview).toHaveTextContent('Adult - USD220.00 per passenger');
+    expect(preview).toHaveTextContent('United Airlines');
+    expect(preview).toHaveTextContent('Adult - USD470.00 per passenger');
 
     await userEvent.click(screen.getByRole('checkbox', { name: /Option 1: Spirit Airlines/ }));
-    expect(preview).not.toHaveTextContent('Spirit Airlines - USD220.00 per passenger');
+    expect(preview).not.toHaveTextContent('Adult - USD220.00 per passenger');
   });
 
   it('disables sending when no option is checked', async () => {

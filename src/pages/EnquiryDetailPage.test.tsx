@@ -21,7 +21,7 @@ function renderWithClient(ui: React.ReactElement) {
 const OPTION: enquiriesApi.EnquiryFareOption = {
   airlineCode: 'NK',
   airlineName: 'Spirit Airlines',
-  pricePerPax: 220,
+  prices: { adult: 220 },
   baggageNotes: 'Personal baggage might be allowed.',
   segments: [{ from: 'IAH', to: 'LAX', date: '2026-07-08', departTime: '06:20', arriveTime: '07:47' }],
 };
@@ -65,8 +65,17 @@ describe('EnquiryDetailPage', () => {
     expect(screen.getByText(/±3 days/)).toBeInTheDocument();
     expect(screen.getByText('Morning preferred')).toBeInTheDocument();
     expect(screen.getByText(/Spirit Airlines/)).toBeInTheDocument();
-    expect(screen.getByText(/USD220.00 per passenger/)).toBeInTheDocument();
+    expect(screen.getByText(/Adult USD220\.00/)).toBeInTheDocument();
     expect(screen.getByText(/IAH to LAX/)).toBeInTheDocument();
+  });
+
+  it('shows only the quoted pax types on a fare option', async () => {
+    // fareOptions[0] has prices { adult: 220 } only
+    renderWithClient(<EnquiryDetailPage />);
+
+    expect(await screen.findByText(/Adult USD220\.00/)).toBeInTheDocument();
+    expect(screen.queryByText(/Child/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Infant/)).not.toBeInTheDocument();
   });
 
   it('changes status via the status select (PATCH)', async () => {
@@ -89,7 +98,7 @@ describe('EnquiryDetailPage', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Add fare option' }));
     await userEvent.type(screen.getByLabelText('Airline'), 'United Airlines');
-    await userEvent.type(screen.getByLabelText('Price per passenger'), '470');
+    await userEvent.type(screen.getByLabelText('Adult fare'), '470');
     await userEvent.type(screen.getByLabelText('Segment 1 from'), 'IAH');
     await userEvent.type(screen.getByLabelText('Segment 1 to'), 'LAX');
     await userEvent.type(screen.getByLabelText('Segment 1 date'), '2026-07-08');
@@ -105,7 +114,7 @@ describe('EnquiryDetailPage', () => {
           {
             airlineCode: undefined,
             airlineName: 'United Airlines',
-            pricePerPax: 470,
+            prices: { adult: 470, child: undefined, infant: undefined },
             baggageNotes: 'Carry-on baggage is allowed.',
             segments: [{ from: 'IAH', to: 'LAX', date: '2026-07-08', departTime: '07:36', arriveTime: '09:05' }],
           },

@@ -20,7 +20,7 @@ import { EnquiryStatusBadge } from '@/components/enquiries/enquiry-status-badge'
 import { FareOptionDialog } from '@/components/enquiries/fare-option-dialog';
 import { SendQuoteDialog } from '@/components/enquiries/send-quote-dialog';
 import { formatDisplayDate } from '@/utils/dateFormat';
-import { formatItinerary, formatPax, formatSegmentDates } from '@/utils/tripFormat';
+import { farePriceSummary, formatItinerary, formatPax, formatSegmentDates } from '@/utils/tripFormat';
 
 export default function EnquiryDetailPage() {
   const { enquiryId } = useParams({ from: '/authed/enquiries/$enquiryId' });
@@ -189,7 +189,7 @@ export default function EnquiryDetailPage() {
               <div className="flex items-start justify-between gap-2">
                 <p className="font-medium">
                   Option {index + 1}: {option.airlineName}
-                  {option.airlineCode && ` (${option.airlineCode})`} — USD{option.pricePerPax.toFixed(2)} per passenger
+                  {option.airlineCode && ` (${option.airlineCode})`} — {farePriceSummary(option)}
                 </p>
                 <div className="flex gap-2">
                   <Button

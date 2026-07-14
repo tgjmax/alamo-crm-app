@@ -1,4 +1,4 @@
-import { CabinClass, EnquiryPax, EnquiryTripSegment } from '@/api/enquiries.api';
+import { CabinClass, EnquiryFareOption, EnquiryPax, EnquiryTripSegment } from '@/api/enquiries.api';
 import { formatDisplayDate } from './dateFormat';
 
 /** Three-letter cabin codes, shown on the selected-cabin cards. A display concern only — the
@@ -45,4 +45,13 @@ export function formatSegmentDates(segments: EnquiryTripSegment[]): string {
     .map((segment) => formatDisplayDate(segment.date))
     .filter(Boolean)
     .join(' – ');
+}
+
+/** 'Adult USD220.00 · Child USD180.00' — only the pax types actually quoted. Shared by the
+ * enquiry detail page and the send-quote preview so the two cannot drift apart. */
+export function farePriceSummary(option: EnquiryFareOption): string {
+  const parts = [`Adult USD${option.prices.adult.toFixed(2)}`];
+  if (option.prices.child !== undefined) parts.push(`Child USD${option.prices.child.toFixed(2)}`);
+  if (option.prices.infant !== undefined) parts.push(`Infant USD${option.prices.infant.toFixed(2)}`);
+  return parts.join(' · ');
 }

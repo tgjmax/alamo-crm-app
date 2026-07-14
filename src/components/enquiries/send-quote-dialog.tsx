@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Enquiry, sendEnquiryQuote } from '@/api/enquiries.api';
+import { farePriceSummary } from '@/utils/tripFormat';
 
 interface SendQuoteDialogProps {
   open: boolean;
@@ -21,7 +22,10 @@ function buildPreview(enquiry: Enquiry, selectedIndexes: number[], personalMessa
   if (personalMessage.trim()) parts.push(personalMessage.trim());
   selectedIndexes.forEach((optionIndex, n) => {
     const option = enquiry.fareOptions[optionIndex];
-    const lines = [`Option ${n + 1}:`, `${option.airlineName} - USD${option.pricePerPax.toFixed(2)} per passenger`];
+    const lines = [`Option ${n + 1}:`, option.airlineName];
+    lines.push(`Adult - USD${option.prices.adult.toFixed(2)} per passenger`);
+    if (option.prices.child !== undefined) lines.push(`Child - USD${option.prices.child.toFixed(2)} per passenger`);
+    if (option.prices.infant !== undefined) lines.push(`Infant - USD${option.prices.infant.toFixed(2)} per passenger`);
     for (const s of option.segments) {
       lines.push('', `${s.from} to ${s.to} - ${s.date}`);
       if (s.departTime) lines.push(`Depart: ${s.departTime}`);
@@ -116,14 +120,14 @@ export function SendQuoteDialog({ open, onOpenChange, enquiry }: SendQuoteDialog
                 <div key={index} className="flex items-center gap-2">
                   <Checkbox
                     id={`quote-option-${index}`}
-                    aria-label={`Option ${index + 1}: ${option.airlineName} — USD${option.pricePerPax.toFixed(2)} per passenger`}
+                    aria-label={`Option ${index + 1}: ${option.airlineName} — ${farePriceSummary(option)}`}
                     checked={checked[index] ?? false}
                     onCheckedChange={(v) =>
                       setChecked((prev) => prev.map((c, i) => (i === index ? v === true : c)))
                     }
                   />
                   <Label htmlFor={`quote-option-${index}`}>
-                    Option {index + 1}: {option.airlineName} — USD{option.pricePerPax.toFixed(2)} per passenger
+                    Option {index + 1}: {option.airlineName} — {farePriceSummary(option)}
                   </Label>
                 </div>
               ))}
