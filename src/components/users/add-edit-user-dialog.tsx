@@ -1,8 +1,9 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { KeyRound, Mail, User } from 'lucide-react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { IconInput } from '@/components/icon-input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ManagedUser, createUser, updateUser, USERS_QUERY_KEY } from '@/api/users.api';
@@ -76,22 +77,39 @@ function Body({
 
       <div className="space-y-2">
         <Label htmlFor="user-name">Name</Label>
-        <Input id="user-name" value={name} onChange={(e) => setName(e.target.value)} required />
+        <IconInput
+          id="user-name"
+          icon={<User />}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Priya Menon"
+          required
+        />
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="user-email">Email</Label>
-        <Input id="user-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <IconInput
+          id="user-email"
+          icon={<Mail />}
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="name@example.com"
+          required
+        />
       </div>
 
       {!user && (
         <div className="space-y-2">
           <Label htmlFor="user-password">Password</Label>
-          <Input
+          <IconInput
             id="user-password"
+            icon={<KeyRound />}
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            placeholder="At least 8 characters"
             minLength={8}
             required
           />
