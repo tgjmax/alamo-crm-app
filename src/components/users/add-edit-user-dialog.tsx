@@ -8,12 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ManagedUser, createUser, updateUser, USERS_QUERY_KEY } from '@/api/users.api';
 import { UserRole } from '@/stores/authStore';
 import { errorMessage } from '@/utils/apiError';
-
-const ROLE_LABELS: Record<UserRole, string> = {
-  superadmin: 'Super Admin',
-  admin: 'Admin',
-  agent: 'Agent',
-};
+import { ROLE_LABELS } from '@/utils/permissions';
 
 /** An Admin may only ever create or edit an Agent — mirrors the backend's manageableRoles(). */
 function assignableRoles(actorRole: UserRole): UserRole[] {

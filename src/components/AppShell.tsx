@@ -21,7 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuthStore } from '../stores/authStore';
-import { canViewSalesReports, canManageUsers } from '../utils/permissions';
+import { canViewSalesReports, canManageUsers, ROLE_LABELS } from '../utils/permissions';
 import { logoutRequest } from '../api/auth.api';
 import { useBranding } from '@/hooks/useBranding';
 
@@ -176,7 +176,7 @@ export default function AppShell() {
                     </div>
                     <div className="grid flex-1 text-left text-base leading-tight">
                       <span className="truncate font-medium">{user?.name}</span>
-                      <span className="truncate text-sm text-muted-foreground">{user?.role}</span>
+                      <span className="truncate text-sm text-muted-foreground">{user ? ROLE_LABELS[user.role] : ''}</span>
                     </div>
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>

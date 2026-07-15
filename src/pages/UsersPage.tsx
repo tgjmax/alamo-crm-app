@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,19 +10,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ManagedUser, listUsers, setUserActive, USERS_QUERY_KEY } from '@/api/users.api';
+import { ManagedUser, listUsers, USERS_QUERY_KEY } from '@/api/users.api';
 import { UserRole, useAuthStore } from '@/stores/authStore';
 import { AddEditUserDialog } from '@/components/users/add-edit-user-dialog';
 import { UserPermissionsDialog } from '@/components/users/user-permissions-dialog';
 import { ResetPasswordDialog } from '@/components/users/reset-password-dialog';
-import { errorMessage } from '@/utils/apiError';
-import { canResetPasswordOf } from '@/utils/permissions';
-
-const ROLE_LABELS: Record<UserRole, string> = {
-  superadmin: 'Super Admin',
-  admin: 'Admin',
-  agent: 'Agent',
-};
+import { SetActiveDialog } from '@/components/users/set-active-dialog';
+import { canResetPasswordOf, ROLE_LABELS } from '@/utils/permissions';
 
 const ROLE_BADGE: Record<UserRole, string> = {
   superadmin: 'bg-purple-100 text-purple-800 hover:bg-purple-100',
@@ -36,21 +30,9 @@ export default function UsersPage() {
   const [creating, setCreating] = useState(false);
   const [permissionsFor, setPermissionsFor] = useState<ManagedUser | null>(null);
   const [resettingFor, setResettingFor] = useState<ManagedUser | null>(null);
-  const [activeError, setActiveError] = useState<string | null>(null);
-  const queryClient = useQueryClient();
+  const [settingActiveFor, setSettingActiveFor] = useState<ManagedUser | null>(null);
 
   const { data: users = [], isLoading } = useQuery({ queryKey: USERS_QUERY_KEY, queryFn: listUsers });
-
-  const activeMutation = useMutation({
-    mutationFn: ({ id, active }: { id: string; active: boolean }) => setUserActive(id, active),
-    onSuccess: () => {
-      setActiveError(null);
-      queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY });
-    },
-    onError: (err) => {
-      setActiveError(errorMessage(err, 'Could not update this user. Check your connection and try again.'));
-    },
-  });
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
@@ -63,8 +45,6 @@ export default function UsersPage() {
         </div>
         <Button onClick={() => setCreating(true)}>Add User</Button>
       </div>
-
-      {activeError && <p className="text-sm text-destructive">{activeError}</p>}
 
       <Table>
         <TableHeader>
@@ -135,9 +115,7 @@ export default function UsersPage() {
                           {canReset && (
                             <DropdownMenuItem onClick={() => setResettingFor(user)}>Reset password</DropdownMenuItem>
                           )}
-                          <DropdownMenuItem
-                            onClick={() => activeMutation.mutate({ id: user.id, active: !user.active })}
-                          >
+                          <DropdownMenuItem onClick={() => setSettingActiveFor(user)}>
                             {user.active ? 'Deactivate' : 'Reactivate'}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -164,6 +142,10 @@ export default function UsersPage() {
       />
       <UserPermissionsDialog user={permissionsFor} onOpenChange={(open) => !open && setPermissionsFor(null)} />
       <ResetPasswordDialog user={resettingFor} onOpenChange={(open) => !open && setResettingFor(null)} />
+      <SetActiveDialog
+        user={settingActiveFor}
+        onOpenChange={(open) => !open && setSettingActiveFor(null)}
+      />
     </div>
   );
 }

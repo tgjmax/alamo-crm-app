@@ -1,5 +1,12 @@
 import { AuthUser, UserPermissions, UserRole } from '../stores/authStore';
 
+/** Human-readable role names for display (navbar, Users table, role picker). */
+export const ROLE_LABELS: Record<UserRole, string> = {
+  superadmin: 'Super Admin',
+  admin: 'Admin',
+  agent: 'Agent',
+};
+
 /**
  * "Admin or better." EVERY former `role === 'admin'` check in this app was really
  * this test — a superadmin must never end up with LESS access than an admin.

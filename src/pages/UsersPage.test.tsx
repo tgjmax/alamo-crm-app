@@ -71,7 +71,22 @@ describe('UsersPage', () => {
     await screen.findByText('Priya M');
     await userEvent.click(screen.getByRole('button', { name: 'Actions for Priya M' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Deactivate' }));
+    // Opening the menu item opens a confirm dialog; it must NOT mutate on that click.
+    expect(await screen.findByRole('heading', { name: 'Deactivate Priya M?' })).toBeInTheDocument();
+    expect(usersApi.setUserActive).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Deactivate' }));
     await waitFor(() => expect(usersApi.setUserActive).toHaveBeenCalledWith('u2', false));
+  });
+
+  it('reactivates an inactive user through a confirm dialog', async () => {
+    vi.mocked(usersApi.setUserActive).mockResolvedValue({ ...USERS[2], active: true });
+    renderPage();
+    await screen.findByText('Alex K');
+    await userEvent.click(screen.getByRole('button', { name: 'Actions for Alex K' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Reactivate' }));
+    expect(await screen.findByRole('heading', { name: 'Reactivate Alex K?' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Reactivate' }));
+    await waitFor(() => expect(usersApi.setUserActive).toHaveBeenCalledWith('u3', true));
   });
 
   it('offers no actions at all on your own row — Edit/Reset password/Deactivate are all wrong there', async () => {
@@ -118,6 +133,7 @@ describe('UsersPage', () => {
     await screen.findByText('Priya M');
     await userEvent.click(screen.getByRole('button', { name: 'Actions for Priya M' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Deactivate' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Deactivate' }));
     expect(await screen.findByText('Cannot deactivate the last active Super Admin.')).toBeInTheDocument();
   });
 
