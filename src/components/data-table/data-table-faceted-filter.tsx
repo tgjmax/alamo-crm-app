@@ -24,9 +24,17 @@ interface DataTableFacetedFilterProps {
   options: FacetedFilterOption[];
   selectedValues: Set<string>;
   onChange: (values: Set<string>) => void;
+  /** Show the in-popover search input. Defaults to true; not worth it for a handful of options. */
+  searchable?: boolean;
 }
 
-export function DataTableFacetedFilter({ title, options, selectedValues, onChange }: DataTableFacetedFilterProps) {
+export function DataTableFacetedFilter({
+  title,
+  options,
+  selectedValues,
+  onChange,
+  searchable = true,
+}: DataTableFacetedFilterProps) {
   function toggle(value: string) {
     const next = new Set(selectedValues);
     if (next.has(value)) {
@@ -70,7 +78,7 @@ export function DataTableFacetedFilter({ title, options, selectedValues, onChang
       </PopoverTrigger>
       <PopoverContent className="w-[200px] p-0" align="start">
         <Command>
-          <CommandInput placeholder={title} />
+          {searchable && <CommandInput placeholder={title} />}
           <CommandList>
             <CommandEmpty>No results found.</CommandEmpty>
             <CommandGroup>

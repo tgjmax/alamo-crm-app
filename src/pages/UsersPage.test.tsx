@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi } from 'vitest';
@@ -171,5 +171,50 @@ describe('UsersPage', () => {
     await screen.findByText('Riley P');
     await userEvent.click(screen.getByRole('button', { name: 'Actions for Riley P' }));
     expect(await screen.findByRole('menuitem', { name: 'Reset password' })).toBeInTheDocument();
+  });
+
+  it('filters to a single role with the Role facet', async () => {
+    renderPage();
+    await screen.findByText('Priya M');
+    const filters = screen.getByRole('group', { name: 'Filters' });
+    await userEvent.click(within(filters).getByRole('button', { name: 'Role' }));
+    await userEvent.click(await screen.findByRole('option', { name: 'Agent' }));
+    // Agents (Alex K, Riley P) remain; the admin row is filtered out.
+    expect(screen.getByText('Alex K')).toBeInTheDocument();
+    expect(screen.queryByText('Priya M')).not.toBeInTheDocument();
+  });
+
+  it('filters to inactive users with the Status facet', async () => {
+    renderPage();
+    await screen.findByText('Priya M');
+    const filters = screen.getByRole('group', { name: 'Filters' });
+    await userEvent.click(within(filters).getByRole('button', { name: 'Status' }));
+    await userEvent.click(await screen.findByRole('option', { name: 'Inactive' }));
+    expect(screen.getByText('Alex K')).toBeInTheDocument(); // the only inactive user
+    expect(screen.queryByText('Priya M')).not.toBeInTheDocument();
+    expect(screen.queryByText('Toncy Z')).not.toBeInTheDocument();
+  });
+
+  it('sorts by name when the Name header is clicked', async () => {
+    renderPage();
+    await screen.findByText('Priya M');
+    await userEvent.click(screen.getByRole('button', { name: 'Name' }));
+    // Ascending among {Toncy Z, Priya M, Alex K, Sam R, Riley P}: Alex K first.
+    expect(screen.getAllByRole('row')[1]).toHaveTextContent('Alex K');
+    await userEvent.click(screen.getByRole('button', { name: 'Name' }));
+    // Descending: Toncy Z first.
+    expect(screen.getAllByRole('row')[1]).toHaveTextContent('Toncy Z');
+  });
+
+  it('sorts Role by privilege (Super Admin → Admin → Agent), not alphabetically', async () => {
+    renderPage();
+    await screen.findByText('Priya M');
+    // The Role facet trigger is also named "Role"; the sort header is the one inside the table.
+    await userEvent.click(within(screen.getByRole('table')).getByRole('button', { name: 'Role' }));
+    const rows = screen.getAllByRole('row').slice(1); // drop the header row
+    // Hierarchy ascending leads with a Super Admin; alphabetical on the raw value ('admin' <
+    // 'agent' < 'superadmin') would lead with Admin instead.
+    expect(rows[0]).toHaveTextContent('Super Admin');
+    expect(rows[rows.length - 1]).toHaveTextContent('Agent');
   });
 });

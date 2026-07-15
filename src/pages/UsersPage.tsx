@@ -1,28 +1,24 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { MoreHorizontal } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+  ColumnFiltersState,
+  SortingState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from '@tanstack/react-table';
+import { Button } from '@/components/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { DataTableFacetedFilter } from '@/components/data-table/data-table-faceted-filter';
 import { ManagedUser, listUsers, USERS_QUERY_KEY } from '@/api/users.api';
-import { UserRole, useAuthStore } from '@/stores/authStore';
+import { useAuthStore } from '@/stores/authStore';
 import { AddEditUserDialog } from '@/components/users/add-edit-user-dialog';
 import { UserPermissionsDialog } from '@/components/users/user-permissions-dialog';
 import { ResetPasswordDialog } from '@/components/users/reset-password-dialog';
 import { SetActiveDialog } from '@/components/users/set-active-dialog';
-import { canResetPasswordOf, ROLE_LABELS } from '@/utils/permissions';
-
-const ROLE_BADGE: Record<UserRole, string> = {
-  superadmin: 'bg-purple-100 text-purple-800 hover:bg-purple-100',
-  admin: 'bg-blue-100 text-blue-800 hover:bg-blue-100',
-  agent: 'bg-slate-100 text-slate-800 hover:bg-slate-100',
-};
+import { buildUserColumns } from '@/components/users/user-columns';
 
 export default function UsersPage() {
   const currentUser = useAuthStore((s) => s.user);
@@ -31,8 +27,36 @@ export default function UsersPage() {
   const [permissionsFor, setPermissionsFor] = useState<ManagedUser | null>(null);
   const [resettingFor, setResettingFor] = useState<ManagedUser | null>(null);
   const [settingActiveFor, setSettingActiveFor] = useState<ManagedUser | null>(null);
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 
   const { data: users = [], isLoading } = useQuery({ queryKey: USERS_QUERY_KEY, queryFn: listUsers });
+
+  const columns = useMemo(
+    () =>
+      buildUserColumns({
+        currentUser,
+        onEdit: setEditing,
+        onPermissions: setPermissionsFor,
+        onReset: setResettingFor,
+        onSetActive: setSettingActiveFor,
+      }),
+    [currentUser]
+  );
+
+  const table = useReactTable({
+    data: users,
+    columns,
+    state: { sorting, columnFilters },
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+  });
+
+  const roleFilter = new Set((table.getColumn('role')?.getFilterValue() as string[]) ?? []);
+  const statusFilter = new Set((table.getColumn('status')?.getFilterValue() as string[]) ?? []);
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
@@ -46,85 +70,63 @@ export default function UsersPage() {
         <Button onClick={() => setCreating(true)}>Add User</Button>
       </div>
 
+      <div role="group" aria-label="Filters" className="flex items-center gap-2">
+        <DataTableFacetedFilter
+          title="Role"
+          searchable={false}
+          options={[
+            { label: 'Super Admin', value: 'superadmin' },
+            { label: 'Admin', value: 'admin' },
+            { label: 'Agent', value: 'agent' },
+          ]}
+          selectedValues={roleFilter}
+          onChange={(set) => table.getColumn('role')?.setFilterValue(set.size ? [...set] : undefined)}
+        />
+        <DataTableFacetedFilter
+          title="Status"
+          searchable={false}
+          options={[
+            { label: 'Active', value: 'active' },
+            { label: 'Inactive', value: 'inactive' },
+          ]}
+          selectedValues={statusFilter}
+          onChange={(set) => table.getColumn('status')?.setFilterValue(set.size ? [...set] : undefined)}
+        />
+      </div>
+
       <Table>
         <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead>Role</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="w-10" />
-          </TableRow>
+          {table.getHeaderGroups().map((headerGroup) => (
+            <TableRow key={headerGroup.id}>
+              {headerGroup.headers.map((header) => (
+                <TableHead key={header.id}>
+                  {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                </TableHead>
+              ))}
+            </TableRow>
+          ))}
         </TableHeader>
         <TableBody>
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+              <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
                 Loading…
               </TableCell>
             </TableRow>
-          ) : users.length === 0 ? (
+          ) : table.getRowModel().rows.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+              <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
                 No users found.
               </TableCell>
             </TableRow>
           ) : (
-            users.map((user) => {
-              const isSelf = user.id === currentUser?.id;
-              const canReset = canResetPasswordOf(currentUser, user);
-              return (
-                <TableRow key={user.id}>
-                  <TableCell className="font-medium">{user.name}</TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>
-                    <Badge className={ROLE_BADGE[user.role]}>{ROLE_LABELS[user.role]}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <span className={user.active ? 'text-green-700' : 'text-muted-foreground'}>
-                      {user.active ? 'Active' : 'Inactive'}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    {/* Self-service (name, email, password, photo) lives at Settings → My
-                        Profile, which enforces currentPassword — unlike this dialog's Reset
-                        password. Edit's Role select is also refused on yourself by the backend
-                        (403 CANNOT_MODIFY_SELF_ROLE). Deactivate is likewise never offered on
-                        your own row (403 CANNOT_MODIFY_SELF_ACTIVE). That leaves no actions at
-                        all on your own row, so — mirroring customer-row-actions.tsx — the
-                        trigger itself is not rendered rather than opening an empty menu. */}
-                    {!isSelf && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" aria-label={`Actions for ${user.name}`}>
-                            <MoreHorizontal className="size-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setEditing(user)}>Edit</DropdownMenuItem>
-                          {/* A Super Admin has unrestricted access by virtue of the role — there is
-                              nothing to configure, so the entry is not offered at all. */}
-                          {user.role !== 'superadmin' && (
-                            <DropdownMenuItem onClick={() => setPermissionsFor(user)}>Permissions</DropdownMenuItem>
-                          )}
-                          {/* Hidden (not just disabled) when the target holds a permission the
-                              current actor lacks -- resetting a password is a full account
-                              takeover, so offering it here would just be a UI dead end: the
-                              backend refuses with 403 CANNOT_RESET_MORE_PRIVILEGED regardless.
-                              See canResetPasswordOf() (utils/permissions.ts). */}
-                          {canReset && (
-                            <DropdownMenuItem onClick={() => setResettingFor(user)}>Reset password</DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem onClick={() => setSettingActiveFor(user)}>
-                            {user.active ? 'Deactivate' : 'Reactivate'}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                  </TableCell>
-                </TableRow>
-              );
-            })
+            table.getRowModel().rows.map((row) => (
+              <TableRow key={row.id}>
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
+                ))}
+              </TableRow>
+            ))
           )}
         </TableBody>
       </Table>
@@ -142,10 +144,7 @@ export default function UsersPage() {
       />
       <UserPermissionsDialog user={permissionsFor} onOpenChange={(open) => !open && setPermissionsFor(null)} />
       <ResetPasswordDialog user={resettingFor} onOpenChange={(open) => !open && setResettingFor(null)} />
-      <SetActiveDialog
-        user={settingActiveFor}
-        onOpenChange={(open) => !open && setSettingActiveFor(null)}
-      />
+      <SetActiveDialog user={settingActiveFor} onOpenChange={(open) => !open && setSettingActiveFor(null)} />
     </div>
   );
 }
