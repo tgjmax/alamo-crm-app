@@ -24,7 +24,7 @@ describe('LoginPage', () => {
   beforeEach(() => {
     useAuthStore.setState({ accessToken: null, user: null, sessionRestoreAttempted: false });
     vi.spyOn(authApi, 'refreshRequest').mockRejectedValue(new Error('no session'));
-    vi.spyOn(organizationApi, 'getBranding').mockResolvedValue({ name: 'Alamo Travels', tagline: 'Internal CRM', logoUrl: null, invoiceTerms: null });
+    vi.spyOn(organizationApi, 'getBranding').mockResolvedValue({ name: 'Alamo Travels', tagline: 'Internal CRM', logoUrl: null, invoiceTerms: null, timeZone: 'America/Chicago' });
   });
 
   it('shows the Alamo Travels logo', async () => {
@@ -41,7 +41,7 @@ describe('LoginPage', () => {
 
   it('shows a custom org name, tagline, and logo once branding loads', async () => {
     vi.spyOn(organizationApi, 'getBranding').mockResolvedValue({
-      name: 'Acme Travel', tagline: 'Custom Tagline', logoUrl: 'https://signed.example.com/logo.png', invoiceTerms: null,
+      name: 'Acme Travel', tagline: 'Custom Tagline', logoUrl: 'https://signed.example.com/logo.png', invoiceTerms: null, timeZone: 'America/Chicago',
     });
     renderAtLogin();
     expect(await screen.findByRole('img', { name: 'Acme Travel' })).toHaveAttribute('src', 'https://signed.example.com/logo.png');

@@ -7,7 +7,7 @@ export const BRANDING_QUERY_KEY = ['organization', 'branding'] as const;
 /** Kept under the backend's 300-second presigned logo URL expiry. */
 export const BRANDING_REFRESH_MS = 4 * 60 * 1000;
 
-const DEFAULT_BRANDING: Branding = { name: 'Alamo Travels', tagline: 'Internal CRM', logoUrl: null, invoiceTerms: null };
+const DEFAULT_BRANDING: Branding = { name: 'Alamo Travels', tagline: 'Internal CRM', logoUrl: null, invoiceTerms: null, timeZone: 'America/Chicago' };
 
 export function useBranding(): Branding {
   const { data } = useQuery({

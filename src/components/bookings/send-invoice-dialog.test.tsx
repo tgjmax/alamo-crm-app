@@ -48,6 +48,7 @@ beforeEach(() => {
     tagline: 'Internal CRM',
     logoUrl: null,
     invoiceTerms: 'All sales are final.',
+    timeZone: 'America/Chicago',
   });
   vi.spyOn(bookingsApi, 'listBookings').mockResolvedValue({
     bookings: [PAX_A, PAX_REFUND],

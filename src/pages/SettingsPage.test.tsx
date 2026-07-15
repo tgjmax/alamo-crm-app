@@ -172,7 +172,7 @@ describe('SettingsPage', () => {
   });
 
   it('shows the Organization tab for an admin', async () => {
-    vi.spyOn(organizationApi, 'getBranding').mockResolvedValue({ name: 'Alamo Travels', tagline: 'Internal CRM', logoUrl: null, invoiceTerms: null });
+    vi.spyOn(organizationApi, 'getBranding').mockResolvedValue({ name: 'Alamo Travels', tagline: 'Internal CRM', logoUrl: null, invoiceTerms: null, timeZone: 'America/Chicago' });
     useAuthStore.setState({ accessToken: 't', user: ADMIN_USER });
     renderWithClient(<SettingsPage />);
     expect(await screen.findByRole('tab', { name: 'Organization' })).toBeInTheDocument();
@@ -186,9 +186,9 @@ describe('SettingsPage', () => {
   });
 
   it('saves organization branding, uploading a new logo when one is chosen', async () => {
-    vi.spyOn(organizationApi, 'getBranding').mockResolvedValue({ name: 'Alamo Travels', tagline: 'Internal CRM', logoUrl: null, invoiceTerms: null });
+    vi.spyOn(organizationApi, 'getBranding').mockResolvedValue({ name: 'Alamo Travels', tagline: 'Internal CRM', logoUrl: null, invoiceTerms: null, timeZone: 'America/Chicago' });
     const upload = vi.spyOn(organizationApi, 'uploadLogoFile').mockResolvedValue('branding/new-logo.png');
-    const update = vi.spyOn(organizationApi, 'updateBranding').mockResolvedValue({ name: 'New Co', tagline: 'New Tag', logoS3Key: 'branding/new-logo.png' });
+    const update = vi.spyOn(organizationApi, 'updateBranding').mockResolvedValue({ name: 'New Co', tagline: 'New Tag', logoS3Key: 'branding/new-logo.png', timeZone: 'America/Chicago' });
     useAuthStore.setState({ accessToken: 't', user: ADMIN_USER });
     renderWithClient(<SettingsPage />);
 
@@ -208,6 +208,7 @@ describe('SettingsPage', () => {
         name: 'New Co',
         tagline: 'Internal CRM',
         invoiceTerms: '',
+        timeZone: 'America/Chicago',
         logoS3Key: 'branding/new-logo.png',
       });
     });
@@ -219,11 +220,13 @@ describe('SettingsPage', () => {
       tagline: 'Internal CRM',
       logoUrl: null,
       invoiceTerms: 'Old terms.',
+      timeZone: 'America/Chicago',
     });
     const update = vi.spyOn(organizationApi, 'updateBranding').mockResolvedValue({
       name: 'Alamo Travels',
       tagline: 'Internal CRM',
       logoS3Key: null,
+      timeZone: 'America/Chicago',
     });
     useAuthStore.setState({ accessToken: 't', user: ADMIN_USER });
     renderWithClient(<SettingsPage />);

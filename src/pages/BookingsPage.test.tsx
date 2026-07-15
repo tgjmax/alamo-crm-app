@@ -618,6 +618,7 @@ describe('BookingsPage', () => {
       tagline: 'Internal CRM',
       logoUrl: null,
       invoiceTerms: null,
+      timeZone: 'America/Chicago',
     });
     renderWithClient(<BookingsPage />);
 

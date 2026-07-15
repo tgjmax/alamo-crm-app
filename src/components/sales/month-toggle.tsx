@@ -14,6 +14,9 @@ export interface MonthValue {
 interface MonthToggleProps {
   value: MonthValue;
   onChange: (next: MonthValue) => void;
+  /** The latest selectable month — the agency's current month (see utils/agencyTime.ts). Passed in
+   * rather than computed here so this stays a pure controlled component. */
+  current: MonthValue;
 }
 
 /**
@@ -22,13 +25,12 @@ interface MonthToggleProps {
  * normal calendar), while the Year arrows jump directly to the same month in
  * the previous/next year — the capability the combined single-stepper
  * version didn't have (you'd otherwise need 12 clicks to compare against
- * last year). Neither control ever lands on a future date (relative to the
- * client clock, in UTC to match the backend's day-capping convention).
+ * last year). Neither control ever lands on a future month (relative to
+ * `current`, the agency's current month).
  */
-export function MonthToggle({ value, onChange }: MonthToggleProps) {
-  const today = new Date();
-  const currentYear = today.getUTCFullYear();
-  const currentMonth = today.getUTCMonth() + 1;
+export function MonthToggle({ value, onChange, current }: MonthToggleProps) {
+  const currentYear = current.year;
+  const currentMonth = current.month;
 
   const atCurrentMonth = value.year === currentYear && value.month === currentMonth;
   const atCurrentYear = value.year === currentYear;

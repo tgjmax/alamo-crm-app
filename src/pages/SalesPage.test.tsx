@@ -5,6 +5,8 @@ import { vi } from 'vitest';
 import SalesPage from './SalesPage';
 import * as bookingsApi from '../api/bookings.api';
 import * as salesApi from '../api/sales.api';
+import * as organizationApi from '../api/organization.api';
+import { agencyYearMonth } from '../utils/agencyTime';
 
 function renderWithClient(ui: React.ReactElement) {
   const client = new QueryClient();
@@ -35,7 +37,15 @@ describe('SalesPage', () => {
   beforeEach(() => {
     vi.spyOn(bookingsApi, 'listBookings').mockResolvedValue({ bookings: [BASE_ROW], total: 1, page: 1, pageSize: 15 });
     vi.spyOn(salesApi, 'getSalesSummary').mockResolvedValue(SUMMARY);
+    // SalesPage reads the agency timezone from branding to pick its default month.
+    vi.spyOn(organizationApi, 'getBranding').mockResolvedValue({
+      name: 'Alamo Travels', tagline: 'Internal CRM', logoUrl: null, invoiceTerms: null, timeZone: 'America/Chicago',
+    });
   });
+
+  // The page derives its default month from the agency timezone, so the expectation must use the
+  // SAME helper — computing it in UTC would flake at a month boundary.
+  const agencyNow = () => agencyYearMonth('America/Chicago');
 
   it('renders the summary cards', async () => {
     renderWithClient(<SalesPage />);
@@ -51,10 +61,8 @@ describe('SalesPage', () => {
     expect(screen.getByText(/JOSEPH\/SHINY S/)).toBeInTheDocument();
   });
 
-  it('defaults to the current UTC month/year and page size 15', async () => {
-    const now = new Date();
-    const expectedYear = now.getUTCFullYear();
-    const expectedMonth = now.getUTCMonth() + 1;
+  it('defaults to the agency current month/year and page size 15', async () => {
+    const { year: expectedYear, month: expectedMonth } = agencyNow();
     renderWithClient(<SalesPage />);
     await screen.findByText('0000150');
     expect(salesApi.getSalesSummary).toHaveBeenCalledWith(expectedYear, expectedMonth);
@@ -70,9 +78,7 @@ describe('SalesPage', () => {
   });
 
   it('stepping the month toggle backward requests the previous month for both the cards and the table', async () => {
-    const now = new Date();
-    const expectedYear = now.getUTCFullYear();
-    const expectedMonth = now.getUTCMonth() + 1;
+    const { year: expectedYear, month: expectedMonth } = agencyNow();
     const prevMonth = expectedMonth === 1 ? 12 : expectedMonth - 1;
     const prevYear = expectedMonth === 1 ? expectedYear - 1 : expectedYear;
 

@@ -5,6 +5,7 @@ export interface Branding {
   tagline: string;
   logoUrl: string | null;
   invoiceTerms: string | null;
+  timeZone: string;
 }
 
 export async function getBranding(): Promise<Branding> {
@@ -17,12 +18,14 @@ export interface UpdateBrandingInput {
   tagline?: string;
   logoS3Key?: string;
   invoiceTerms?: string;
+  timeZone?: string;
 }
 
 export interface UpdateBrandingResponse {
   name: string;
   tagline: string;
   logoS3Key: string | null;
+  timeZone: string;
 }
 
 export async function updateBranding(input: UpdateBrandingInput): Promise<UpdateBrandingResponse> {
