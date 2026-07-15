@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider, createMemoryHistory } from '@tanstack/react-router';
 import { vi } from 'vitest';
 import { createAppRouter } from '../router';
+import { reorder } from '../components/dashboard/reorder';
 import { useAuthStore } from '../stores/authStore';
 import * as widgetsApi from '../api/widgets.api';
 import * as usersApi from '../api/users.api';
@@ -53,7 +54,31 @@ describe('DashboardPage', () => {
     expect(headings).toEqual(['By airline', 'QR count']);
   });
 
-  it('persists a reorder when Move down is clicked', async () => {
+  // The reorder logic itself — both a mouse drop and a keyboard drop route through this pure
+  // function. (The full drag interaction needs real element rects that jsdom doesn't provide, so
+  // it's browser-verified; here we pin the ordering math and, below, the a11y-reachable handle.)
+  it('reorder() moves the dragged id to the drop position', () => {
+    expect(reorder(['a', 'b', 'c'], 'a', 'c')).toEqual(['b', 'c', 'a']);
+    expect(reorder(['a', 'b', 'c'], 'c', 'a')).toEqual(['c', 'a', 'b']);
+    expect(reorder(['a', 'b', 'c'], 'b', 'b')).toEqual(['a', 'b', 'c']); // no-op
+    expect(reorder(['a', 'b', 'c'], 'x', 'a')).toEqual(['a', 'b', 'c']); // unknown id → unchanged
+  });
+
+  it('gives every card a keyboard-reachable drag handle', async () => {
+    vi.spyOn(widgetsApi, 'listWidgets').mockResolvedValue({
+      widgets: [W1, W2],
+      layout: [{ widget: 'w1', order: 0, size: 'small' }, { widget: 'w2', order: 1, size: 'small' }],
+    });
+    vi.spyOn(widgetsApi, 'getWidgetData').mockResolvedValue({ kind: 'scalar', value: 1 });
+    renderAtDashboard();
+
+    const handle = await screen.findByRole('button', { name: 'Drag QR count to reorder' });
+    expect(handle).toBeInTheDocument();
+    handle.focus();
+    expect(handle).toHaveFocus(); // a keyboard user can reach and lift it
+  });
+
+  it('persists the layout when a widget is resized', async () => {
     vi.spyOn(widgetsApi, 'listWidgets').mockResolvedValue({
       widgets: [W1, W2],
       layout: [{ widget: 'w1', order: 0, size: 'small' }, { widget: 'w2', order: 1, size: 'small' }],
@@ -63,17 +88,17 @@ describe('DashboardPage', () => {
     renderAtDashboard();
 
     await screen.findByRole('heading', { name: 'QR count' });
-    await userEvent.click(screen.getByRole('button', { name: 'Move QR count down' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Resize QR count' }));
 
     await waitFor(() =>
       expect(save).toHaveBeenCalledWith([
-        { widget: 'w2', order: 0, size: 'small' },
-        { widget: 'w1', order: 1, size: 'small' },
+        { widget: 'w1', order: 0, size: 'large' },
+        { widget: 'w2', order: 1, size: 'small' },
       ])
     );
   });
 
-  it('toasts and reverts the order when the layout save fails', async () => {
+  it('toasts and reverts when the layout save fails', async () => {
     vi.spyOn(widgetsApi, 'listWidgets').mockResolvedValue({
       widgets: [W1, W2],
       layout: [{ widget: 'w1', order: 0, size: 'small' }, { widget: 'w2', order: 1, size: 'small' }],
@@ -83,7 +108,8 @@ describe('DashboardPage', () => {
     renderAtDashboard();
 
     await screen.findByRole('heading', { name: 'QR count' });
-    await userEvent.click(screen.getByRole('button', { name: 'Move QR count down' }));
+    // Resize goes through the same persist → save path a drop does.
+    await userEvent.click(screen.getByRole('button', { name: 'Resize QR count' }));
 
     const toastText = await screen.findByText(/could not save/i);
     expect(toastText).toBeInTheDocument();
@@ -92,11 +118,11 @@ describe('DashboardPage', () => {
     // error toast with data-type="error", which is what its CSS keys the destructive palette off.
     expect(toastText.closest('[data-sonner-toast]')).toHaveAttribute('data-type', 'error');
 
-    // The board must snap back to the order the server actually holds, not keep showing a lie.
-    await waitFor(() => {
-      const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
-      expect(headings).toEqual(['QR count', 'By airline']);
-    });
+    // The board must snap back to what the server actually holds: the resize is undone, so the
+    // button reads "Large" again (i.e. the widget is back to small).
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Resize QR count' })).toHaveTextContent('Large')
+    );
   });
 
   it('reverts to the last server-confirmed layout (not the page-load layout) after two successful saves then a failed one', async () => {
@@ -108,51 +134,33 @@ describe('DashboardPage', () => {
     const save = vi.spyOn(widgetsApi, 'saveLayout');
     save.mockClear();
     save
-      .mockResolvedValueOnce(undefined) // 1st save succeeds: move QR count down -> [w2, w1]
-      .mockResolvedValueOnce(undefined) // 2nd save succeeds: resize QR count to large (order stays [w2, w1])
+      .mockResolvedValueOnce(undefined) // 1st save succeeds: resize QR count to large
+      .mockResolvedValueOnce(undefined) // 2nd save succeeds: resize By airline to large
       .mockRejectedValueOnce(new Error('network')); // 3rd save fails
     renderAtDashboard();
 
     await screen.findByRole('heading', { name: 'QR count' });
 
-    // 1st successful reorder.
-    await userEvent.click(screen.getByRole('button', { name: 'Move QR count down' }));
-    await waitFor(() =>
-      expect(save).toHaveBeenNthCalledWith(1, [
-        { widget: 'w2', order: 0, size: 'small' },
-        { widget: 'w1', order: 1, size: 'small' },
-      ])
-    );
-    await waitFor(() => {
-      const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
-      expect(headings).toEqual(['By airline', 'QR count']);
-    });
-
-    // 2nd successful save: resize QR count to large. Order is unchanged ([w2, w1]) but this
-    // is the state the `confirmed` ref must hold after this point -- distinct from BOTH the
-    // page-load layout (w1 small, w2 small) and the mid-sequence state after save #1 alone.
+    // 1st successful save: QR count -> large. Button flips to "Small".
     await userEvent.click(screen.getByRole('button', { name: 'Resize QR count' }));
-    await waitFor(() =>
-      expect(save).toHaveBeenNthCalledWith(2, [
-        { widget: 'w2', order: 0, size: 'small' },
-        { widget: 'w1', order: 1, size: 'large' },
-      ])
-    );
     expect(await screen.findByRole('button', { name: 'Resize QR count' })).toHaveTextContent('Small');
 
-    // 3rd save fails: move By airline down -> attempted order [w1, w2].
-    await userEvent.click(screen.getByRole('button', { name: 'Move By airline down' }));
+    // 2nd successful save: By airline -> large. This is the state the `confirmed` ref must hold
+    // now -- distinct from BOTH the page-load layout and the state after save #1 alone.
+    await userEvent.click(screen.getByRole('button', { name: 'Resize By airline' }));
+    expect(await screen.findByRole('button', { name: 'Resize By airline' })).toHaveTextContent('Small');
+
+    // 3rd save fails: attempt QR count -> small.
+    await userEvent.click(screen.getByRole('button', { name: 'Resize QR count' }));
     expect(await screen.findByText(/could not save/i)).toBeInTheDocument();
 
-    // Must land on the last SERVER-CONFIRMED state -- order [By airline, QR count] with
-    // QR count still large -- not the page-load order [QR count, By airline] with QR count
-    // small, which is what a `confirmed` ref seeded only once at mount (i.e. a deleted
-    // onSuccess handler) would incorrectly revert to.
-    await waitFor(() => {
-      const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
-      expect(headings).toEqual(['By airline', 'QR count']);
-    });
-    expect(screen.getByRole('button', { name: 'Resize QR count' })).toHaveTextContent('Small');
+    // Must land on the last SERVER-CONFIRMED state: BOTH widgets large. A `confirmed` ref seeded
+    // only once at mount (i.e. a deleted onSuccess handler) would wrongly revert QR count to small,
+    // flipping its button back to "Large".
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Resize QR count' })).toHaveTextContent('Small')
+    );
+    expect(screen.getByRole('button', { name: 'Resize By airline' })).toHaveTextContent('Small');
   });
 
   it('deletes a widget after confirmation', async () => {

@@ -2,7 +2,16 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
+import {
+  DndContext, DragEndEvent, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors,
+} from '@dnd-kit/core';
+import {
+  SortableContext, rectSortingStrategy, sortableKeyboardCoordinates, useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { GripVertical } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { reorder } from '../components/dashboard/reorder';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -98,11 +107,15 @@ export default function DashboardPage() {
     layoutMutation.mutate(nextIds.map((id, i) => ({ widget: id, order: i, size: nextSizes[id] ?? 'small' })));
   }
 
-  function move(index: number, delta: number) {
-    const target = index + delta;
-    if (target < 0 || target >= ids.length) return;
-    const next = [...ids];
-    [next[index], next[target]] = [next[target], next[index]];
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const next = reorder(ids, String(active.id), String(over.id));
     setIds(next);
     persist(next, sizes);
   }
@@ -126,28 +139,30 @@ export default function DashboardPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {ids.map((id, index) => {
-          const widget = widgetsById.get(id);
-          if (!widget) return null;
-          const canEdit = isAdminOrAbove(user) || widget.owner.id === user?.id;
-          return (
-            <div key={id} className={sizes[id] === 'large' ? 'md:col-span-2' : ''}>
-              <WidgetCard
-                widget={widget}
-                index={index}
-                total={ids.length}
-                size={sizes[id] ?? 'small'}
-                canEdit={canEdit}
-                keyLabel={keyLabelFor(widget)}
-                onMove={move}
-                onToggleSize={() => toggleSize(id)}
-                onDelete={() => setPendingDelete(widget)}
-              />
-            </div>
-          );
-        })}
-      </div>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={ids} strategy={rectSortingStrategy}>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {ids.map((id) => {
+              const widget = widgetsById.get(id);
+              if (!widget) return null;
+              const canEdit = isAdminOrAbove(user) || widget.owner.id === user?.id;
+              return (
+                <SortableWidgetCard
+                  key={id}
+                  id={id}
+                  spanClass={sizes[id] === 'large' ? 'md:col-span-2' : ''}
+                  widget={widget}
+                  size={sizes[id] ?? 'small'}
+                  canEdit={canEdit}
+                  keyLabel={keyLabelFor(widget)}
+                  onToggleSize={() => toggleSize(id)}
+                  onDelete={() => setPendingDelete(widget)}
+                />
+              );
+            })}
+          </div>
+        </SortableContext>
+      </DndContext>
 
       {ids.length === 0 && data && (
         <div className="space-y-3">
@@ -190,19 +205,19 @@ export default function DashboardPage() {
   );
 }
 
-interface WidgetCardProps {
+interface SortableWidgetCardProps {
+  id: string;
+  spanClass: string;
   widget: WidgetSummary;
-  index: number;
-  total: number;
   size: 'small' | 'large';
   canEdit: boolean;
   keyLabel: (key: string) => string;
-  onMove: (index: number, delta: number) => void;
   onToggleSize: () => void;
   onDelete: () => void;
 }
 
-function WidgetCard({ widget, index, total, size, canEdit, keyLabel, onMove, onToggleSize, onDelete }: WidgetCardProps) {
+function SortableWidgetCard({ id, spanClass, widget, size, canEdit, keyLabel, onToggleSize, onDelete }: SortableWidgetCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const { data, error } = useQuery({
     queryKey: ['widget', widget.id, 'data'],
     queryFn: () => getWidgetData(widget.id),
@@ -214,7 +229,15 @@ function WidgetCard({ widget, index, total, size, canEdit, keyLabel, onMove, onT
         ? 'Could not load this widget'
         : null;
 
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : undefined,
+    opacity: isDragging ? 0.6 : undefined,
+  };
+
   return (
+    <div ref={setNodeRef} style={style} className={spanClass}>
     <Card className="h-full">
       <CardHeader className="flex flex-row items-start justify-between space-y-0">
         <div className="flex flex-col">
@@ -227,11 +250,16 @@ function WidgetCard({ widget, index, total, size, canEdit, keyLabel, onMove, onT
         </div>
         <div className="flex items-center gap-1">
           {widget.sharedWith.mode === 'shared' && <Badge variant="secondary">Shared</Badge>}
-          <Button type="button" variant="ghost" size="sm" aria-label={`Move ${widget.name} up`} disabled={index === 0} onClick={() => onMove(index, -1)}>
-            ↑
-          </Button>
-          <Button type="button" variant="ghost" size="sm" aria-label={`Move ${widget.name} down`} disabled={index === total - 1} onClick={() => onMove(index, 1)}>
-            ↓
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label={`Drag ${widget.name} to reorder`}
+            className="cursor-grab touch-none"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="h-4 w-4" />
           </Button>
           <Button type="button" variant="ghost" size="sm" aria-label={`Resize ${widget.name}`} onClick={onToggleSize}>
             {size === 'large' ? 'Small' : 'Large'}
@@ -265,5 +293,6 @@ function WidgetCard({ widget, index, total, size, canEdit, keyLabel, onMove, onT
         />
       </CardContent>
     </Card>
+    </div>
   );
 }
