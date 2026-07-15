@@ -101,6 +101,9 @@ export default function DashboardPage() {
       queryClient.invalidateQueries({ queryKey: ['widgets'] });
       setPendingDelete(null);
     },
+    onError: () => {
+      toast.error('Could not delete the widget. Please try again.');
+    },
   });
 
   function persist(nextIds: string[], nextSizes: Record<string, 'small' | 'large'>) {

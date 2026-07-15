@@ -43,13 +43,18 @@ describe('DashboardPage', () => {
       widgets: [W1, W2],
       layout: [{ widget: 'w2', order: 0, size: 'small' }, { widget: 'w1', order: 1, size: 'small' }],
     });
+    // Distinct values per widget so each is unambiguously assertable. (They used to both be 7,
+    // which made `findByText('7')` throw "Found multiple elements" whenever both async widget
+    // loads resolved in the same tick — a race that stayed hidden in isolation but surfaced
+    // reliably under full-suite CPU contention.)
     vi.spyOn(widgetsApi, 'getWidgetData').mockImplementation(async (id) =>
-      id === 'w1' ? { kind: 'scalar', value: 7 } : { kind: 'breakdown', rows: [{ key: 'QR', value: 7 }] }
+      id === 'w1' ? { kind: 'scalar', value: 42 } : { kind: 'breakdown', rows: [{ key: 'QR', value: 7 }] }
     );
     renderAtDashboard();
 
     expect(await screen.findByRole('heading', { name: 'By airline' })).toBeInTheDocument();
-    expect(await screen.findByText('7')).toBeInTheDocument();
+    expect(await screen.findByText('42')).toBeInTheDocument(); // scalar widget's data
+    expect(await screen.findByText('7')).toBeInTheDocument(); // table widget's data
     const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
     expect(headings).toEqual(['By airline', 'QR count']);
   });
@@ -123,6 +128,25 @@ describe('DashboardPage', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Resize QR count' })).toHaveAttribute('title', 'Large')
     );
+  });
+
+  it('toasts when deleting a widget fails', async () => {
+    vi.spyOn(widgetsApi, 'listWidgets').mockResolvedValue({
+      widgets: [W1, W2],
+      layout: [{ widget: 'w1', order: 0, size: 'small' }, { widget: 'w2', order: 1, size: 'small' }],
+    });
+    vi.spyOn(widgetsApi, 'getWidgetData').mockResolvedValue({ kind: 'scalar', value: 1 });
+    vi.spyOn(widgetsApi, 'deleteWidget').mockRejectedValue(new Error('network'));
+    renderAtDashboard();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete QR count' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Confirm delete' }));
+
+    const toastText = await screen.findByText(/could not delete/i);
+    expect(toastText).toBeInTheDocument();
+    // Same structural pin as the layout-save toast above: jsdom can't apply sonner's stylesheet, so
+    // the closest assertion that the destructive palette would render is the data-type attribute.
+    expect(toastText.closest('[data-sonner-toast]')).toHaveAttribute('data-type', 'error');
   });
 
   it('reverts to the last server-confirmed layout (not the page-load layout) after two successful saves then a failed one', async () => {

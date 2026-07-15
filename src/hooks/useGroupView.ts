@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { SortingState, VisibilityState } from '@tanstack/react-table';
+import { toast } from 'sonner';
 import { GroupSortBy, GroupView, updateGroupView } from '@/api/groups.api';
 
 const SAVE_DEBOUNCE_MS = 600;
@@ -40,10 +41,13 @@ export function useGroupView(
 
     const timer = setTimeout(() => {
       const view: GroupView = { hiddenColumns: toHiddenColumns(columnVisibility), sort: toSort(sorting) };
-      // Best-effort: a shared-but-non-owner request would 404 (defence in depth — canPersist
-      // already prevents this from firing), and any other failure isn't worth surfacing for a
-      // silent background save.
-      void updateGroupView(groupId, view).catch(() => {});
+      // A shared-but-non-owner request would 404, but canPersist already prevents this from firing
+      // (the .catch is defence in depth). A genuine failure IS surfaced — this background save is the
+      // same class as the dashboard layout save, which toasts; a silently-lost view change leaves the
+      // user believing their columns/sort stuck when they didn't.
+      void updateGroupView(groupId, view).catch(() =>
+        toast.error('Could not save your view. Your column and sort changes may not persist.')
+      );
     }, SAVE_DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
