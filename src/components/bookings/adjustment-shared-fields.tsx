@@ -65,14 +65,16 @@ export function AdjustmentSharedFields({ bookingType, value, onChange }: Adjustm
             icon={<PlaneTakeoff />}
             value={value.depCity}
             onChange={(e) => onChange({ depCity: e.target.value })}
-            placeholder="Departure city (optional) — e.g. ORD"
+            placeholder="Departure city — e.g. ORD"
+            required
           />
           <IconInput
             aria-label="Adjustment arrival city"
             icon={<PlaneLanding />}
             value={value.arrCity}
             onChange={(e) => onChange({ arrCity: e.target.value })}
-            placeholder="Arrival city (optional) — e.g. COK"
+            placeholder="Arrival city — e.g. COK"
+            required
           />
           <div className="space-y-2">
             <Label htmlFor="adjustment-dep-date">Departure date</Label>

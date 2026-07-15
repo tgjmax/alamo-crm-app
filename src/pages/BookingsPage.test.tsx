@@ -14,6 +14,12 @@ function renderWithClient(ui: React.ReactElement) {
   return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
 }
 
+async function linkPassenger(label: string, match: customersApi.CustomerSearchResult) {
+  vi.spyOn(customersApi, 'searchCustomers').mockResolvedValue([match]);
+  await userEvent.type(screen.getByLabelText(label), match.firstName);
+  await userEvent.click(await screen.findByText(`${match.lastName}/${match.firstName}`));
+}
+
 const SUPERADMIN = { id: 'u0', name: 'Super', email: 'super@a.test', role: 'superadmin' as const };
 
 const BASE_ROW: bookingsApi.BookingRow = {
@@ -171,23 +177,25 @@ describe('BookingsPage', () => {
 
   it('shows matching customers when typing 3+ letters in the passenger name field', async () => {
     vi.spyOn(customersApi, 'searchCustomers').mockResolvedValue([
-      { id: 'c1', firstName: 'Alexander', lastName: 'Varghese', phone: '555-0100' },
+      { id: 'c1', firstName: 'Alexander', lastName: 'Varghese', phone: '555-0100', dob: '02-Sep-1953' },
     ]);
     renderWithClient(<BookingsPage />);
     await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));
     await userEvent.type(screen.getByLabelText('Passenger name'), 'Var');
-    expect(await screen.findByText('Alexander Varghese')).toBeInTheDocument();
+    expect(await screen.findByText('Varghese/Alexander')).toBeInTheDocument();
   });
 
   it('selecting a matched customer fills the passenger name field', async () => {
     vi.spyOn(customersApi, 'searchCustomers').mockResolvedValue([
-      { id: 'c1', firstName: 'Alexander', lastName: 'Varghese', phone: '555-0100' },
+      { id: 'c1', firstName: 'Alexander', lastName: 'Varghese', phone: '555-0100', dob: '02-Sep-1953' },
     ]);
     renderWithClient(<BookingsPage />);
     await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));
     await userEvent.type(screen.getByLabelText('Passenger name'), 'Var');
-    await userEvent.click(await screen.findByText('Alexander Varghese'));
-    expect(screen.getByLabelText('Passenger name')).toHaveValue('Alexander Varghese');
+    await userEvent.click(await screen.findByText('Varghese/Alexander'));
+    // The dropdown option (and the read-only field once picked) both show the ticketing name
+    // (LastName/GivenName).
+    expect(screen.getByLabelText('Passenger name')).toHaveValue('Varghese/Alexander');
   });
 
   it('offers "+ Add new customer" in the passenger autocomplete once 3+ letters are typed', async () => {
@@ -219,7 +227,8 @@ describe('BookingsPage', () => {
 
     await waitFor(() => {
       expect(customersApi.createCustomer).toHaveBeenCalled();
-      expect(screen.getByLabelText('Passenger name')).toHaveValue('Zed Newman');
+      // Zed / Newman with no middle name -> ticketing name 'Newman/Zed'.
+      expect(screen.getByLabelText('Passenger name')).toHaveValue('Newman/Zed');
     });
     // Booking dialog context preserved
     expect(screen.getByLabelText('Invoice number')).toHaveValue('0000300');
@@ -241,7 +250,7 @@ describe('BookingsPage', () => {
     await userEvent.type(screen.getByLabelText('Arrival city'), 'COK');
     await userEvent.type(screen.getByLabelText('Departure Date'), '2026-06-01');
     await userEvent.type(screen.getByLabelText('Arrival Date'), '2026-06-10');
-    await userEvent.type(screen.getByLabelText('Passenger name'), 'NEW/PAX');
+    await linkPassenger('Passenger name', { id: 'c1', firstName: 'New', lastName: 'Pax', phone: '5', dob: '02-Sep-1953' });
     await userEvent.type(screen.getByLabelText('Amount'), '500');
     await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));
 
@@ -255,7 +264,8 @@ describe('BookingsPage', () => {
           airlineCode: 'QR',
           depCity: 'DXB',
           arrCity: 'COK',
-          passengers: [{ passengerName: 'NEW/PAX', amount: 500 }],
+          // Linked name is `lastName/givenName`.
+          passengers: [{ passengerName: 'Pax/New', amount: 500, customer: 'c1' }],
         })
       );
     });
@@ -294,11 +304,15 @@ describe('BookingsPage', () => {
     await userEvent.type(screen.getByLabelText('Invoice number'), '0000210');
     await userEvent.type(screen.getByLabelText('PNR'), 'GUDBFX');
     await userEvent.type(screen.getByLabelText('Airline code'), 'QR');
-    await userEvent.type(screen.getByLabelText('Passenger name'), 'JOSEPH/SHINY S');
+    await userEvent.type(screen.getByLabelText('Departure city'), 'DXB');
+    await userEvent.type(screen.getByLabelText('Arrival city'), 'COK');
+    await userEvent.type(screen.getByLabelText('Departure Date'), '2026-06-01');
+    await userEvent.type(screen.getByLabelText('Arrival Date'), '2026-06-10');
+    await linkPassenger('Passenger name', { id: 'c1', firstName: 'Shiny', lastName: 'Joseph', phone: '5', dob: '02-Sep-1953' });
     await userEvent.type(screen.getByLabelText('Amount'), '2400');
 
     await userEvent.click(screen.getByRole('button', { name: 'Add passenger' }));
-    await userEvent.type(screen.getByLabelText('Passenger name 2'), 'JOSEPH/ANTON');
+    await linkPassenger('Passenger name 2', { id: 'c2', firstName: 'Anton', lastName: 'Joseph', phone: '5', dob: '01-Jan-1990' });
     await userEvent.type(screen.getByLabelText('Amount 2'), '1800');
 
     await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));
@@ -306,8 +320,8 @@ describe('BookingsPage', () => {
     await waitFor(() => {
       const [firstCallArgs] = vi.mocked(bookingsApi.createBooking).mock.calls[0];
       expect(firstCallArgs.passengers).toEqual([
-        { passengerName: 'JOSEPH/SHINY S', amount: 2400 },
-        { passengerName: 'JOSEPH/ANTON', amount: 1800 },
+        { passengerName: 'Joseph/Shiny', amount: 2400, customer: 'c1' },
+        { passengerName: 'Joseph/Anton', amount: 1800, customer: 'c2' },
       ]);
     });
   });
@@ -340,7 +354,11 @@ describe('BookingsPage', () => {
     await userEvent.type(screen.getByLabelText('Invoice number'), '0000202');
     await userEvent.type(screen.getByLabelText('PNR'), 'ABC123');
     await userEvent.type(screen.getByLabelText('Airline code'), 'QR');
-    await userEvent.type(screen.getByLabelText('Passenger name'), 'PEND/PAX');
+    await userEvent.type(screen.getByLabelText('Departure city'), 'DXB');
+    await userEvent.type(screen.getByLabelText('Arrival city'), 'COK');
+    await userEvent.type(screen.getByLabelText('Departure Date'), '2026-06-01');
+    await userEvent.type(screen.getByLabelText('Arrival Date'), '2026-06-10');
+    await linkPassenger('Passenger name', { id: 'c1', firstName: 'Pend', lastName: 'Pax', phone: '5', dob: '02-Sep-1953' });
     await userEvent.type(screen.getByLabelText('Amount'), '500');
     await userEvent.click(screen.getByRole('combobox', { name: 'Payment status' }));
     await userEvent.click(await screen.findByRole('option', { name: 'Pending' }));
@@ -366,7 +384,11 @@ describe('BookingsPage', () => {
     await userEvent.type(screen.getByLabelText('Invoice number'), '0000203');
     await userEvent.type(screen.getByLabelText('PNR'), 'ABC123');
     await userEvent.type(screen.getByLabelText('Airline code'), 'QR');
-    await userEvent.type(screen.getByLabelText('Passenger name'), 'PAID/PAX');
+    await userEvent.type(screen.getByLabelText('Departure city'), 'DXB');
+    await userEvent.type(screen.getByLabelText('Arrival city'), 'COK');
+    await userEvent.type(screen.getByLabelText('Departure Date'), '2026-06-01');
+    await userEvent.type(screen.getByLabelText('Arrival Date'), '2026-06-10');
+    await linkPassenger('Passenger name', { id: 'c1', firstName: 'Paid', lastName: 'Pax', phone: '5', dob: '02-Sep-1953' });
     await userEvent.type(screen.getByLabelText('Amount'), '500');
     expect(screen.queryByLabelText('Amount owed')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));
@@ -378,30 +400,23 @@ describe('BookingsPage', () => {
     });
   });
 
-  it('creates a booking without a Departure city (historic data does not have it)', async () => {
-    vi.spyOn(bookingsApi, 'createBooking').mockResolvedValue({
-      id: 'b3',
-      invoiceNumber: '0000201',
-      passengers: [{ id: 'p3', passengerName: 'NEW/PAX', amount: 500 }],
-    });
+  it('does not create a New booking when Departure city is left empty', async () => {
+    const create = vi.spyOn(bookingsApi, 'createBooking');
     renderWithClient(<BookingsPage />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));
-    await userEvent.type(screen.getByLabelText('Invoice number'), '0000201');
+    await userEvent.type(screen.getByLabelText('Invoice number'), '0000205');
     await userEvent.type(screen.getByLabelText('PNR'), 'ABC123');
     await userEvent.type(screen.getByLabelText('Airline code'), 'QR');
     await userEvent.type(screen.getByLabelText('Arrival city'), 'COK');
     await userEvent.type(screen.getByLabelText('Departure Date'), '2026-06-01');
     await userEvent.type(screen.getByLabelText('Arrival Date'), '2026-06-10');
-    await userEvent.type(screen.getByLabelText('Passenger name'), 'NEW/PAX');
+    await linkPassenger('Passenger name', { id: 'c1', firstName: 'New', lastName: 'Pax', phone: '5', dob: '02-Sep-1953' });
     await userEvent.type(screen.getByLabelText('Amount'), '500');
     await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));
 
-    await waitFor(() => {
-      expect(bookingsApi.createBooking).toHaveBeenCalled();
-      const [firstCallArgs] = vi.mocked(bookingsApi.createBooking).mock.calls[0];
-      expect(firstCallArgs.depCity).toBeUndefined();
-    });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(create).not.toHaveBeenCalled();
   });
 
   it('hides trip and payment fields and submits voided:true when Mark as voided is checked', async () => {
@@ -1089,14 +1104,14 @@ describe('BookingsPage', () => {
 
     it('an agent without customers.create does not see "+ Add new customer", but existing-customer search still works', async () => {
       vi.spyOn(customersApi, 'searchCustomers').mockResolvedValue([
-        { id: 'c1', firstName: 'Alexander', lastName: 'Varghese', phone: '555-0100' },
+        { id: 'c1', firstName: 'Alexander', lastName: 'Varghese', phone: '555-0100', dob: '02-Sep-1953' },
       ]);
       useAuthStore.setState({ accessToken: 't', user: AGENT_NO_CUSTOMER_CREATE });
       renderWithClient(<BookingsPage />);
       await userEvent.click(await screen.findByRole('button', { name: 'Create booking' }));
       await userEvent.type(screen.getByLabelText('Passenger name'), 'Var');
 
-      expect(await screen.findByText('Alexander Varghese')).toBeInTheDocument();
+      expect(await screen.findByText('Varghese/Alexander')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: '+ Add new customer' })).not.toBeInTheDocument();
     });
 

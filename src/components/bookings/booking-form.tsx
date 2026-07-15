@@ -1,7 +1,6 @@
 import { FormEvent, ReactNode, useState } from 'react';
 import { Hash, Plane, PlaneLanding, PlaneTakeoff, StickyNote, Ticket, User, X } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DialogFooter } from '@/components/ui/dialog';
@@ -18,6 +17,7 @@ import { searchAirports, searchAirlines } from '@/api/flightData.api';
 import { useListNavigation } from '@/hooks/useListNavigation';
 import { duplicateInvoice, errorMessage } from '@/utils/apiError';
 import { formatDisplayDate } from '@/utils/dateFormat';
+import { ticketingName } from '@/utils/ticketingName';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/authStore';
 import { canCreateCustomers } from '@/utils/permissions';
@@ -119,6 +119,9 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
   // The payload the backend warned about, held so "Save anyway" can re-send exactly it with
   // confirmDuplicate set. Non-null iff the warning panel is showing.
   const [pendingDuplicate, setPendingDuplicate] = useState<{ input: UpdateBookingInput; duplicate: DuplicateInvoice } | null>(null);
+  // True once the user has tried to submit with an unlinked passenger — drives the inline
+  // "pick a customer" message. Every non-voided passenger must be tied to a Customer record.
+  const [linkAttempted, setLinkAttempted] = useState(false);
   const queryClient = useQueryClient();
 
   const searchQuery = search?.query ?? '';
@@ -152,19 +155,6 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
     setPassengers((rows) => rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   }
 
-  function handleNameChange(index: number, value: string) {
-    // Typing does NOT unlink `customer` — passengerName is always free text and is the source of
-    // truth, while `customer` is an optional ref, so a soft mismatch between them is tolerable and
-    // user-correctable. This used to clear `customer` on every keystroke, which silently destroyed
-    // a stored passenger's customer link the moment someone fixed a one-character typo in their
-    // name, with no indication a link had ever existed. The "Linked" badge + unlink control below
-    // make the link (and losing it) visible instead; picking a different autocomplete match or
-    // inline-creating a customer still re-points `customer`, which is what actually prevents a
-    // mismatch when the user genuinely changes who the passenger is.
-    updatePassenger(index, { name: value });
-    setSearch({ index, query: value });
-  }
-
   function selectMatch(index: number, name: string, customerId: string) {
     updatePassenger(index, { name, customer: customerId });
     setSearch(null);
@@ -183,13 +173,26 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
   } = useListNavigation({
     items: matches,
     onSelect: (m) => {
-      if (search) selectMatch(search.index, `${m.firstName} ${m.lastName}`, m.id);
+      if (search) selectMatch(search.index, ticketingName(m), m.id);
     },
     onClose: () => setSearch(null),
   });
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
+
+    // Every non-voided passenger must be linked to a Customer (picked from autocomplete or
+    // inline-created). The name control never accepts hand-typed final values, so an unlinked row
+    // here means the user never picked (or re-picked) anyone.
+    if (!form.voided && passengers.some((p) => !p.customer)) {
+      setLinkAttempted(true);
+      return;
+    }
+
+    // Rows that will actually be submitted (a blank never-typed row is dropped; a stored row is
+    // always kept). Voided invoices don't render passengers and submit a placeholder instead.
+    const storedRows = passengers.filter((p) => Boolean(p.id) || p.name.trim().length > 0);
+
     saveMutation.mutate({
       invoiceNumber: form.invoiceNumber,
       bookingDate: form.bookingDate,
@@ -228,23 +231,13 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
       passengers:
         form.voided && !initial
           ? [{ passengerName: 'VOID', amount: 0 }]
-          : passengers
-              // A blank row (no stored id, no typed name) must never be submitted. On the
-              // non-voided path `required` already blocks this in the browser, but ticking
-              // "Mark as voided" hides the whole Passengers section — its `required` attribute
-              // can no longer fire — while the row is still sitting in this component's state, so
-              // without this filter a blank row silently becomes `passengerName: ''` in the
-              // payload and the backend 400s. A row with a stored `id` is always kept even if its
-              // name was blanked out, since that's a real edit for the user to fix, not a
-              // never-typed placeholder.
-              .filter((p) => Boolean(p.id) || p.name.trim().length > 0)
-              .map<UpdatePassengerInput>((p) => ({
-                // A row with no id is a passenger the user just added — the backend creates it.
-                ...(p.id ? { id: p.id } : {}),
-                passengerName: p.name,
-                amount: Number(p.amount),
-                ...(p.customer ? { customer: p.customer } : {}),
-              })),
+          : storedRows.map<UpdatePassengerInput>((p) => ({
+              // A row with no id is a passenger the user just added — the backend creates it.
+              ...(p.id ? { id: p.id } : {}),
+              passengerName: p.name,
+              amount: Number(p.amount),
+              ...(p.customer ? { customer: p.customer } : {}),
+            })),
     });
   }
 
@@ -300,87 +293,127 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
       {!form.voided && (
       <div className="space-y-2 rounded-md border p-3">
         <p className="text-sm font-medium">Passengers</p>
-        {passengers.map((passenger, index) => (
+        {passengers.map((passenger, index) => {
+          const nameLabel = index === 0 ? 'Passenger name' : `Passenger name ${index + 1}`;
+          const searching = search?.index === index;
+          const mode: 'search' | 'selected' | 'unlinked' = searching
+            ? 'search'
+            : passenger.customer
+              ? 'selected'
+              : passenger.name.trim().length > 0
+                ? 'unlinked'
+                : 'search';
+          return (
           <div key={index} className="flex items-start gap-2">
             <div className="relative flex-1">
-              <IconInput
-                aria-label={index === 0 ? 'Passenger name' : `Passenger name ${index + 1}`}
-                icon={<User />}
-                value={passenger.name}
-                onChange={(e) => handleNameChange(index, e.target.value)}
-                onKeyDown={search?.index === index ? handleNameKeyDown : undefined}
-                placeholder="Passenger Name (type 3+ letters to search)"
-                required
-                role="combobox"
-                aria-expanded={isNameListOpen(index)}
-                aria-controls={`passenger-listbox-${index}`}
-                aria-autocomplete="list"
-                aria-activedescendant={
-                  isNameListOpen(index) && nameActiveIndex >= 0
-                    ? `passenger-listbox-${index}-${nameActiveIndex}`
-                    : undefined
-                }
-              />
-              {/* Makes an existing customer link visible instead of silently dropping it — typing
-                  in the name field above no longer clears `customer` (see handleNameChange). */}
-              {passenger.customer && (
-                <div className="mt-1 flex items-center gap-1">
-                  <Badge variant="secondary">Linked</Badge>
+              {mode === 'selected' && (
+                <div className="flex items-center gap-2">
+                  <IconInput aria-label={nameLabel} icon={<User />} value={passenger.name} readOnly />
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="h-5 w-5"
-                    aria-label={`Unlink customer from passenger ${index + 1}`}
-                    onClick={() => updatePassenger(index, { customer: undefined })}
+                    aria-label={`Change customer for passenger ${index + 1}`}
+                    className="h-9 w-9 shrink-0"
+                    onClick={() => {
+                      updatePassenger(index, { name: '', customer: undefined });
+                      setSearch({ index, query: '' });
+                    }}
                   >
-                    <X className="h-3 w-3" />
+                    <X className="h-4 w-4" />
                   </Button>
                 </div>
               )}
-              {isNameListOpen(index) && (
-                <div className="absolute left-0 right-0 top-full z-10 mt-1 rounded-md border bg-popover text-popover-foreground shadow">
-                  {/* "+ Add new customer" pinned above the (scrollable) matches so it never sinks
-                      below a long result list; max-h-48 ≈ 6 rows visible, the rest scroll.
-                      Gated on customers.create — it opens the Add-Customer dialog, so that's the
-                      permission it needs, not a bookings one. Searching/selecting an EXISTING
-                      customer below is unaffected and stays available to everyone. */}
-                  {canAddCustomer && (
+              {mode === 'unlinked' && (
+                <div className="space-y-1">
+                  <IconInput aria-label={nameLabel} icon={<User />} value={passenger.name} readOnly />
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-destructive">Not linked — select a customer</p>
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
-                      className="w-full justify-start border-b font-medium"
-                      onClick={() => {
-                        setAddCustomerIndex(index);
-                        setAddCustomerOpen(true);
-                      }}
+                      aria-label={`Select customer for passenger ${index + 1}`}
+                      onClick={() => setSearch({ index, query: '' })}
                     >
-                      + Add new customer
+                      Select customer
                     </Button>
-                  )}
-                  {matches.length > 0 && (
-                    <ul id={`passenger-listbox-${index}`} role="listbox" className="max-h-48 overflow-y-auto">
-                      {matches.map((m, matchIndex) => (
-                        <li
-                          key={m.id}
-                          id={`passenger-listbox-${index}-${matchIndex}`}
-                          role="option"
-                          aria-selected={matchIndex === nameActiveIndex}
-                          className={cn(
-                            'cursor-pointer px-3 py-1',
-                            matchIndex === nameActiveIndex && 'bg-accent'
-                          )}
-                          onMouseEnter={() => setNameActiveIndex(matchIndex)}
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => selectMatch(index, `${m.firstName} ${m.lastName}`, m.id)}
-                        >
-                          {m.firstName} {m.lastName}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                  </div>
                 </div>
+              )}
+              {mode === 'search' && (
+                <>
+                  <IconInput
+                    aria-label={nameLabel}
+                    icon={<User />}
+                    value={searching ? search.query : ''}
+                    onChange={(e) => setSearch({ index, query: e.target.value })}
+                    onKeyDown={searching ? handleNameKeyDown : undefined}
+                    placeholder="Search customer (3+ letters)"
+                    role="combobox"
+                    aria-expanded={isNameListOpen(index)}
+                    aria-controls={`passenger-listbox-${index}`}
+                    aria-autocomplete="list"
+                    aria-activedescendant={
+                      isNameListOpen(index) && nameActiveIndex >= 0
+                        ? `passenger-listbox-${index}-${nameActiveIndex}`
+                        : undefined
+                    }
+                  />
+                  {/* A historic (originally-unlinked) row keeps its stored name in state while the
+                      user re-searches; surface it so they know who to match. A ✕-cleared selected
+                      row has name '' here, so this only shows for the historic case. */}
+                  {searching && !passenger.customer && passenger.name.trim().length > 0 && (
+                    <p className="mt-1 text-xs text-muted-foreground">Originally recorded as {passenger.name}</p>
+                  )}
+                  {linkAttempted && !passenger.customer && (
+                    <p role="alert" className="mt-1 text-sm text-destructive">
+                      Select a customer from the list, or add a new one.
+                    </p>
+                  )}
+                  {isNameListOpen(index) && (
+                    <div className="absolute left-0 right-0 top-full z-10 mt-1 rounded-md border bg-popover text-popover-foreground shadow">
+                      {/* "+ Add new customer" pinned above the (scrollable) matches so it never sinks
+                          below a long result list; max-h-48 ≈ 6 rows visible, the rest scroll.
+                          Gated on customers.create — it opens the Add-Customer dialog, so that's the
+                          permission it needs, not a bookings one. Searching/selecting an EXISTING
+                          customer below is unaffected and stays available to everyone. */}
+                      {canAddCustomer && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="w-full justify-start border-b font-medium"
+                          onClick={() => {
+                            setAddCustomerIndex(index);
+                            setAddCustomerOpen(true);
+                          }}
+                        >
+                          + Add new customer
+                        </Button>
+                      )}
+                      {matches.length > 0 && (
+                        <ul id={`passenger-listbox-${index}`} role="listbox" className="max-h-48 overflow-y-auto">
+                          {matches.map((m, matchIndex) => (
+                            <li
+                              key={m.id}
+                              id={`passenger-listbox-${index}-${matchIndex}`}
+                              role="option"
+                              aria-selected={matchIndex === nameActiveIndex}
+                              className={cn('cursor-pointer px-3 py-1', matchIndex === nameActiveIndex && 'bg-accent')}
+                              onMouseEnter={() => setNameActiveIndex(matchIndex)}
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => selectMatch(index, ticketingName(m), m.id)}
+                            >
+                              <div>{ticketingName(m)}</div>
+                              <div className="text-xs text-muted-foreground">{m.dob}</div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </div>
             <div className="relative w-32 shrink-0">
@@ -409,12 +442,18 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
               <X className="h-4 w-4" />
             </Button>
           </div>
-        ))}
+          );
+        })}
         <Button
           type="button"
           variant="secondary"
           size="sm"
-          onClick={() => setPassengers((rows) => [...rows, { ...EMPTY_PASSENGER }])}
+          onClick={() => {
+            // Reset the submit-attempt flag so a fresh blank row doesn't inherit the red
+            // "Select a customer" alert from a previous failed submit before it's even been used.
+            setLinkAttempted(false);
+            setPassengers((rows) => [...rows, { ...EMPTY_PASSENGER }]);
+          }}
         >
           Add passenger
         </Button>
@@ -468,6 +507,7 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
                 queryKey="airports"
                 placeholder="e.g. Chicago or ORD"
                 icon={<PlaneTakeoff />}
+                required
               />
             </div>
             <div className="space-y-1">
@@ -481,6 +521,7 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
                 queryKey="airports"
                 placeholder="e.g. Kochi or COK"
                 icon={<PlaneLanding />}
+                required
               />
             </div>
           </div>
@@ -494,6 +535,7 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
                 ariaLabel="Departure Date"
                 value={form.depDate}
                 onChange={(iso) => setForm({ ...form, depDate: iso })}
+                required
               />
             </div>
             <div className="space-y-1">
@@ -503,6 +545,7 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
                 ariaLabel="Arrival Date"
                 value={form.arrDate}
                 onChange={(iso) => setForm({ ...form, arrDate: iso })}
+                required
               />
             </div>
           </div>

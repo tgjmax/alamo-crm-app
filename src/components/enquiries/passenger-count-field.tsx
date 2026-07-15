@@ -23,7 +23,6 @@ const ROWS: { key: PaxKey; label: string; caption?: string }[] = [
   { key: 'infants', label: 'Infants on Lap', caption: 'Under 2' },
 ];
 
-/** A Sabre-style traveller stepper: a summary button opening a popover of +/- counters. */
 export function PassengerCountField({ value, onChange }: PassengerCountFieldProps) {
   const [open, setOpen] = useState(false);
 

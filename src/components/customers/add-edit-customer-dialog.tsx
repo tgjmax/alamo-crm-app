@@ -18,12 +18,14 @@ import {
   CustomerPassportInput,
 } from '@/api/customers.api';
 import { isoToDob, dobToIso } from '@/utils/dateFormat';
+import { ticketingName } from '@/utils/ticketingName';
 
 interface AddEditCustomerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   customer?: CustomerListItem | null;
-  /** Called with the new customer's full name and id after a successful create (never on edit). */
+  /** Called with the new customer's ticketing name (LastName/GivenName) and id after a successful
+   * create (never on edit). */
   onCreated?: (fullName: string, customerId: string) => void;
 }
 
@@ -109,7 +111,7 @@ export function AddEditCustomerDialog({ open, onOpenChange, customer, onCreated 
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['customers', 'list'] });
       queryClient.invalidateQueries({ queryKey: ['customers', 'search'] });
-      if (!isEdit) onCreated?.(`${form.firstName} ${form.lastName}`, data.id);
+      if (!isEdit) onCreated?.(ticketingName(form), data.id);
       onOpenChange(false);
     },
   });

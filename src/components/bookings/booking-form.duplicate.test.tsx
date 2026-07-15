@@ -1,10 +1,11 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AxiosError, AxiosResponse } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BookingForm } from './booking-form';
 import { createBooking, updateBooking, type BookingDetail } from '@/api/bookings.api';
+import { searchCustomers } from '@/api/customers.api';
 
 vi.mock('@/api/bookings.api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/api/bookings.api')>()),
@@ -58,18 +59,28 @@ const EXISTING_BOOKING: BookingDetail = {
     airlineCode: 'QR',
     depCity: 'ORD',
     arrCity: 'COK',
+    depDate: '2026-01-10',
+    arrDate: '2026-01-20',
     remark: '',
     payment: { status: 'paid', type: 'card', amount: 0 },
   },
-  passengers: [{ id: 'p1', passengerName: 'John Smith', amount: 500 }],
+  passengers: [{ id: 'p1', passengerName: 'John Smith', amount: 500, customer: 'c1' }],
 };
 
 async function fillAndSubmit(user: ReturnType<typeof userEvent.setup>) {
+  vi.mocked(searchCustomers).mockResolvedValue([
+    { id: 'c1', firstName: 'Jane', lastName: 'Smith', phone: '555-0100', dob: '02-Sep-1953' },
+  ]);
   await user.type(screen.getByLabelText('Invoice#'), '000005');
   await user.type(screen.getByLabelText(/PNR/i), 'GUDBFX');
   await user.type(screen.getByLabelText(/Airline/i), 'QR');
-  await user.type(screen.getByLabelText(/Passenger name/i), 'Jane Smith');
-  await user.type(screen.getByLabelText(/Amount/i), '700');
+  await user.type(screen.getByLabelText('Departure city'), 'ORD');
+  await user.type(screen.getByLabelText('Arrival city'), 'COK');
+  fireEvent.change(screen.getByLabelText('Departure Date'), { target: { value: '2026-01-10' } });
+  fireEvent.change(screen.getByLabelText('Arrival Date'), { target: { value: '2026-01-20' } });
+  await user.type(screen.getByLabelText(/Passenger name/i), 'Jane');
+  await user.click(await screen.findByText('Smith/Jane'));
+  await user.type(screen.getByLabelText(/^Amount$/i), '700');
   await user.click(screen.getByRole('button', { name: /create booking/i }));
 }
 

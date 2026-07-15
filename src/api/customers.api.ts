@@ -8,6 +8,7 @@ export interface CustomerSearchResult {
   middleName?: string;
   /** Computed by the API (firstName + ' ' + middleName); read-only, not user-inputtable. */
   givenName?: string;
+  dob: string;
   phone: string;
   passportNumber?: string;
 }

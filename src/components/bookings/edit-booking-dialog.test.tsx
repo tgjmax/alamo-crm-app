@@ -22,12 +22,14 @@ const DETAIL: bookingsApi.BookingDetail = {
     airlineCode: 'QR',
     depCity: 'ORD',
     arrCity: 'COK',
+    depDate: '2026-05-08',
+    arrDate: '2026-05-28',
     remark: '',
     payment: { status: 'paid', type: 'card', amount: 0 },
   },
   passengers: [
-    { id: 'p1', passengerName: 'SMITH/JOHN', amount: 300 },
-    { id: 'p2', passengerName: 'SMITH/JANE', amount: 450 },
+    { id: 'p1', passengerName: 'SMITH/JOHN', amount: 300, customer: 'c1' },
+    { id: 'p2', passengerName: 'SMITH/JANE', amount: 450, customer: 'c2' },
   ],
 };
 
@@ -68,7 +70,11 @@ describe('EditBookingDialog', () => {
 
     await screen.findByDisplayValue('10432');
     await user.click(screen.getByRole('button', { name: 'Add passenger' }));
-    await user.type(screen.getByLabelText('Passenger name 3'), 'SMITH/BOB');
+    vi.mocked(customersApi.searchCustomers).mockResolvedValue([
+      { id: 'c3', firstName: 'Bob', lastName: 'Smith', phone: '5', dob: '03-Mar-1980' },
+    ]);
+    await user.type(screen.getByLabelText('Passenger name 3'), 'Bob');
+    await user.click(await screen.findByText('Smith/Bob'));
     await user.type(screen.getByLabelText('Amount 3'), '200');
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
 
@@ -76,9 +82,9 @@ describe('EditBookingDialog', () => {
     const [id, input] = vi.mocked(bookingsApi.updateBooking).mock.calls[0];
     expect(id).toBe('b1');
     expect(input.passengers).toEqual([
-      { id: 'p1', passengerName: 'SMITH/JOHN', amount: 300 },
-      { id: 'p2', passengerName: 'SMITH/JANE', amount: 450 },
-      { passengerName: 'SMITH/BOB', amount: 200 },
+      { id: 'p1', passengerName: 'SMITH/JOHN', amount: 300, customer: 'c1' },
+      { id: 'p2', passengerName: 'SMITH/JANE', amount: 450, customer: 'c2' },
+      { passengerName: 'Smith/Bob', amount: 200, customer: 'c3' },
     ]);
   });
 
@@ -92,7 +98,7 @@ describe('EditBookingDialog', () => {
 
     await waitFor(() => expect(bookingsApi.updateBooking).toHaveBeenCalled());
     const [, input] = vi.mocked(bookingsApi.updateBooking).mock.calls[0];
-    expect(input.passengers).toEqual([{ id: 'p1', passengerName: 'SMITH/JOHN', amount: 300 }]);
+    expect(input.passengers).toEqual([{ id: 'p1', passengerName: 'SMITH/JOHN', amount: 300, customer: 'c1' }]);
   });
 
   // Regression guard for the refetch-mid-edit bug already fixed once in this codebase (see
@@ -158,31 +164,12 @@ describe('EditBookingDialog', () => {
     const [, input] = vi.mocked(bookingsApi.updateBooking).mock.calls[0];
     expect(input.voided).toBe(true);
     expect(input.passengers).toEqual([
-      { id: 'p1', passengerName: 'SMITH/JOHN', amount: 300 },
-      { id: 'p2', passengerName: 'SMITH/JANE', amount: 450 },
+      { id: 'p1', passengerName: 'SMITH/JOHN', amount: 300, customer: 'c1' },
+      { id: 'p2', passengerName: 'SMITH/JANE', amount: 450, customer: 'c2' },
     ]);
   });
 
   it('sends the selected customer id when picking an autocomplete match for an unlinked passenger', async () => {
-    const user = userEvent.setup();
-    vi.mocked(customersApi.searchCustomers).mockResolvedValue([
-      { id: 'c2', firstName: 'Jane', lastName: 'Doe', phone: '555-0100' },
-    ]);
-    renderDialog();
-
-    await screen.findByDisplayValue('10432');
-    const nameField = screen.getByLabelText('Passenger name 2');
-    await user.clear(nameField);
-    await user.type(nameField, 'Doe');
-    await user.click(await screen.findByText('Jane Doe'));
-    await user.click(screen.getByRole('button', { name: 'Save changes' }));
-
-    await waitFor(() => expect(bookingsApi.updateBooking).toHaveBeenCalled());
-    const [, input] = vi.mocked(bookingsApi.updateBooking).mock.calls[0];
-    expect(input.passengers[1]).toEqual({ id: 'p2', passengerName: 'Jane Doe', amount: 450, customer: 'c2' });
-  });
-
-  it('keeps an existing customer link while the name is edited, and clears it only via the unlink control', async () => {
     const user = userEvent.setup();
     vi.mocked(bookingsApi.getBooking).mockResolvedValue({
       ...DETAIL,
@@ -191,25 +178,40 @@ describe('EditBookingDialog', () => {
         { id: 'p2', passengerName: 'SMITH/JANE', amount: 450 },
       ],
     });
+    vi.mocked(customersApi.searchCustomers).mockResolvedValue([
+      { id: 'c2', firstName: 'Jane', lastName: 'Doe', phone: '555-0100', dob: '02-Sep-1953' },
+    ]);
     renderDialog();
 
     await screen.findByDisplayValue('10432');
-    expect(screen.getByText('Linked')).toBeInTheDocument();
-
-    // Fixing a typo in the linked passenger's name must NOT drop the link.
-    await user.type(screen.getByLabelText('Passenger name'), 'X');
+    await user.click(screen.getByRole('button', { name: 'Select customer for passenger 2' }));
+    await user.type(screen.getByLabelText('Passenger name 2'), 'Doe');
+    await user.click(await screen.findByText('Doe/Jane'));
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
-    await waitFor(() => expect(bookingsApi.updateBooking).toHaveBeenCalledTimes(1));
-    let [, input] = vi.mocked(bookingsApi.updateBooking).mock.calls[0];
-    expect(input.passengers[0]).toEqual({ id: 'p1', passengerName: 'SMITH/JOHNX', amount: 300, customer: 'c1' });
 
-    // The unlink control clears just the customer id, leaving the typed name alone.
-    await user.click(screen.getByRole('button', { name: 'Unlink customer from passenger 1' }));
-    expect(screen.queryByText('Linked')).not.toBeInTheDocument();
+    await waitFor(() => expect(bookingsApi.updateBooking).toHaveBeenCalled());
+    const [, input] = vi.mocked(bookingsApi.updateBooking).mock.calls[0];
+    expect(input.passengers[1]).toEqual({ id: 'p2', passengerName: 'Doe/Jane', amount: 450, customer: 'c2' });
+  });
+
+  it('a linked passenger name is read-only; changing it requires re-picking a customer', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    await screen.findByDisplayValue('10432');
+    const nameField = screen.getByLabelText('Passenger name');
+    expect(nameField).toHaveAttribute('readonly');
+
+    vi.mocked(customersApi.searchCustomers).mockResolvedValue([
+      { id: 'c9', firstName: 'New', lastName: 'Person', phone: '5', dob: '01-Jan-1990' },
+    ]);
+    await user.click(screen.getByRole('button', { name: 'Change customer for passenger 1' }));
+    await user.type(screen.getByLabelText('Passenger name'), 'New');
+    await user.click(await screen.findByText('Person/New'));
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
-    await waitFor(() => expect(bookingsApi.updateBooking).toHaveBeenCalledTimes(2));
-    [, input] = vi.mocked(bookingsApi.updateBooking).mock.calls[1];
-    expect(input.passengers[0]).toEqual({ id: 'p1', passengerName: 'SMITH/JOHNX', amount: 300 });
+
+    await waitFor(() => expect(bookingsApi.updateBooking).toHaveBeenCalled());
+    const [, input] = vi.mocked(bookingsApi.updateBooking).mock.calls[0];
+    expect(input.passengers[0]).toEqual({ id: 'p1', passengerName: 'Person/New', amount: 300, customer: 'c9' });
   });
 
   it('renders 0 (not empty) in the Amount owed input for a pending payment stored with amount 0', async () => {
@@ -221,26 +223,6 @@ describe('EditBookingDialog', () => {
 
     await screen.findByDisplayValue('10432');
     expect(screen.getByLabelText('Amount owed')).toHaveValue(0);
-  });
-
-  it('sets the customer id on the passenger row when an autocomplete match is selected', async () => {
-    const user = userEvent.setup();
-    vi.mocked(customersApi.searchCustomers).mockResolvedValue([
-      { id: 'c9', firstName: 'Jane', lastName: 'Doe', phone: '555-0100' },
-    ]);
-    renderDialog();
-
-    await screen.findByDisplayValue('10432');
-    // Replace the second passenger with an autocomplete match.
-    const nameField = screen.getByDisplayValue('SMITH/JANE');
-    await user.clear(nameField);
-    await user.type(nameField, 'Doe');
-    await user.click(await screen.findByRole('option', { name: 'Jane Doe' }));
-    await user.click(screen.getByRole('button', { name: 'Save changes' }));
-
-    await waitFor(() => expect(bookingsApi.updateBooking).toHaveBeenCalled());
-    const [, input] = vi.mocked(bookingsApi.updateBooking).mock.calls[0];
-    expect(input.passengers[1]).toEqual({ id: 'p2', passengerName: 'Jane Doe', amount: 450, customer: 'c9' });
   });
 
   // FIX 1: neither this form nor `edit-adjustment-dialog.tsx` sends `payment.paidOn` — only
@@ -280,8 +262,8 @@ describe('EditBookingDialog', () => {
     await waitFor(() => expect(bookingsApi.updateBooking).toHaveBeenCalled());
     const [, input] = vi.mocked(bookingsApi.updateBooking).mock.calls[0];
     expect(input.passengers).toEqual([
-      { id: 'p1', passengerName: 'SMITH/JOHN', amount: 300 },
-      { id: 'p2', passengerName: 'SMITH/JANE', amount: 450 },
+      { id: 'p1', passengerName: 'SMITH/JOHN', amount: 300, customer: 'c1' },
+      { id: 'p2', passengerName: 'SMITH/JANE', amount: 450, customer: 'c2' },
     ]);
   });
 

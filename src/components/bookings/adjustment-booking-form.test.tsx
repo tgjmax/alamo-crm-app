@@ -183,6 +183,21 @@ describe('AdjustmentBookingForm', () => {
     expect(vi.mocked(create).mock.calls[2][0]).toBe('p2');
   });
 
+  it('does not submit a Reissue when the departure city is cleared', async () => {
+    mockSearch([PAX_A]);
+    const create = vi.spyOn(bookingsApi, 'createAdjustment');
+    renderWithClient(<AdjustmentBookingForm bookingType="Reissue" onDone={vi.fn()} onCancel={vi.fn()} />);
+
+    await userEvent.type(screen.getByLabelText('Original PNR'), 'GUD');
+    await userEvent.click(await screen.findByRole('button', { name: /GUDBFX — 0000150 — 1 passenger/ }));
+    // Cities are prefilled from the original booking; clear the departure city to violate the new rule.
+    await userEvent.clear(screen.getByLabelText('Adjustment departure city'));
+    await userEvent.click(screen.getByRole('button', { name: 'Record reissue' }));
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(create).not.toHaveBeenCalled();
+  });
+
   it('submits pending payment with a shared Amount owed', async () => {
     mockSearch([PAX_A]);
     const create = vi.spyOn(bookingsApi, 'createAdjustment').mockResolvedValue({
