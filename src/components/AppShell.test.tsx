@@ -138,6 +138,12 @@ describe('AppShell', () => {
     });
   });
 
+  it('offers a theme control in the account menu', async () => {
+    renderAuthedApp('/customers');
+    await userEvent.click(await screen.findByRole('button', { name: 'Account menu' }));
+    expect(await screen.findByText('Theme')).toBeInTheDocument();
+  });
+
   it('signs out and redirects to /login', async () => {
     const logout = vi.spyOn(authApi, 'logoutRequest').mockResolvedValue(undefined);
     const router = renderAuthedApp('/customers');

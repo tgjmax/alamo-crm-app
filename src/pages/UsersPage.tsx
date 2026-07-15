@@ -63,9 +63,6 @@ export default function UsersPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Users</h2>
-          <p className="text-sm text-muted-foreground">
-            To change your own name, email or password, go to Settings → My Profile.
-          </p>
         </div>
         <Button onClick={() => setCreating(true)}>Add User</Button>
       </div>

@@ -94,8 +94,6 @@ describe('UsersPage', () => {
     await screen.findByText('Toncy Z');
     // Own row: no actions trigger at all (not just an empty menu — the button itself is absent).
     expect(screen.queryByRole('button', { name: 'Actions for Toncy Z' })).not.toBeInTheDocument();
-    // A hint points self-service to Settings instead of leaving a dead end.
-    expect(screen.getByText(/Settings → My Profile/i)).toBeInTheDocument();
   });
 
   it('does not offer Permissions on a Super Admin row — the role already grants everything', async () => {

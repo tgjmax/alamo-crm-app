@@ -19,21 +19,26 @@
 // EVERY toast (including an error) renders with only the `--normal-*` variables, no matter what
 // `--error-*` is set to.
 //
-// This does NOT make dark mode "come for free": sonner's own `theme` prop defaults to `'light'`
-// and, when set to `'system'`, follows the OS `prefers-color-scheme` media query — it has no
-// awareness of this app's `.dark` class toggle at all. The variables below are set as an inline
-// `style` on the `<Toaster>` element, so they win over sonner's `data-sonner-theme` attribute
-// regardless of its value; they WILL track a real light/dark toggle if one is ever added, but
-// only because their values reference the SAME `--background`/`--foreground`/`--border`/
-// `--destructive` tokens the rest of the app uses — not because of anything sonner does itself.
+// sonner has no awareness of this app's `.dark` class toggle on its own: its `theme` prop
+// defaults to `'light'` and, when set to `'system'`, follows the OS `prefers-color-scheme` media
+// query — NOT the app's class. The theme selector added in 2026-07-14 addresses this from BOTH
+// sides. First, the variables below are set as an inline `style` on the `<Toaster>` element, so
+// they win over sonner's `data-sonner-theme` attribute regardless of its value, and they already
+// track the app theme because they reference the SAME `--background`/`--foreground`/`--border`/
+// `--destructive` tokens the rest of the app uses. Second, `theme={useEffectiveTheme()}` below
+// feeds sonner the app's resolved light/dark value directly, so its own `data-sonner-theme`
+// attribute agrees rather than following the OS query independently.
 import * as React from 'react';
 import { Toaster as SonnerToaster } from 'sonner';
+import { useEffectiveTheme } from '../../hooks/useApplyTheme';
 
 export function Toaster() {
+  const theme = useEffectiveTheme();
   return (
     <SonnerToaster
       position="bottom-right"
       richColors
+      theme={theme}
       style={
         {
           '--normal-bg': 'hsl(var(--background))',

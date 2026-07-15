@@ -6,6 +6,29 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     <link rel="shortcut icon" href="/favicon.ico" />
+    <script>
+      // Pre-paint theme guard: sets the `.dark` class before React mounts so there is
+      // no flash of the wrong theme on load. Mirrors readStoredTheme()/resolveTheme()
+      // in src/stores/themeStore.ts — keep the two in sync.
+      (function () {
+        // Read+validate in a narrow try (matches readStoredTheme): a localStorage
+        // that THROWS (privacy mode) falls back to 'system', NOT to light — so the
+        // OS preference is still honoured, exactly as the store does after mount.
+        var t = 'system';
+        try {
+          var stored = localStorage.getItem('alamo-theme');
+          if (stored === 'light' || stored === 'dark' || stored === 'system') t = stored;
+        } catch (e) {
+          /* localStorage unavailable — treat as 'system'. */
+        }
+        var prefersDark =
+          typeof window.matchMedia === 'function' &&
+          window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (t === 'dark' || (t === 'system' && prefersDark)) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

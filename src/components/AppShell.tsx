@@ -24,6 +24,8 @@ import { useAuthStore } from '../stores/authStore';
 import { canViewSalesReports, canManageUsers, ROLE_LABELS } from '../utils/permissions';
 import { logoutRequest } from '../api/auth.api';
 import { useBranding } from '@/hooks/useBranding';
+import { useApplyTheme } from '../hooks/useApplyTheme';
+import { ThemeMenuItems } from './theme-toggle';
 
 export default function AppShell() {
   const user = useAuthStore((s) => s.user);
@@ -32,6 +34,7 @@ export default function AppShell() {
   const showSales = canViewSalesReports(user);
   const showUsers = canManageUsers(user);
   const branding = useBranding();
+  useApplyTheme();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   function isActive(path: string): boolean {
@@ -181,6 +184,7 @@ export default function AppShell() {
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="top" align="start" className="w-56">
+                  <ThemeMenuItems />
                   <DropdownMenuItem onClick={() => router.navigate({ to: '/settings' })}>
                     <Settings className="mr-2 h-4 w-4" />
                     Settings
