@@ -9,7 +9,7 @@ import {
   SortableContext, rectSortingStrategy, sortableKeyboardCoordinates, useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical } from 'lucide-react';
+import { GripVertical, Maximize2, Minimize2, Pencil, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { reorder } from '../components/dashboard/reorder';
 import { Button } from '@/components/ui/button';
@@ -261,18 +261,37 @@ function SortableWidgetCard({ id, spanClass, widget, size, canEdit, keyLabel, on
           >
             <GripVertical className="h-4 w-4" />
           </Button>
-          <Button type="button" variant="ghost" size="sm" aria-label={`Resize ${widget.name}`} onClick={onToggleSize}>
-            {size === 'large' ? 'Small' : 'Large'}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={`Resize ${widget.name}`}
+            title={size === 'large' ? 'Small' : 'Large'}
+            onClick={onToggleSize}
+          >
+            {size === 'large' ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
           </Button>
           {canEdit && (
             <>
-              <Button asChild variant="ghost" size="sm">
-                <Link to="/dashboard/widgets/$widgetId" params={{ widgetId: widget.id }}>
-                  Edit
+              <Button asChild variant="ghost" size="icon" title="Edit">
+                <Link
+                  to="/dashboard/widgets/$widgetId"
+                  params={{ widgetId: widget.id }}
+                  aria-label={`Edit ${widget.name}`}
+                >
+                  <Pencil className="h-4 w-4" />
                 </Link>
               </Button>
-              <Button type="button" variant="ghost" size="sm" aria-label={`Delete ${widget.name}`} onClick={onDelete}>
-                Delete
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={`Delete ${widget.name}`}
+                title="Delete"
+                className="text-destructive hover:text-destructive"
+                onClick={onDelete}
+              >
+                <Trash2 className="h-4 w-4" />
               </Button>
             </>
           )}

@@ -121,7 +121,7 @@ describe('DashboardPage', () => {
     // The board must snap back to what the server actually holds: the resize is undone, so the
     // button reads "Large" again (i.e. the widget is back to small).
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Resize QR count' })).toHaveTextContent('Large')
+      expect(screen.getByRole('button', { name: 'Resize QR count' })).toHaveAttribute('title', 'Large')
     );
   });
 
@@ -143,12 +143,12 @@ describe('DashboardPage', () => {
 
     // 1st successful save: QR count -> large. Button flips to "Small".
     await userEvent.click(screen.getByRole('button', { name: 'Resize QR count' }));
-    expect(await screen.findByRole('button', { name: 'Resize QR count' })).toHaveTextContent('Small');
+    expect(await screen.findByRole('button', { name: 'Resize QR count' })).toHaveAttribute('title', 'Small');
 
     // 2nd successful save: By airline -> large. This is the state the `confirmed` ref must hold
     // now -- distinct from BOTH the page-load layout and the state after save #1 alone.
     await userEvent.click(screen.getByRole('button', { name: 'Resize By airline' }));
-    expect(await screen.findByRole('button', { name: 'Resize By airline' })).toHaveTextContent('Small');
+    expect(await screen.findByRole('button', { name: 'Resize By airline' })).toHaveAttribute('title', 'Small');
 
     // 3rd save fails: attempt QR count -> small.
     await userEvent.click(screen.getByRole('button', { name: 'Resize QR count' }));
@@ -158,9 +158,9 @@ describe('DashboardPage', () => {
     // only once at mount (i.e. a deleted onSuccess handler) would wrongly revert QR count to small,
     // flipping its button back to "Large".
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Resize QR count' })).toHaveTextContent('Small')
+      expect(screen.getByRole('button', { name: 'Resize QR count' })).toHaveAttribute('title', 'Small')
     );
-    expect(screen.getByRole('button', { name: 'Resize By airline' })).toHaveTextContent('Small');
+    expect(screen.getByRole('button', { name: 'Resize By airline' })).toHaveAttribute('title', 'Small');
   });
 
   it('deletes a widget after confirmation', async () => {

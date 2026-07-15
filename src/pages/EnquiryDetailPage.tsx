@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from '@tanstack/react-router';
+import { Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -97,11 +98,26 @@ export default function EnquiryDetailPage() {
               </SelectContent>
             </Select>
           </div>
-          <Button type="button" variant="outline" size="sm" onClick={() => setShowEdit(true)}>
-            Edit
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            aria-label="Edit"
+            title="Edit"
+            onClick={() => setShowEdit(true)}
+          >
+            <Pencil className="h-4 w-4" />
           </Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => setShowDelete(true)}>
-            Delete
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            aria-label="Delete"
+            title="Delete"
+            className="text-destructive hover:text-destructive"
+            onClick={() => setShowDelete(true)}
+          >
+            <Trash2 className="h-4 w-4" />
           </Button>
           {canSendQuote && (
             <Button type="button" size="sm" disabled={enquiry.fareOptions.length === 0} onClick={() => setShowSendQuote(true)}>
@@ -201,20 +217,23 @@ export default function EnquiryDetailPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    size="sm"
+                    size="icon"
                     aria-label={`Edit option ${index + 1}`}
+                    title="Edit"
                     onClick={() => setOptionDialog({ open: true, index })}
                   >
-                    Edit
+                    <Pencil className="h-4 w-4" />
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
-                    size="sm"
+                    size="icon"
                     aria-label={`Remove option ${index + 1}`}
+                    title="Remove"
+                    className="text-destructive hover:text-destructive"
                     onClick={() => removeOption(index)}
                   >
-                    Remove
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
