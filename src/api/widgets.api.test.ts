@@ -26,7 +26,7 @@ describe('widgets.api', () => {
     expect(await getWidgetData('w1')).toEqual({ kind: 'scalar', value: 3 });
     expect(get).toHaveBeenCalledWith('/widgets/w1/data');
     const post = vi.spyOn(apiClient, 'post').mockResolvedValueOnce({ data: { kind: 'breakdown', rows: [] } });
-    const body = { conditions: [{ field: 'airlineCode', operator: 'equals' as const, value: 'QR' }], vizType: 'table' as const, aggregation: { fn: 'count' as const, groupBy: 'airlineCode' } };
+    const body = { conditions: [{ field: 'airlineCode', operator: 'equals' as const, value: 'QR' }], vizType: 'table' as const, aggregation: { fn: 'count' as const, groupBy: 'airlineCode' }, period: 'all' as const };
     await previewWidget(body);
     expect(post).toHaveBeenCalledWith('/widgets/preview', body);
   });
@@ -37,6 +37,7 @@ describe('widgets.api', () => {
       conditions: [{ field: 'airlineCode', operator: 'equals' as const, value: 'QR' }],
       vizType: 'number' as const,
       aggregation: { fn: 'count' as const },
+      period: 'all' as const,
     };
     const post = vi.spyOn(apiClient, 'post').mockResolvedValueOnce({ data: { id: 'w1' } });
     expect(await createWidget(input)).toEqual({ id: 'w1' });

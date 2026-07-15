@@ -1,8 +1,12 @@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
-import { ChartType, WidgetAggregation, WidgetData, WidgetVizType } from '../api/widgets.api';
+import {
+  ChartType, WIDGET_COMPARISON_LABELS, WidgetAggregation, WidgetData, WidgetPeriod, WidgetVizType,
+} from '../api/widgets.api';
 import { formatAxisValue, formatWidgetKey, formatWidgetValue } from '../utils/widgetFormat';
+import { formatPct, pctColorClass } from '../utils/pctFormat';
 import WidgetChart from './WidgetChart';
+import WidgetSparkline from './WidgetSparkline';
 
 interface WidgetViewProps {
   widget: {
@@ -10,6 +14,7 @@ interface WidgetViewProps {
     vizType: WidgetVizType;
     chartType?: ChartType;
     aggregation: WidgetAggregation;
+    period: WidgetPeriod;
   };
   data: WidgetData | null;
   error: string | null;
@@ -38,8 +43,33 @@ export default function WidgetView({ widget, data, error, keyLabel }: WidgetView
   const formatAxis = (value: number) => formatAxisValue(value, aggregation);
 
   if (widget.vizType === 'number') {
-    const value = data.kind === 'scalar' ? data.value : 0;
-    return <p className="text-4xl font-semibold tabular-nums">{formatValue(value)}</p>;
+    const scalar = data.kind === 'scalar' ? data : null;
+    const value = scalar ? scalar.value : 0;
+    const delta = scalar?.changePct;
+    const series = scalar?.series ?? [];
+
+    return (
+      <div className="space-y-2">
+        <p className="text-4xl font-semibold tabular-nums">{formatValue(value)}</p>
+
+        {/*
+          `=== undefined`/`=== null`, NEVER truthiness: a real changePct of 0 (genuinely unchanged)
+          is a valid result that must render as "0%", and a null one (previous period was zero) must
+          render nothing — not "null%", not "0%", not a dash.
+        */}
+        {delta !== undefined && delta !== null && (
+          <p className={`text-sm tabular-nums ${pctColorClass(delta)}`}>
+            {formatPct(delta)}{' '}
+            <span className="text-muted-foreground">{WIDGET_COMPARISON_LABELS[widget.period]}</span>
+          </p>
+        )}
+
+        {/* One point is not a trend. */}
+        {series.length > 1 && (
+          <WidgetSparkline rows={series} label={widget.name} formatValue={formatValue} />
+        )}
+      </div>
+    );
   }
 
   const rows = data.kind === 'breakdown' ? data.rows : [];

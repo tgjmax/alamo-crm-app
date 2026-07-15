@@ -9,7 +9,7 @@ import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  listWidgets, getWidgetData, deleteWidget, saveLayout, WidgetSummary, LayoutEntry,
+  listWidgets, getWidgetData, deleteWidget, saveLayout, WidgetSummary, LayoutEntry, WIDGET_PERIOD_LABELS,
 } from '../api/widgets.api';
 import { getUserDirectory } from '../api/users.api';
 import WidgetView from '../components/WidgetView';
@@ -196,9 +196,14 @@ function WidgetCard({ widget, index, total, size, canEdit, keyLabel, onMove, onT
   return (
     <Card className="h-full">
       <CardHeader className="flex flex-row items-start justify-between space-y-0">
-        <CardTitle className="text-base">
-          <h3 className="contents">{widget.name}</h3>
-        </CardTitle>
+        <div className="flex flex-col">
+          <CardTitle className="text-base">
+            <h3 className="contents">{widget.name}</h3>
+          </CardTitle>
+          {widget.period !== 'all' && (
+            <p className="text-xs text-muted-foreground">{WIDGET_PERIOD_LABELS[widget.period]}</p>
+          )}
+        </div>
         <div className="flex items-center gap-1">
           {widget.sharedWith.mode === 'shared' && <Badge variant="secondary">Shared</Badge>}
           <Button type="button" variant="ghost" size="sm" aria-label={`Move ${widget.name} up`} disabled={index === 0} onClick={() => onMove(index, -1)}>
@@ -231,6 +236,7 @@ function WidgetCard({ widget, index, total, size, canEdit, keyLabel, onMove, onT
             vizType: widget.vizType,
             chartType: widget.chartType,
             aggregation: widget.aggregation,
+            period: widget.period,
           }}
           data={data ?? null}
           error={message}

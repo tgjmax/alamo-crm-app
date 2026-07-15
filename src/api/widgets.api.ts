@@ -4,6 +4,32 @@ import { GroupCondition } from './groups.api';
 export type WidgetVizType = 'number' | 'table' | 'chart';
 export type ChartType = 'bar' | 'line' | 'pie';
 
+export const WIDGET_PERIODS = ['all', 'thisMonth', 'lastMonth', 'thisYear', 'last30Days', 'last12Months'] as const;
+export type WidgetPeriod = (typeof WIDGET_PERIODS)[number];
+
+/** What the user picks in the editor. */
+export const WIDGET_PERIOD_LABELS: Record<WidgetPeriod, string> = {
+  all: 'All time',
+  thisMonth: 'This month',
+  lastMonth: 'Last month',
+  thisYear: 'This year',
+  last30Days: 'Last 30 days',
+  last12Months: 'Last 12 months',
+};
+
+/**
+ * What the delta is measured AGAINST. Never let the card just say "vs previous" — the user cannot
+ * otherwise tell whether a 12% rise is against last month or last year.
+ */
+export const WIDGET_COMPARISON_LABELS: Record<WidgetPeriod, string> = {
+  all: '',
+  thisMonth: 'vs last month',
+  lastMonth: 'vs the month before',
+  thisYear: 'vs last year',
+  last30Days: 'vs the previous 30 days',
+  last12Months: 'vs the previous 12 months',
+};
+
 export interface WidgetAggregation {
   fn: 'count' | 'sum' | 'avg';
   field?: 'amount' | 'paymentAmount';
@@ -23,6 +49,7 @@ export interface WidgetSummary {
   vizType: WidgetVizType;
   aggregation: WidgetAggregation;
   chartType?: ChartType;
+  period: WidgetPeriod;
   updatedAt: string;
 }
 
@@ -34,10 +61,17 @@ export interface WidgetDetail {
   vizType: WidgetVizType;
   aggregation: WidgetAggregation;
   chartType?: ChartType;
+  period: WidgetPeriod;
 }
 
 export type WidgetData =
-  | { kind: 'scalar'; value: number }
+  | {
+      kind: 'scalar';
+      value: number;
+      previousValue?: number;
+      changePct?: number | null;
+      series?: { key: string; value: number }[];
+    }
   | { kind: 'breakdown'; rows: { key: string; value: number }[] };
 
 export interface GroupByDimension {
@@ -57,6 +91,7 @@ export interface WidgetInput {
   vizType: WidgetVizType;
   aggregation: WidgetAggregation;
   chartType?: ChartType;
+  period: WidgetPeriod;
   sharedWith?: { mode: 'private' | 'shared'; users?: string[] };
 }
 
@@ -65,6 +100,7 @@ export interface WidgetPreviewInput {
   vizType: WidgetVizType;
   aggregation: WidgetAggregation;
   chartType?: ChartType;
+  period: WidgetPeriod;
 }
 
 export async function getDimensions(): Promise<GroupByDimension[]> {

@@ -68,6 +68,7 @@ describe('WidgetEditorPage', () => {
         vizType: 'table',
         aggregation: { fn: 'count', field: undefined, groupBy: 'airlineCode' },
         chartType: undefined,
+        period: 'all',
         sharedWith: { mode: 'private', users: [] },
       });
       expect(router.state.location.pathname).toBe('/dashboard');
@@ -90,6 +91,7 @@ describe('WidgetEditorPage', () => {
         vizType: 'number',
         aggregation: { fn: 'sum', field: 'amount', groupBy: undefined },
         chartType: undefined,
+        period: 'all',
       })
     );
     expect(await screen.findByText('$12.00')).toBeInTheDocument();
@@ -152,6 +154,7 @@ describe('WidgetEditorPage', () => {
       id: 'w1', name: 'Monthly', sharedWith: { mode: 'private', users: [] },
       conditions: [{ field: 'airlineCode', operator: 'equals', value: 'QR' }],
       vizType: 'chart', aggregation: { fn: 'sum', field: 'amount', groupBy: 'month' }, chartType: 'bar',
+      period: 'all',
     });
     const update = vi.spyOn(widgetsApi, 'updateWidget').mockResolvedValue({ id: 'w1' });
     vi.spyOn(widgetsApi, 'listWidgets').mockResolvedValue({ widgets: [], layout: [] });
@@ -171,8 +174,92 @@ describe('WidgetEditorPage', () => {
         vizType: 'chart',
         aggregation: { fn: 'sum', field: 'amount', groupBy: 'month' },
         chartType: 'bar',
+        period: 'all',
         sharedWith: { mode: 'private', users: [] },
       })
     );
+  });
+
+  it('creates a widget with the chosen period', async () => {
+    const create = vi.spyOn(widgetsApi, 'createWidget').mockResolvedValue({ id: 'w9' });
+    vi.spyOn(widgetsApi, 'listWidgets').mockResolvedValue({ widgets: [], layout: [] });
+    renderAt('/dashboard/widgets/new');
+
+    await userEvent.type(await screen.findByLabelText('Widget name'), 'By airline');
+    await userEvent.click(await screen.findByRole('button', { name: 'Add condition' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Condition 1 value' }), 'QR');
+    await pick('Period', 'This month');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save widget' }));
+
+    await waitFor(() => {
+      expect(create).toHaveBeenCalledWith(expect.objectContaining({ period: 'thisMonth' }));
+    });
+  });
+
+  it("defaults a new widget's period to All time", async () => {
+    const create = vi.spyOn(widgetsApi, 'createWidget').mockResolvedValue({ id: 'w9' });
+    vi.spyOn(widgetsApi, 'listWidgets').mockResolvedValue({ widgets: [], layout: [] });
+    renderAt('/dashboard/widgets/new');
+
+    await userEvent.type(await screen.findByLabelText('Widget name'), 'By airline');
+    await userEvent.click(await screen.findByRole('button', { name: 'Add condition' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Condition 1 value' }), 'QR');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save widget' }));
+
+    await waitFor(() => {
+      expect(create).toHaveBeenCalledWith(expect.objectContaining({ period: 'all' }));
+    });
+  });
+
+  it('loads an existing widget’s period into the picker', async () => {
+    vi.spyOn(widgetsApi, 'getWidget').mockResolvedValue({
+      id: 'w1', name: 'Monthly', sharedWith: { mode: 'private', users: [] },
+      conditions: [{ field: 'airlineCode', operator: 'equals', value: 'QR' }],
+      vizType: 'table', aggregation: { fn: 'count' },
+      period: 'last30Days',
+    });
+    renderAt('/dashboard/widgets/w1');
+
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Period' })).toHaveTextContent('Last 30 days')
+    );
+  });
+
+  it('sends the period on preview, so the preview shows the real windowed number', async () => {
+    const preview = vi.spyOn(widgetsApi, 'previewWidget').mockResolvedValue({ kind: 'scalar', value: 12 });
+    renderAt('/dashboard/widgets/new');
+
+    await userEvent.type(await screen.findByLabelText('Widget name'), 'Total');
+    await userEvent.click(await screen.findByRole('button', { name: 'Add condition' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Condition 1 value' }), 'QR');
+    await pick('Period', 'This month');
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
+
+    await waitFor(() =>
+      expect(preview).toHaveBeenCalledWith(expect.objectContaining({ period: 'thisMonth' }))
+    );
+  });
+
+  // Same class of stale-preview lie already fixed for metric/groupBy/display: a preview computed
+  // under one period must never be re-rendered as if it matched a newly picked one.
+  it('clears a stale preview when the period changes without re-previewing', async () => {
+    vi.spyOn(widgetsApi, 'previewWidget').mockResolvedValue({ kind: 'scalar', value: 124500.5 });
+    renderAt('/dashboard/widgets/new');
+
+    await userEvent.type(await screen.findByLabelText('Widget name'), 'Total');
+    await userEvent.click(await screen.findByRole('button', { name: 'Add condition' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Condition 1 value' }), 'QR');
+    await pick('Metric', 'Sum of amount');
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
+
+    expect(await screen.findByText('$124,500.50')).toBeInTheDocument();
+
+    await pick('Period', 'This month');
+
+    expect(screen.queryByText('$124,500.50')).not.toBeInTheDocument();
   });
 });

@@ -18,6 +18,7 @@ import WidgetView from '../components/WidgetView';
 import {
   getDimensions, getWidget, createWidget, updateWidget, previewWidget,
   WidgetData, WidgetInput, WidgetPreviewInput, WidgetVizType, ChartType,
+  WIDGET_PERIODS, WIDGET_PERIOD_LABELS, WidgetPeriod,
 } from '../api/widgets.api';
 import { getGroupFields, GroupCondition } from '../api/groups.api';
 import { getUserDirectory } from '../api/users.api';
@@ -60,6 +61,7 @@ export default function WidgetEditorPage() {
 
   const [name, setName] = useState('');
   const [conditions, setConditions] = useState<GroupCondition[]>([]);
+  const [period, setPeriod] = useState<WidgetPeriod>('all');
   const [metric, setMetric] = useState<Metric>('count');
   const [groupBy, setGroupBy] = useState<string>(NONE);
   const [display, setDisplay] = useState<Display>('table');
@@ -84,6 +86,7 @@ export default function WidgetEditorPage() {
     if (!existing) return;
     setName(existing.name);
     setConditions(existing.conditions ?? []);
+    setPeriod(existing.period ?? 'all');
     setMetric(toMetric(existing.aggregation.fn, existing.aggregation.field));
     setGroupBy(existing.aggregation.groupBy ?? NONE);
     if (existing.vizType === 'chart') {
@@ -96,12 +99,13 @@ export default function WidgetEditorPage() {
     setShareUsers(existing.sharedWith.users);
   }, [existing]);
 
-  // A stale preview payload was computed under a DIFFERENT aggregation (e.g. a dollar sum) —
-  // changing metric/groupBy/display without re-previewing must never let it be re-rendered as if
-  // it matched the new one (e.g. a currency total rounded into a fake integer count).
+  // A stale preview payload was computed under a DIFFERENT aggregation or window (e.g. a dollar
+  // sum, or a different period) — changing metric/groupBy/display/period without re-previewing
+  // must never let it be re-rendered as if it matched the new one (e.g. a currency total rounded
+  // into a fake integer count, or an all-time number shown under a "This month" label).
   useEffect(() => {
     setPreview(null);
-  }, [metric, groupBy, display]);
+  }, [metric, groupBy, display, period]);
 
   const hasGroupBy = groupBy !== NONE;
   const vizType: WidgetVizType = !hasGroupBy ? 'number' : display;
@@ -120,6 +124,7 @@ export default function WidgetEditorPage() {
       vizType,
       aggregation: { ...toAggregation(metric), groupBy: hasGroupBy ? groupBy : undefined },
       chartType: vizType === 'chart' ? chartType : undefined,
+      period,
       sharedWith: { mode: canShare ? shareMode : 'private', users: canShare && shareMode === 'shared' ? shareUsers : [] },
     };
   }
@@ -130,6 +135,7 @@ export default function WidgetEditorPage() {
       vizType,
       aggregation: { ...toAggregation(metric), groupBy: hasGroupBy ? groupBy : undefined },
       chartType: vizType === 'chart' ? chartType : undefined,
+      period,
     };
   }
 
@@ -190,6 +196,20 @@ export default function WidgetEditorPage() {
           <ConditionBuilder fields={fields} users={directory} conditions={conditions} onChange={setConditions} />
 
           <div className="flex flex-wrap items-center gap-2">
+            <Label>Period</Label>
+            <Select value={period} onValueChange={(v) => setPeriod(v as WidgetPeriod)}>
+              <SelectTrigger aria-label="Period" className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {WIDGET_PERIODS.map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {WIDGET_PERIOD_LABELS[p]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <Label>Metric</Label>
             <Select value={metric} onValueChange={(v) => setMetric(v as Metric)}>
               <SelectTrigger aria-label="Metric" className="w-56">
@@ -268,6 +288,7 @@ export default function WidgetEditorPage() {
                     vizType,
                     chartType: vizType === 'chart' ? chartType : undefined,
                     aggregation: { ...toAggregation(metric), groupBy: hasGroupBy ? groupBy : undefined },
+                    period,
                   }}
                   data={preview}
                   error={null}

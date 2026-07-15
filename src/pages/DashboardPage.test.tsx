@@ -23,12 +23,12 @@ function renderAtDashboard() {
 const W1 = {
   id: 'w1', name: 'QR count', owner: { id: 'u1', name: 'Admin' },
   sharedWith: { mode: 'private' as const, users: [] }, vizType: 'number' as const,
-  aggregation: { fn: 'count' as const }, hasInlineConditions: true, updatedAt: '2026-07-06T00:00:00.000Z',
+  aggregation: { fn: 'count' as const }, hasInlineConditions: true, period: 'all' as const, updatedAt: '2026-07-06T00:00:00.000Z',
 };
 const W2 = {
   id: 'w2', name: 'By airline', owner: { id: 'u1', name: 'Admin' },
   sharedWith: { mode: 'private' as const, users: [] }, vizType: 'table' as const,
-  aggregation: { fn: 'count' as const, groupBy: 'airlineCode' }, hasInlineConditions: true, updatedAt: '2026-07-05T00:00:00.000Z',
+  aggregation: { fn: 'count' as const, groupBy: 'airlineCode' }, hasInlineConditions: true, period: 'all' as const, updatedAt: '2026-07-05T00:00:00.000Z',
 };
 
 describe('DashboardPage', () => {
@@ -167,5 +167,26 @@ describe('DashboardPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Delete QR count' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Confirm delete' }));
     await waitFor(() => expect(del).toHaveBeenCalledWith('w1'));
+  });
+
+  it("shows each widget's period on its card, so a bare number is never ambiguous", async () => {
+    vi.spyOn(widgetsApi, 'listWidgets').mockResolvedValue({
+      widgets: [{ ...W1, period: 'thisMonth' }],
+      layout: [{ widget: 'w1', order: 0, size: 'small' }],
+    });
+    vi.spyOn(widgetsApi, 'getWidgetData').mockResolvedValue({ kind: 'scalar', value: 7 });
+    renderAtDashboard();
+    expect(await screen.findByText('This month')).toBeInTheDocument();
+  });
+
+  it('shows no period label on an all-time widget', async () => {
+    vi.spyOn(widgetsApi, 'listWidgets').mockResolvedValue({
+      widgets: [W1],
+      layout: [{ widget: 'w1', order: 0, size: 'small' }],
+    });
+    vi.spyOn(widgetsApi, 'getWidgetData').mockResolvedValue({ kind: 'scalar', value: 7 });
+    renderAtDashboard();
+    await screen.findByRole('heading', { name: 'QR count' });
+    expect(screen.queryByText('All time')).not.toBeInTheDocument();
   });
 });

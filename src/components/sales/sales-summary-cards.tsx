@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCurrency } from '@/utils/currency';
+import { formatPct, pctColorClass } from '@/utils/pctFormat';
 
 /** Shape this component needs — matches (and is structurally satisfied by) the backend's SalesSummary. */
 export interface SalesSummaryLike {
@@ -13,18 +14,6 @@ export interface SalesSummaryLike {
   avgBookingValue: number;
   pendingCount: number;
   pendingAmount: number;
-}
-
-function formatPct(pct: number | null): string {
-  if (pct === null) return '—';
-  const sign = pct > 0 ? '+' : '';
-  return `${sign}${pct}%`;
-}
-
-/** Red for a decrease, green for an increase; no color for null/zero (nothing to compare, or unchanged). */
-function pctColorClass(pct: number | null): string {
-  if (pct === null || pct === 0) return '';
-  return pct > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
 }
 
 interface SalesSummaryCardsProps {
