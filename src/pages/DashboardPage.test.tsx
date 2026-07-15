@@ -189,4 +189,32 @@ describe('DashboardPage', () => {
     await screen.findByRole('heading', { name: 'QR count' });
     expect(screen.queryByText('All time')).not.toBeInTheDocument();
   });
+
+  it('shows the template gallery inline on an empty dashboard', async () => {
+    vi.spyOn(widgetsApi, 'listWidgets').mockResolvedValue({ widgets: [], layout: [] });
+    renderAtDashboard();
+    expect(await screen.findByText(/pick a starting point/i)).toBeInTheDocument();
+    expect(screen.getByText('Revenue this month')).toBeInTheDocument();
+    expect(screen.getByText('Blank widget')).toBeInTheDocument();
+  });
+
+  it('opens the gallery from New widget and navigates to the editor with the chosen template', async () => {
+    vi.spyOn(widgetsApi, 'listWidgets').mockResolvedValue({
+      widgets: [W1], layout: [{ widget: 'w1', order: 0, size: 'small' }],
+    });
+    vi.spyOn(widgetsApi, 'getWidgetData').mockResolvedValue({ kind: 'scalar', value: 1 });
+    vi.spyOn(widgetsApi, 'getDimensions').mockResolvedValue([]);
+    vi.spyOn(widgetsApi, 'getWidget').mockResolvedValue({} as never);
+    const router = renderAtDashboard();
+
+    await screen.findByRole('heading', { name: 'QR count' });
+    await userEvent.click(screen.getByRole('button', { name: 'New widget' }));
+    // The gallery card in the dialog:
+    await userEvent.click(await screen.findByText('Bookings by airline'));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/dashboard/widgets/new');
+      expect(router.state.location.search).toEqual({ template: 'bookings-by-airline' });
+    });
+  });
 });

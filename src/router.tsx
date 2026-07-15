@@ -70,6 +70,10 @@ const dashboardRoute = createRoute({
 const widgetNewRoute = createRoute({
   getParentRoute: () => authedRoute,
   path: '/dashboard/widgets/new',
+  // `template` picks a starter from the widget-template gallery (undefined = show the gallery).
+  validateSearch: (search: Record<string, unknown>): { template?: string } => ({
+    template: typeof search.template === 'string' ? search.template : undefined,
+  }),
   component: WidgetEditorPage,
 });
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { useQuery } from '@tanstack/react-query';
-import { useParams, useRouter } from '@tanstack/react-router';
+import { useParams, useRouter, useSearch } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -25,6 +25,7 @@ import { getUserDirectory } from '../api/users.api';
 import { useAuthStore } from '../stores/authStore';
 import { isAdminOrAbove } from '../utils/permissions';
 import { buildKeyLabel } from '../utils/widgetFormat';
+import { widgetTemplateById } from '../components/dashboard/widget-templates';
 
 type Fn = 'count' | 'sum' | 'avg';
 type MetricField = 'amount' | 'paymentAmount';
@@ -55,17 +56,23 @@ const NONE = '__none__';
 
 export default function WidgetEditorPage() {
   const { widgetId } = useParams({ strict: false }) as { widgetId?: string };
+  const { template } = useSearch({ strict: false }) as { template?: string };
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const canShare = isAdminOrAbove(user) || user?.permissions?.groups.createShared === true;
 
-  const [name, setName] = useState('');
+  // Seed a NEW widget from a chosen starter template (undefined/unknown/'blank' → blank form). This
+  // is safe in a plain useState initializer because navigating in from the gallery mounts this page
+  // fresh; an EDIT (widgetId set) ignores the template and loads the stored widget instead.
+  const seed = widgetId ? undefined : widgetTemplateById(template);
+
+  const [name, setName] = useState(seed?.name ?? '');
   const [conditions, setConditions] = useState<GroupCondition[]>([]);
-  const [period, setPeriod] = useState<WidgetPeriod>('all');
-  const [metric, setMetric] = useState<Metric>('count');
-  const [groupBy, setGroupBy] = useState<string>(NONE);
-  const [display, setDisplay] = useState<Display>('table');
-  const [chartType, setChartType] = useState<ChartType>('bar');
+  const [period, setPeriod] = useState<WidgetPeriod>(seed?.period ?? 'all');
+  const [metric, setMetric] = useState<Metric>(seed ? toMetric(seed.fn, seed.field) : 'count');
+  const [groupBy, setGroupBy] = useState<string>(seed?.groupBy ?? NONE);
+  const [display, setDisplay] = useState<Display>(seed?.display ?? 'table');
+  const [chartType, setChartType] = useState<ChartType>(seed?.chartType ?? 'bar');
   const [shareMode, setShareMode] = useState<'private' | 'shared'>('private');
   const [shareUsers, setShareUsers] = useState<string[]>([]);
   const [preview, setPreview] = useState<WidgetData | null>(null);
@@ -139,7 +146,7 @@ export default function WidgetEditorPage() {
     };
   }
 
-  const sourceReady = conditions.length > 0;
+  // A widget may be conditions-free (over the whole visible ledger) — only a name is required.
 
   async function runPreview() {
     setError(null);
@@ -269,10 +276,10 @@ export default function WidgetEditorPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button type="button" variant="outline" disabled={busy || !sourceReady} onClick={runPreview}>
+            <Button type="button" variant="outline" disabled={busy} onClick={runPreview}>
               {busy ? 'Working…' : 'Preview'}
             </Button>
-            <Button type="button" disabled={busy || !sourceReady || name.trim().length === 0} onClick={() => setSaveOpen(true)}>
+            <Button type="button" disabled={busy || name.trim().length === 0} onClick={() => setSaveOpen(true)}>
               Save
             </Button>
           </div>

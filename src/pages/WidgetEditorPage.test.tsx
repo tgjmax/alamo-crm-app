@@ -75,6 +75,30 @@ describe('WidgetEditorPage', () => {
     });
   });
 
+  it('seeds the editor from a starter template in the URL', async () => {
+    renderAt('/dashboard/widgets/new?template=revenue-this-month');
+    // Name, period, and metric are prefilled from the template (all editable).
+    expect(await screen.findByLabelText('Widget name')).toHaveValue('Revenue this month');
+    expect(screen.getByRole('combobox', { name: 'Period' })).toHaveTextContent('This month');
+    expect(screen.getByRole('combobox', { name: 'Metric' })).toHaveTextContent('Sum of amount');
+  });
+
+  it('saves a conditions-free widget (name only, no conditions added)', async () => {
+    const create = vi.spyOn(widgetsApi, 'createWidget').mockResolvedValue({ id: 'w9' });
+    vi.spyOn(widgetsApi, 'listWidgets').mockResolvedValue({ widgets: [], layout: [] });
+    renderAt('/dashboard/widgets/new');
+
+    await userEvent.type(await screen.findByLabelText('Widget name'), 'All revenue');
+    await pick('Metric', 'Sum of amount');
+    // No conditions added at all — Save must be enabled with just a name.
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save widget' }));
+
+    await waitFor(() =>
+      expect(create).toHaveBeenCalledWith(expect.objectContaining({ name: 'All revenue', conditions: [] }))
+    );
+  });
+
   it('previews a number widget from the chosen source', async () => {
     const preview = vi.spyOn(widgetsApi, 'previewWidget').mockResolvedValue({ kind: 'scalar', value: 12 });
     renderAt('/dashboard/widgets/new');

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
+import { WidgetTemplateGallery } from '../components/dashboard/widget-template-gallery';
 import {
   listWidgets, getWidgetData, deleteWidget, saveLayout, WidgetSummary, LayoutEntry, WIDGET_PERIOD_LABELS,
 } from '../api/widgets.api';
@@ -38,12 +39,20 @@ function orderWidgets(
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { data } = useQuery({ queryKey: ['widgets'], queryFn: listWidgets });
   const { data: directory = [] } = useQuery({ queryKey: ['users', 'directory'], queryFn: getUserDirectory });
 
   const [ids, setIds] = useState<string[]>([]);
   const [sizes, setSizes] = useState<Record<string, 'small' | 'large'>>({});
   const [pendingDelete, setPendingDelete] = useState<WidgetSummary | null>(null);
+  const [galleryOpen, setGalleryOpen] = useState(false);
+
+  // Land in the editor seeded from the chosen starter (or blank). A blank pick carries no `template`.
+  function startWidget(templateId: string | null) {
+    setGalleryOpen(false);
+    navigate({ to: '/dashboard/widgets/new', search: templateId ? { template: templateId } : {} });
+  }
   const confirmed = useRef<{ ids: string[]; sizes: Record<string, 'small' | 'large'> }>({ ids: [], sizes: {} });
 
   useEffect(() => {
@@ -112,8 +121,8 @@ export default function DashboardPage() {
     <div className="mx-auto max-w-6xl space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold tracking-tight">Dashboard</h2>
-        <Button asChild variant="outline" size="sm">
-          <Link to="/dashboard/widgets/new">New widget</Link>
+        <Button type="button" variant="outline" size="sm" onClick={() => setGalleryOpen(true)}>
+          New widget
         </Button>
       </div>
 
@@ -141,8 +150,20 @@ export default function DashboardPage() {
       </div>
 
       {ids.length === 0 && data && (
-        <p className="text-sm text-muted-foreground">No widgets yet. Create one to get started.</p>
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">No widgets yet — pick a starting point:</p>
+          <WidgetTemplateGallery onSelect={startWidget} />
+        </div>
       )}
+
+      <Dialog open={galleryOpen} onOpenChange={setGalleryOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>New widget</DialogTitle>
+          </DialogHeader>
+          <WidgetTemplateGallery onSelect={startWidget} />
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>
         <DialogContent>
