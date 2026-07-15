@@ -179,34 +179,37 @@ export function FareOptionDialog({ open, onOpenChange, initial, onSave }: FareOp
           <DialogTitle>{initial ? 'Edit fare option' : 'Add fare option'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="space-y-1">
-            <Label htmlFor="fare-airline">Airline</Label>
-            <CodeSearchField
-              id="fare-airline"
-              ariaLabel="Airline"
-              value={airlineName}
-              onChange={(value) => {
-                setAirlineName(value);
-                setAirlineCode(undefined); // free-typed text has no code until a suggestion is picked
-              }}
-              onPick={(option) => {
-                setAirlineName(option.label);
-                setAirlineCode(option.code);
-              }}
-              search={searchAirlines}
-              queryKey="airlines"
-              placeholder="e.g. Qatar or QR"
-              icon={<Plane className="h-4 w-4" />}
-              required
-            />
-          </div>
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] items-start gap-3">
+            <div className="space-y-1 rounded-md border p-3">
+              <Label htmlFor="fare-airline" className="flex items-center gap-1.5">
+                <Plane className="h-3.5 w-3.5" />
+                Airline
+              </Label>
+              <CodeSearchField
+                id="fare-airline"
+                ariaLabel="Airline"
+                value={airlineName}
+                onChange={(value) => {
+                  setAirlineName(value);
+                  setAirlineCode(undefined); // free-typed text has no code until a suggestion is picked
+                }}
+                onPick={(option) => {
+                  setAirlineName(option.label);
+                  setAirlineCode(option.code);
+                }}
+                search={searchAirlines}
+                queryKey="airlines"
+                placeholder="e.g. Qatar or QR"
+                required
+              />
+            </div>
 
-          <div className="space-y-2 rounded-md border p-3">
-            <p className="text-sm font-medium">Fares (per passenger)</p>
-            <div className="grid grid-cols-3 gap-3">
-              <FareInput id="fare-adult" label="Adult" ariaLabel="Adult fare" icon={<User className="h-3.5 w-3.5" />} value={adultPrice} onChange={setAdultPrice} required />
-              <FareInput id="fare-child" label="Child" ariaLabel="Child fare" icon={<Users className="h-3.5 w-3.5" />} value={childPrice} onChange={setChildPrice} />
-              <FareInput id="fare-infant" label="Infant" ariaLabel="Infant fare" icon={<Baby className="h-3.5 w-3.5" />} value={infantPrice} onChange={setInfantPrice} />
+            <div className="space-y-2 rounded-md border p-3">
+              <div className="grid grid-cols-3 gap-3">
+                <FareInput id="fare-adult" label="Adult" ariaLabel="Adult fare" icon={<User className="h-3.5 w-3.5" />} value={adultPrice} onChange={setAdultPrice} required />
+                <FareInput id="fare-child" label="Child" ariaLabel="Child fare" icon={<Users className="h-3.5 w-3.5" />} value={childPrice} onChange={setChildPrice} />
+                <FareInput id="fare-infant" label="Infant" ariaLabel="Infant fare" icon={<Baby className="h-3.5 w-3.5" />} value={infantPrice} onChange={setInfantPrice} />
+              </div>
             </div>
           </div>
 
