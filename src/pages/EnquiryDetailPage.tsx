@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from '@tanstack/react-router';
 import { Pencil, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -53,6 +54,7 @@ export default function EnquiryDetailPage() {
     mutationFn: () => deleteEnquiry(enquiryId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['enquiries'] });
+      toast.success('Enquiry deleted');
       navigate({ to: '/enquiries' });
     },
   });

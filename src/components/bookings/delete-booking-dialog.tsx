@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { deleteBooking, deletePassenger, getBooking } from '@/api/bookings.api';
@@ -51,6 +52,7 @@ function DeleteBookingDialogBody({ target, onOpenChange, queryKeyPrefix }: Delet
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [queryKeyPrefix] });
       onOpenChange(false);
+      toast.success(target.scope === 'invoice' ? 'Invoice deleted' : 'Passenger removed');
     },
   });
 

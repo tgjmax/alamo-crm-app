@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi } from 'vitest';
+import { toast } from 'sonner';
 import EnquiryDetailPage from './EnquiryDetailPage';
 import * as enquiriesApi from '../api/enquiries.api';
 import * as flightDataApi from '../api/flightData.api';
@@ -159,6 +160,20 @@ describe('EnquiryDetailPage', () => {
       expect(del).toHaveBeenCalledWith('e1');
       expect(navigateMock).toHaveBeenCalledWith({ to: '/enquiries' });
     });
+  });
+
+  it('toasts "Enquiry deleted" after a successful delete', async () => {
+    const del = vi.spyOn(enquiriesApi, 'deleteEnquiry').mockResolvedValue(undefined);
+    const successSpy = vi.spyOn(toast, 'success');
+    renderWithClient(<EnquiryDetailPage />);
+    await screen.findByText('Johny Smith');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete enquiry' }));
+
+    await waitFor(() => expect(successSpy).toHaveBeenCalledWith('Enquiry deleted'));
+    expect(del).toHaveBeenCalledWith('e1');
+    successSpy.mockRestore();
   });
 
   describe('Send Quote permission gating', () => {

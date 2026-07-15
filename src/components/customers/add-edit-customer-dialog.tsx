@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Eye, Globe, IdCard, Mail, Phone, User } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DateField } from '@/components/date-field';
@@ -113,6 +114,7 @@ export function AddEditCustomerDialog({ open, onOpenChange, customer, onCreated 
       queryClient.invalidateQueries({ queryKey: ['customers', 'search'] });
       if (!isEdit) onCreated?.(ticketingName(form), data.id);
       onOpenChange(false);
+      toast.success(isEdit ? 'Customer updated' : 'Customer created');
     },
   });
 

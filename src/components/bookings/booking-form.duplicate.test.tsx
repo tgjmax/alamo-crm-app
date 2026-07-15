@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AxiosError, AxiosResponse } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { toast } from 'sonner';
 import { BookingForm } from './booking-form';
 import { createBooking, updateBooking, type BookingDetail } from '@/api/bookings.api';
 import { searchCustomers } from '@/api/customers.api';
@@ -148,5 +149,31 @@ describe('BookingForm duplicate-invoice warning', () => {
     expect(id).toBe('b1');
     expect(input.confirmDuplicate).toBe(true);
     expect(input.invoiceNumber).toBe('000005');
+  });
+
+  it('toasts "Booking created" after a successful create', async () => {
+    const user = userEvent.setup();
+    vi.mocked(createBooking).mockResolvedValue(undefined as never);
+    const successSpy = vi.spyOn(toast, 'success');
+    renderForm();
+
+    await fillAndSubmit(user);
+
+    await waitFor(() => expect(successSpy).toHaveBeenCalledWith('Booking created'));
+    successSpy.mockRestore();
+  });
+
+  it('toasts "Booking updated" after a successful edit', async () => {
+    const user = userEvent.setup();
+    vi.mocked(updateBooking).mockResolvedValue(undefined as never);
+    const successSpy = vi.spyOn(toast, 'success');
+    renderForm(EXISTING_BOOKING);
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => expect(successSpy).toHaveBeenCalledWith('Booking updated'));
+    expect(vi.mocked(updateBooking)).toHaveBeenCalled();
+    expect(vi.mocked(createBooking)).not.toHaveBeenCalled();
+    successSpy.mockRestore();
   });
 });

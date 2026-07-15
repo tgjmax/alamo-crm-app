@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { toast } from 'sonner';
 import { EnquiryDialog } from './enquiry-dialog';
 import * as enquiriesApi from '@/api/enquiries.api';
 import type { Enquiry } from '@/api/enquiries.api';
@@ -274,5 +275,28 @@ describe('EnquiryDialog trip fields', () => {
 
     await waitFor(() => expect(screen.getByLabelText('From 2')).toHaveValue('COK'));
     expect(screen.getByLabelText('To 2')).toHaveValue('IAH');
+  });
+});
+
+describe('EnquiryDialog success toasts', () => {
+  it('toasts "Enquiry created" after a successful create', async () => {
+    const user = userEvent.setup();
+    const successSpy = vi.spyOn(toast, 'success');
+
+    renderDialog();
+
+    await user.type(screen.getByLabelText('Enquirer name'), 'Jane Doe');
+    await user.type(screen.getByLabelText('From 1'), 'IAH');
+    await user.type(screen.getByLabelText('To 1'), 'COK');
+
+    await user.type(screen.getByLabelText('Budget per passenger'), '1200');
+
+    await user.click(screen.getByRole('combobox', { name: 'Stops' }));
+    await user.click(await screen.findByRole('option', { name: 'Nonstop' }));
+
+    await user.click(screen.getByRole('button', { name: 'Save enquiry' }));
+
+    await waitFor(() => expect(successSpy).toHaveBeenCalledWith('Enquiry created'));
+    successSpy.mockRestore();
   });
 });

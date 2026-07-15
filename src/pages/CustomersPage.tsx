@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { SortingState, VisibilityState, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -97,6 +98,7 @@ export default function CustomersPage() {
         return next;
       });
       setPendingDeleteIds(null);
+      toast.success(ids.length === 1 ? 'Customer deleted' : `${ids.length} customers deleted`);
     },
   });
 

@@ -3,10 +3,12 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AxiosError } from 'axios';
+import { toast } from 'sonner';
 import { DeleteBookingDialog, DeleteTarget } from './delete-booking-dialog';
 import * as bookingsApi from '@/api/bookings.api';
 
 vi.mock('@/api/bookings.api');
+vi.mock('sonner');
 
 const PASSENGER_TARGET: DeleteTarget = {
   scope: 'passenger',
@@ -244,5 +246,37 @@ describe('DeleteBookingDialog', () => {
 
     expect(screen.getByText(/DOE\/JOHN/)).toBeInTheDocument();
     expect(screen.queryByText(/1 reissue recorded against this booking/)).not.toBeInTheDocument();
+  });
+
+  describe('success toasts', () => {
+    it('toasts "Passenger removed" after a passenger-scope delete', async () => {
+      const user = userEvent.setup();
+      const successSpy = vi.spyOn(toast, 'success');
+
+      vi.mocked(bookingsApi.getBooking).mockResolvedValue({
+        booking: { id: 'b1', invoiceNumber: '10432', bookingDate: '2026-05-01', voided: false },
+        passengers: [
+          { id: 'p1', passengerName: 'SMITH/JOHN', amount: 300 },
+          { id: 'p2', passengerName: 'SMITH/JANE', amount: 450 },
+        ],
+      });
+
+      renderDialog({ ...PASSENGER_TARGET, bookingId: 'b1' });
+      await user.click(screen.getByRole('button', { name: 'Delete' }));
+
+      await waitFor(() => expect(successSpy).toHaveBeenCalledWith('Passenger removed'));
+      successSpy.mockRestore();
+    });
+
+    it('toasts "Invoice deleted" after an invoice-scope delete', async () => {
+      const user = userEvent.setup();
+      const successSpy = vi.spyOn(toast, 'success');
+
+      renderDialog(INVOICE_TARGET);
+      await user.click(screen.getByRole('button', { name: 'Delete' }));
+
+      await waitFor(() => expect(successSpy).toHaveBeenCalledWith('Invoice deleted'));
+      successSpy.mockRestore();
+    });
   });
 });

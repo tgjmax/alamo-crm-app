@@ -1,6 +1,7 @@
 import { FormEvent, ReactNode, useState } from 'react';
 import { Hash, Plane, PlaneLanding, PlaneTakeoff, StickyNote, Ticket, User, X } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DialogFooter } from '@/components/ui/dialog';
@@ -148,6 +149,7 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
       queryClient.invalidateQueries({ queryKey: ['bookings'] });
       queryClient.invalidateQueries({ queryKey: ['sales'] });
       onDone();
+      toast.success(initial ? 'Booking updated' : 'Booking created');
     },
   });
 

@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi } from 'vitest';
+import { toast } from 'sonner';
 import CustomersPage from './CustomersPage';
 import * as customersApi from '../api/customers.api';
 import { useAuthStore } from '../stores/authStore';
@@ -556,6 +557,42 @@ describe('CustomersPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Export' }));
 
     expect(await screen.findByText('Export failed. Check your connection and try again.')).toBeInTheDocument();
+  });
+
+  it('toasts "Customer created" after a successful create', async () => {
+    vi.spyOn(customersApi, 'createCustomer').mockResolvedValue({ id: '2' });
+    const successSpy = vi.spyOn(toast, 'success');
+    renderWithClient(<CustomersPage />);
+    await userEvent.click(screen.getByRole('button', { name: 'Add Customer' }));
+
+    await userEvent.type(screen.getByLabelText('First name'), 'New');
+    await userEvent.type(screen.getByLabelText('Last name'), 'Customer');
+    await userEvent.type(screen.getByLabelText('Date of birth'), '1990-05-15');
+    await userEvent.type(screen.getByLabelText('Phone'), '555-0199');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(successSpy).toHaveBeenCalledWith('Customer created'));
+    successSpy.mockRestore();
+  });
+
+  it('toasts "Customer deleted" after a single-row delete', async () => {
+    vi.spyOn(customersApi, 'listCustomers').mockResolvedValue({
+      customers: [BASE_CUSTOMER],
+      total: 1,
+      page: 1,
+      pageSize: 25,
+    });
+    vi.spyOn(customersApi, 'bulkDeleteCustomers').mockResolvedValue({ deletedCount: 1 });
+    const successSpy = vi.spyOn(toast, 'success');
+    renderWithClient(<CustomersPage />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Row actions for Alexander Varghese' }));
+    await userEvent.click(await screen.findByText('Delete'));
+    expect(await screen.findByText('Delete customer?')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+    await waitFor(() => expect(successSpy).toHaveBeenCalledWith('Customer deleted'));
+    successSpy.mockRestore();
   });
 
   describe('Export/Import permission gating', () => {

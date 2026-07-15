@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { PlaneLanding, PlaneTakeoff, Plus, X } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -197,6 +198,7 @@ export function EnquiryDialog({ open, onOpenChange, enquiry }: EnquiryDialogProp
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['enquiries'] });
       onOpenChange(false);
+      toast.success(enquiry ? 'Enquiry updated' : 'Enquiry created');
     },
   });
 
