@@ -1,17 +1,21 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi } from 'vitest';
+import { toast } from 'sonner';
 import SalesPage from './SalesPage';
 import * as bookingsApi from '../api/bookings.api';
 import * as salesApi from '../api/sales.api';
 import * as organizationApi from '../api/organization.api';
 import { agencyYearMonth } from '../utils/agencyTime';
+import { useAuthStore } from '../stores/authStore';
 
 function renderWithClient(ui: React.ReactElement) {
   const client = new QueryClient();
   return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
 }
+
+const SUPERADMIN = { id: 'u0', name: 'Super', email: 'super@a.test', role: 'superadmin' as const };
 
 const BASE_ROW: bookingsApi.BookingRow = {
   id: 'p1',
@@ -41,6 +45,18 @@ describe('SalesPage', () => {
     vi.spyOn(organizationApi, 'getBranding').mockResolvedValue({
       name: 'Alamo Travels', tagline: 'Internal CRM', logoUrl: null, invoiceTerms: null, timeZone: 'America/Chicago',
     });
+    // A superadmin by default so the Print report button (data.viewReports-gated) is visible for
+    // every pre-existing behavioral test below. The gating test overrides this with its own
+    // useAuthStore.setState(...) before rendering.
+    useAuthStore.setState({ accessToken: 't', user: SUPERADMIN });
+  });
+
+  // Unmount before resetting the store: BookingsTable subscribes to useAuthStore directly, so
+  // resetting it while still mounted would update the store outside act() (RTL's own auto-cleanup
+  // afterEach is registered outside any describe and always runs after this one).
+  afterEach(() => {
+    cleanup();
+    useAuthStore.setState({ accessToken: null, user: null });
   });
 
   // The page derives its default month from the agency timezone, so the expectation must use the
@@ -114,5 +130,55 @@ describe('SalesPage', () => {
       const lastCall = vi.mocked(bookingsApi.listBookings).mock.calls.slice(-1)[0]?.[0];
       expect(lastCall).toMatchObject({ paymentStatus: 'pending' });
     });
+  });
+
+  it('downloads the report for the selected month when Print report is clicked', async () => {
+    const spy = vi.spyOn(salesApi, 'getSalesReport').mockResolvedValue();
+    const { year: expectedYear, month: expectedMonth } = agencyNow();
+    renderWithClient(<SalesPage />);
+    await screen.findByText('0000150');
+
+    const btn = await screen.findByRole('button', { name: /print report/i });
+    await userEvent.click(btn);
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith(expectedYear, expectedMonth);
+  });
+
+  it('toasts an error when the report download fails', async () => {
+    vi.spyOn(salesApi, 'getSalesReport').mockRejectedValue(new Error('x'));
+    const errorSpy = vi.spyOn(toast, 'error');
+    renderWithClient(<SalesPage />);
+    await screen.findByText('0000150');
+
+    const btn = await screen.findByRole('button', { name: /print report/i });
+    await userEvent.click(btn);
+
+    await waitFor(() => expect(errorSpy).toHaveBeenCalled());
+  });
+
+  it('hides the Print report button for a user without data.viewReports', async () => {
+    useAuthStore.setState({
+      accessToken: 't',
+      user: {
+        id: 'u2',
+        name: 'Agent',
+        email: 'agent@a.test',
+        role: 'agent',
+        permissions: {
+          bookings: {
+            create: false, edit: false, delete: false, createAdjustment: false,
+            viewAll: false, import: false, export: false, sendInvoice: false,
+          },
+          customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
+          groups: { createShared: false },
+          data: { viewReports: false },
+          enquiries: { sendQuote: false },
+        },
+      },
+    });
+    renderWithClient(<SalesPage />);
+    await screen.findByText('0000150');
+    expect(screen.queryByRole('button', { name: /print report/i })).not.toBeInTheDocument();
   });
 });
