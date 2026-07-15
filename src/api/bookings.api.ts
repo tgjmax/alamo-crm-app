@@ -217,8 +217,17 @@ export async function importBookings(
   return res.data.results;
 }
 
-export async function exportBookings(): Promise<void> {
-  await downloadFile('/bookings/export', 'bookings.xlsx');
+export async function exportBookings(range?: { from?: string; to?: string }): Promise<void> {
+  const from = range?.from?.trim() ? range.from : undefined;
+  const to = range?.to?.trim() ? range.to : undefined;
+
+  const params = new URLSearchParams();
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  const query = params.toString();
+
+  const filename = from || to ? `bookings-${from ?? 'start'}-to-${to ?? 'end'}.xlsx` : 'bookings.xlsx';
+  await downloadFile(`/bookings/export${query ? `?${query}` : ''}`, filename);
 }
 
 /** One passenger on an invoice, as returned by GET /bookings/:id. `id` is present for a stored
