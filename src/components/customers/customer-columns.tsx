@@ -13,12 +13,16 @@ interface BuildCustomerColumnsArgs {
   onEdit: (customer: CustomerListItem) => void;
   onDelete: (customer: CustomerListItem) => void;
   onViewPassport: (customer: CustomerListItem) => void;
+  onToggleVerified: (customer: CustomerListItem) => void;
+  canToggleVerified: boolean;
 }
 
 export function buildCustomerColumns({
   onEdit,
   onDelete,
   onViewPassport,
+  onToggleVerified,
+  canToggleVerified,
 }: BuildCustomerColumnsArgs): ColumnDef<CustomerListItem>[] {
   return [
     {
@@ -135,15 +139,32 @@ export function buildCustomerColumns({
       header: () => <div className="text-center">Verified</div>,
       meta: { label: 'Verified' },
       enableSorting: false,
-      cell: ({ row }) => (
-        <div className="flex justify-center">
-          {row.original.verified ? (
-            <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" aria-label="Verified" />
-          ) : (
-            <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" aria-label="Not verified" />
-          )}
-        </div>
-      ),
+      cell: ({ row }) => {
+        const { verified, firstName, lastName } = row.original;
+        const icon = verified ? (
+          <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" aria-label="Verified" />
+        ) : (
+          <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" aria-label="Not verified" />
+        );
+        return (
+          <div className="flex justify-center">
+            {canToggleVerified ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                aria-label={`Toggle verified status for ${firstName} ${lastName}`}
+                onClick={() => onToggleVerified(row.original)}
+              >
+                {icon}
+              </Button>
+            ) : (
+              icon
+            )}
+          </div>
+        );
+      },
     },
     {
       id: 'passport',

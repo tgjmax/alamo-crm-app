@@ -8,8 +8,7 @@ import { useAuthStore } from '../stores/authStore';
 
 const SUPERADMIN = { id: 'u1', name: 'Super', email: 'super@a.test', role: 'superadmin' as const };
 
-function renderWithClient(ui: React.ReactElement) {
-  const client = new QueryClient();
+function renderWithClient(ui: React.ReactElement, client: QueryClient = new QueryClient()) {
   return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
 }
 
@@ -153,6 +152,77 @@ describe('CustomersPage', () => {
     });
     renderWithClient(<CustomersPage />);
     expect(await screen.findByLabelText('Not verified')).toBeInTheDocument();
+  });
+
+  it('toggles verified via the inline button + confirm dialog', async () => {
+    vi.spyOn(customersApi, 'listCustomers').mockResolvedValue({
+      customers: [{ ...BASE_CUSTOMER, verified: false }],
+      total: 1,
+      page: 1,
+      pageSize: 25,
+    });
+    vi.spyOn(customersApi, 'updateCustomer').mockResolvedValue({ id: '1' });
+    const client = new QueryClient();
+    const invalidateSpy = vi.spyOn(client, 'invalidateQueries');
+    renderWithClient(<CustomersPage />, client);
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Toggle verified status for Alexander Varghese' })
+    );
+    expect(await screen.findByText('Mark Alexander Varghese as verified?')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+
+    await waitFor(() => {
+      expect(customersApi.updateCustomer).toHaveBeenCalledWith('1', { verified: true });
+    });
+    // Confirms the customers list query is invalidated on success, so the table refreshes to
+    // reflect the new verified state without a manual reload.
+    await waitFor(() => {
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['customers', 'list'] });
+    });
+  });
+
+  it('renders a read-only Verified icon (no toggle button) without edit permission', async () => {
+    useAuthStore.setState({
+      accessToken: 't',
+      user: {
+        id: 'u7',
+        name: 'Edit-less Agent',
+        email: 'agent-no-edit@a.test',
+        role: 'agent' as const,
+        permissions: {
+          bookings: {
+            create: false,
+            edit: false,
+            delete: false,
+            createAdjustment: false,
+            viewAll: false,
+            import: false,
+            export: false,
+            sendInvoice: false,
+          },
+          customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
+          groups: { createShared: false },
+          data: { viewReports: false },
+          enquiries: { sendQuote: false },
+        },
+      },
+    });
+    vi.spyOn(customersApi, 'listCustomers').mockResolvedValue({
+      customers: [BASE_CUSTOMER],
+      total: 1,
+      page: 1,
+      pageSize: 25,
+    });
+    renderWithClient(<CustomersPage />);
+
+    await screen.findByText('alex@example.com');
+    expect(
+      screen.queryByRole('button', { name: 'Toggle verified status for Alexander Varghese' })
+    ).not.toBeInTheDocument();
+    // The cell must still degrade to the read-only icon rather than rendering nothing —
+    // BASE_CUSTOMER is verified: true.
+    expect(screen.getByLabelText('Verified')).toBeInTheDocument();
   });
 
   it('copies the Ticketing Name, Email, and Phone values to the clipboard', async () => {

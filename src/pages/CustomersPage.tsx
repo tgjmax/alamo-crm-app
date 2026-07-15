@@ -10,6 +10,7 @@ import {
   CustomerListItem,
   bulkDeleteCustomers,
   listCustomers,
+  updateCustomer,
 } from '../api/customers.api';
 import { buildCustomerColumns } from '@/components/customers/customer-columns';
 import { AddEditCustomerDialog } from '@/components/customers/add-edit-customer-dialog';
@@ -17,12 +18,13 @@ import { DeleteCustomersDialog } from '@/components/customers/delete-customers-d
 import { ImportCustomersDialog } from '@/components/customers/import-customers-dialog';
 import { ExportCustomersDialog } from '@/components/customers/export-customers-dialog';
 import { ViewPassportDialog } from '@/components/customers/view-passport-dialog';
+import { ToggleVerifiedDialog } from '@/components/customers/toggle-verified-dialog';
 import { COMPACT_CELL_CLASS, COMPACT_HEAD_CLASS } from '@/components/data-table/table-density';
 import { DataTableFacetedFilter } from '@/components/data-table/data-table-faceted-filter';
 import { DataTableViewOptions } from '@/components/data-table/data-table-view-options';
 import { DataTablePagination } from '@/components/data-table/data-table-pagination';
 import { useAuthStore } from '@/stores/authStore';
-import { canCreateCustomers, canDeleteCustomers, canImportExport } from '@/utils/permissions';
+import { canCreateCustomers, canDeleteCustomers, canEditCustomers, canImportExport } from '@/utils/permissions';
 
 const STATUS_OPTIONS = [
   { label: 'Verified', value: 'verified' },
@@ -35,6 +37,7 @@ export default function CustomersPage() {
   const canImport = canImportExport(user, 'customers', 'import');
   const canCreate = canCreateCustomers(user);
   const canDelete = canDeleteCustomers(user);
+  const canEdit = canEditCustomers(user);
   const [searchInput, setSearchInput] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [statusValues, setStatusValues] = useState<Set<string>>(new Set());
@@ -50,6 +53,7 @@ export default function CustomersPage() {
   const [showExport, setShowExport] = useState(false);
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[] | null>(null);
   const [viewingPassportCustomer, setViewingPassportCustomer] = useState<CustomerListItem | null>(null);
+  const [pendingVerifyCustomer, setPendingVerifyCustomer] = useState<CustomerListItem | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -96,6 +100,14 @@ export default function CustomersPage() {
     },
   });
 
+  const toggleVerifiedMutation = useMutation({
+    mutationFn: ({ id, verified }: { id: string; verified: boolean }) => updateCustomer(id, { verified }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers', 'list'] });
+      setPendingVerifyCustomer(null);
+    },
+  });
+
   const columns = useMemo(
     () =>
       buildCustomerColumns({
@@ -105,8 +117,10 @@ export default function CustomersPage() {
         },
         onDelete: (customer) => setPendingDeleteIds([customer.id]),
         onViewPassport: (customer) => setViewingPassportCustomer(customer),
+        onToggleVerified: (customer) => setPendingVerifyCustomer(customer),
+        canToggleVerified: canEdit,
       }),
-    []
+    [canEdit]
   );
 
   const table = useReactTable({
@@ -260,6 +274,19 @@ export default function CustomersPage() {
         count={pendingDeleteIds?.length ?? 0}
         isPending={bulkDeleteMutation.isPending}
         onConfirm={() => pendingDeleteIds && bulkDeleteMutation.mutate(pendingDeleteIds)}
+      />
+      <ToggleVerifiedDialog
+        open={pendingVerifyCustomer !== null}
+        onOpenChange={(open) => !open && setPendingVerifyCustomer(null)}
+        customer={pendingVerifyCustomer}
+        isPending={toggleVerifiedMutation.isPending}
+        onConfirm={() =>
+          pendingVerifyCustomer &&
+          toggleVerifiedMutation.mutate({
+            id: pendingVerifyCustomer.id,
+            verified: !pendingVerifyCustomer.verified,
+          })
+        }
       />
     </div>
   );
