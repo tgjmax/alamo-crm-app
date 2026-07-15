@@ -4,12 +4,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi } from 'vitest';
 import { AddEditUserDialog } from './add-edit-user-dialog';
 import * as usersApi from '@/api/users.api';
+import { toast } from 'sonner';
 
 vi.mock('@/api/users.api', async (importActual) => ({
   ...(await importActual<typeof usersApi>()),
   createUser: vi.fn(),
   updateUser: vi.fn(),
 }));
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 function renderDialog(actorRole: 'superadmin' | 'admin') {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -52,7 +54,6 @@ describe('AddEditUserDialog', () => {
     renderDialog('superadmin');
     await userEvent.type(screen.getByLabelText('Name'), 'Priya M');
     await userEvent.type(screen.getByLabelText('Email'), 'priya@alamo.test');
-    await userEvent.type(screen.getByLabelText('Password'), 'password123');
     await userEvent.click(screen.getByRole('button', { name: 'Create user' }));
 
     await waitFor(() =>
@@ -60,6 +61,17 @@ describe('AddEditUserDialog', () => {
         expect.objectContaining({ name: 'Priya M', email: 'priya@alamo.test', role: 'agent' })
       )
     );
+    expect(usersApi.createUser).not.toHaveBeenCalledWith(
+      expect.objectContaining({ password: expect.anything() })
+    );
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('priya@alamo.test'))
+    );
+  });
+
+  it('has no password field (temp password is system-generated and emailed)', () => {
+    renderDialog('superadmin');
+    expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
   });
 
   it('offers an admin only the Agent role — it cannot create another admin', async () => {

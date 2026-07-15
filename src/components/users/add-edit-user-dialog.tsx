@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { KeyRound, Mail, User } from 'lucide-react';
+import { Mail, User } from 'lucide-react';
+import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { IconInput } from '@/components/icon-input';
@@ -48,7 +49,6 @@ function Body({
 }) {
   const [name, setName] = useState(() => user?.name ?? '');
   const [email, setEmail] = useState(() => user?.email ?? '');
-  const [password, setPassword] = useState('');
   const [role, setRole] = useState<UserRole>(() => user?.role ?? 'agent');
   const queryClient = useQueryClient();
   const roles = assignableRoles(actorRole);
@@ -57,9 +57,12 @@ function Body({
     mutationFn: () =>
       user
         ? updateUser(user.id, { name, email, role })
-        : createUser({ name, email, password, role }),
+        : createUser({ name, email, role }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY });
+      if (!user) {
+        toast.success(`User created — a welcome email with a temporary password was sent to ${email}.`);
+      }
       onOpenChange(false);
     },
   });
@@ -99,22 +102,6 @@ function Body({
           required
         />
       </div>
-
-      {!user && (
-        <div className="space-y-2">
-          <Label htmlFor="user-password">Password</Label>
-          <IconInput
-            id="user-password"
-            icon={<KeyRound />}
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="At least 8 characters"
-            minLength={8}
-            required
-          />
-        </div>
-      )}
 
       <div className="space-y-2">
         <Label htmlFor="user-role">Role</Label>

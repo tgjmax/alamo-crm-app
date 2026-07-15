@@ -34,7 +34,7 @@ describe('users.api', () => {
 
   it('creates a user', async () => {
     vi.spyOn(apiClient, 'post').mockResolvedValueOnce({ data: MANAGED_USER });
-    const input = { name: 'Priya M', email: 'priya@alamo.test', password: 'password123', role: 'agent' as const };
+    const input = { name: 'Priya M', email: 'priya@alamo.test', role: 'agent' as const };
     expect(await createUser(input)).toEqual(MANAGED_USER);
     expect(apiClient.post).toHaveBeenCalledWith('/users', input);
   });
