@@ -8,16 +8,23 @@ const labelVariants = cva(
   "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
 )
 
+export function RequiredMark() {
+  return <span aria-hidden="true" className="ml-0.5 text-destructive after:content-['*']" />;
+}
+
 const Label = React.forwardRef<
   React.ElementRef<typeof LabelPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof LabelPrimitive.Root> &
-    VariantProps<typeof labelVariants>
->(({ className, ...props }, ref) => (
+    VariantProps<typeof labelVariants> & { required?: boolean }
+>(({ className, required, children, ...props }, ref) => (
   <LabelPrimitive.Root
     ref={ref}
     className={cn(labelVariants(), className)}
     {...props}
-  />
+  >
+    {children}
+    {required && <RequiredMark />}
+  </LabelPrimitive.Root>
 ))
 Label.displayName = LabelPrimitive.Root.displayName
 

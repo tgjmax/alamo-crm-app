@@ -76,11 +76,11 @@ export function OrganizationTab({ branding }: OrganizationTabProps) {
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="org-name">Organization name</Label>
+            <Label htmlFor="org-name" required>Organization name</Label>
             <Input id="org-name" value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="org-tagline">Tagline</Label>
+            <Label htmlFor="org-tagline" required>Tagline</Label>
             <Input id="org-tagline" value={tagline} onChange={(e) => setTagline(e.target.value)} required />
           </div>
           <div className="space-y-2">

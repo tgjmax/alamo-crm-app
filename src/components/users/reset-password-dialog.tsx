@@ -49,7 +49,7 @@ function ResetPasswordBody({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            <Label htmlFor="new-password">New password</Label>
+            <Label htmlFor="new-password" required>New password</Label>
             <Input
               id="new-password"
               type="password"

@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Label, RequiredMark } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { BookingRow, listBookings } from '@/api/bookings.api';
 import { sendInvoice } from '@/api/invoices.api';
@@ -224,7 +224,7 @@ export function SendInvoiceDialog({ open, onOpenChange }: SendInvoiceDialogProps
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="invoice-to-email">To email</Label>
+              <Label htmlFor="invoice-to-email" required>To email</Label>
               <Input
                 id="invoice-to-email"
                 aria-label="To email"
@@ -237,7 +237,7 @@ export function SendInvoiceDialog({ open, onOpenChange }: SendInvoiceDialogProps
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label htmlFor="invoice-number">Invoice number</Label>
+                <Label htmlFor="invoice-number" required>Invoice number</Label>
                 <Input
                   id="invoice-number"
                   aria-label="Invoice number"
@@ -247,7 +247,7 @@ export function SendInvoiceDialog({ open, onOpenChange }: SendInvoiceDialogProps
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="invoice-date">Invoice date</Label>
+                <Label htmlFor="invoice-date" required>Invoice date</Label>
                 <Input
                   id="invoice-date"
                   aria-label="Invoice date"
@@ -259,7 +259,7 @@ export function SendInvoiceDialog({ open, onOpenChange }: SendInvoiceDialogProps
               </div>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="invoice-billing-name">Billing to (name)</Label>
+              <Label htmlFor="invoice-billing-name" required>Billing to (name)</Label>
               <Input
                 id="invoice-billing-name"
                 aria-label="Billing to name"
@@ -280,7 +280,7 @@ export function SendInvoiceDialog({ open, onOpenChange }: SendInvoiceDialogProps
             </div>
 
             <div className="space-y-2 rounded-md border p-3">
-              <p className="text-sm font-medium">Line items</p>
+              <p className="text-sm font-medium">Line items<RequiredMark /></p>
               <div className="flex gap-2 text-xs font-medium text-muted-foreground">
                 <span className="flex-1">Description</span>
                 <span className="w-36">Date</span>

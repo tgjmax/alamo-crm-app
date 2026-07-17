@@ -196,7 +196,7 @@ export default function WidgetEditorPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="widget-name">Widget name</Label>
+            <Label htmlFor="widget-name" required>Widget name</Label>
             <Input id="widget-name" value={name} onChange={(e) => setName(e.target.value)} className="max-w-sm" />
           </div>
 

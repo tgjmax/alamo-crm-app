@@ -33,7 +33,7 @@ export function AdjustmentSharedFields({ bookingType, value, onChange }: Adjustm
   return (
     <>
       <div className="space-y-2">
-        <Label htmlFor="adjustment-booking-date">Adjustment booking date</Label>
+        <Label htmlFor="adjustment-booking-date" required>Adjustment booking date</Label>
         <Input
           id="adjustment-booking-date"
           aria-label="Adjustment booking date"
@@ -43,14 +43,18 @@ export function AdjustmentSharedFields({ bookingType, value, onChange }: Adjustm
           required
         />
       </div>
-      <IconInput
-        aria-label="Adjustment PNR"
-        icon={<Ticket />}
-        value={value.pnr}
-        onChange={(e) => onChange({ pnr: e.target.value })}
-        placeholder="PNR — e.g. X4F2QP"
-        required
-      />
+      <div className="space-y-2">
+        <Label htmlFor="adjustment-pnr" required>PNR</Label>
+        <IconInput
+          id="adjustment-pnr"
+          aria-label="Adjustment PNR"
+          icon={<Ticket />}
+          value={value.pnr}
+          onChange={(e) => onChange({ pnr: e.target.value })}
+          placeholder="PNR — e.g. X4F2QP"
+          required
+        />
+      </div>
       <IconInput
         aria-label="Adjustment airline code"
         icon={<Plane />}
@@ -60,22 +64,30 @@ export function AdjustmentSharedFields({ bookingType, value, onChange }: Adjustm
       />
       {bookingType === 'Reissue' && (
         <>
-          <IconInput
-            aria-label="Adjustment departure city"
-            icon={<PlaneTakeoff />}
-            value={value.depCity}
-            onChange={(e) => onChange({ depCity: e.target.value })}
-            placeholder="Departure city — e.g. ORD"
-            required
-          />
-          <IconInput
-            aria-label="Adjustment arrival city"
-            icon={<PlaneLanding />}
-            value={value.arrCity}
-            onChange={(e) => onChange({ arrCity: e.target.value })}
-            placeholder="Arrival city — e.g. COK"
-            required
-          />
+          <div className="space-y-2">
+            <Label htmlFor="adjustment-dep-city" required>Departure city</Label>
+            <IconInput
+              id="adjustment-dep-city"
+              aria-label="Adjustment departure city"
+              icon={<PlaneTakeoff />}
+              value={value.depCity}
+              onChange={(e) => onChange({ depCity: e.target.value })}
+              placeholder="Departure city — e.g. ORD"
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="adjustment-arr-city" required>Arrival city</Label>
+            <IconInput
+              id="adjustment-arr-city"
+              aria-label="Adjustment arrival city"
+              icon={<PlaneLanding />}
+              value={value.arrCity}
+              onChange={(e) => onChange({ arrCity: e.target.value })}
+              placeholder="Arrival city — e.g. COK"
+              required
+            />
+          </div>
           <div className="space-y-2">
             <Label htmlFor="adjustment-dep-date">Departure date</Label>
             <Input
@@ -143,14 +155,18 @@ export function AdjustmentSharedFields({ bookingType, value, onChange }: Adjustm
         </div>
       </div>
       {value.paymentStatus === 'pending' && (
-        <Input
-          aria-label="Adjustment amount owed"
-          type="number"
-          value={value.pendingAmount}
-          onChange={(e) => onChange({ pendingAmount: e.target.value })}
-          placeholder="Amount owed"
-          required
-        />
+        <div className="space-y-2">
+          <Label htmlFor="adjustment-amount-owed" required>Amount owed</Label>
+          <Input
+            id="adjustment-amount-owed"
+            aria-label="Adjustment amount owed"
+            type="number"
+            value={value.pendingAmount}
+            onChange={(e) => onChange({ pendingAmount: e.target.value })}
+            placeholder="Amount owed"
+            required
+          />
+        </div>
       )}
     </>
   );

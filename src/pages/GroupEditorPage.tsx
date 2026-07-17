@@ -161,7 +161,7 @@ export default function GroupEditorPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="group-name">Group name</Label>
+            <Label htmlFor="group-name" required>Group name</Label>
             <Input id="group-name" value={name} onChange={(e) => setName(e.target.value)} className="max-w-sm" />
           </div>
 

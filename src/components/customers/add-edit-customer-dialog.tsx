@@ -156,7 +156,7 @@ export function AddEditCustomerDialog({ open, onOpenChange, customer, onCreated 
             <h3 className="text-sm font-semibold">Personal Information</h3>
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="customer-first-name">First name</Label>
+                <Label htmlFor="customer-first-name" required>First name</Label>
                 <IconInput
                   id="customer-first-name"
                   icon={<User />}
@@ -177,7 +177,7 @@ export function AddEditCustomerDialog({ open, onOpenChange, customer, onCreated 
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="customer-last-name">Last name</Label>
+                <Label htmlFor="customer-last-name" required>Last name</Label>
                 <IconInput
                   id="customer-last-name"
                   icon={<User />}
@@ -190,7 +190,7 @@ export function AddEditCustomerDialog({ open, onOpenChange, customer, onCreated 
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="customer-dob">Date of birth</Label>
+                <Label htmlFor="customer-dob" required>Date of birth</Label>
                 <DateField
                   id="customer-dob"
                   ariaLabel="Date of birth"
@@ -225,7 +225,7 @@ export function AddEditCustomerDialog({ open, onOpenChange, customer, onCreated 
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="customer-phone">Phone</Label>
+                <Label htmlFor="customer-phone" required>Phone</Label>
                 <IconInput
                   id="customer-phone"
                   icon={<Phone />}

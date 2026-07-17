@@ -156,7 +156,7 @@ export function AdjustmentBookingForm({ bookingType, onDone, onCancel }: Adjustm
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       <div className="space-y-2">
-        <Label htmlFor="adjustment-pnr-search">Original PNR</Label>
+        <Label htmlFor="adjustment-pnr-search" required>Original PNR</Label>
         <Input
           id="adjustment-pnr-search"
           value={pnrQuery}

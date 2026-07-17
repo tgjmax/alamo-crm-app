@@ -103,7 +103,7 @@ function AdjustmentEditForm({ detail, onDone, onCancel, queryKeyPrefix }: Adjust
       {/* The parent passenger is fixed — shown, never editable. */}
       <p className="text-sm text-muted-foreground">Passenger: {detail.passengerName}</p>
       <div className="space-y-1">
-        <Label htmlFor="edit-adjustment-amount">Amount</Label>
+        <Label htmlFor="edit-adjustment-amount" required>Amount</Label>
         <Input
           id="edit-adjustment-amount"
           aria-label="Adjustment amount"

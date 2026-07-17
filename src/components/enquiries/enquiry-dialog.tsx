@@ -219,7 +219,7 @@ export function EnquiryDialog({ open, onOpenChange, enquiry }: EnquiryDialogProp
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
-              <Label htmlFor="enquiry-name">Enquirer name</Label>
+              <Label htmlFor="enquiry-name" required>Enquirer name</Label>
               <Input
                 id="enquiry-name"
                 aria-label="Enquirer name"

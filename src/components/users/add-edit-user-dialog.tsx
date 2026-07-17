@@ -79,7 +79,7 @@ function Body({
       </DialogHeader>
 
       <div className="space-y-2">
-        <Label htmlFor="user-name">Name</Label>
+        <Label htmlFor="user-name" required>Name</Label>
         <IconInput
           id="user-name"
           icon={<User />}
@@ -91,7 +91,7 @@ function Body({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="user-email">Email</Label>
+        <Label htmlFor="user-email" required>Email</Label>
         <IconInput
           id="user-email"
           icon={<Mail />}

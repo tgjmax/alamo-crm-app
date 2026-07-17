@@ -100,14 +100,18 @@ export function RecordPaymentDialog({ row, onOpenChange, queryKeyPrefix }: Recor
             />
           </div>
           {status === 'pending' && (
-            <Input
-              aria-label="Amount owed"
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="Amount owed"
-              required
-            />
+            <div className="space-y-2">
+              <Label htmlFor="record-payment-amount-owed" required>Amount owed</Label>
+              <Input
+                id="record-payment-amount-owed"
+                aria-label="Amount owed"
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="Amount owed"
+                required
+              />
+            </div>
           )}
           {mutation.isError && <p className="text-sm text-destructive">Save failed. Check your connection and try again.</p>}
           <DialogFooter>

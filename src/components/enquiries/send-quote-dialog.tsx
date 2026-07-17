@@ -103,7 +103,7 @@ export function SendQuoteDialog({ open, onOpenChange, enquiry }: SendQuoteDialog
         ) : (
           <form onSubmit={handleSubmit} className="space-y-3">
             <div className="space-y-1">
-              <Label htmlFor="quote-to-email">To email</Label>
+              <Label htmlFor="quote-to-email" required>To email</Label>
               <Input
                 id="quote-to-email"
                 aria-label="To email"

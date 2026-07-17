@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Label, RequiredMark } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BookingDetail, createBooking, DuplicateInvoice, updateBooking, UpdateBookingInput, UpdatePassengerInput } from '@/api/bookings.api';
 import { searchCustomers } from '@/api/customers.api';
@@ -259,7 +259,7 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
       <div className={cn('grid items-end gap-3', typeSelector ? 'grid-cols-4' : 'grid-cols-3')}>
         {typeSelector && <div className="space-y-1">{typeSelector}</div>}
         <div className="space-y-1">
-          <Label htmlFor="booking-invoice-number">Invoice#</Label>
+          <Label htmlFor="booking-invoice-number" required>Invoice#</Label>
           <IconInput
             id="booking-invoice-number"
             aria-label="Invoice number"
@@ -271,7 +271,7 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
           />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="booking-date">Booking Date</Label>
+          <Label htmlFor="booking-date" required>Booking Date</Label>
           <DateField
             id="booking-date"
             ariaLabel="Booking Date"
@@ -294,7 +294,7 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
           VOID passenger is submitted instead, since the backend requires ≥1 passenger). */}
       {!form.voided && (
       <div className="space-y-2 rounded-md border p-3">
-        <p className="text-sm font-medium">Passengers</p>
+        <p className="text-sm font-medium">Passengers<RequiredMark /></p>
         {passengers.map((passenger, index) => {
           const nameLabel = index === 0 ? 'Passenger name' : `Passenger name ${index + 1}`;
           const searching = search?.index === index;
@@ -466,7 +466,7 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
       {!form.voided && (
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
-            <Label htmlFor="booking-pnr">PNR</Label>
+            <Label htmlFor="booking-pnr" required>PNR</Label>
             <IconInput
               id="booking-pnr"
               aria-label="PNR"
@@ -478,7 +478,7 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
             />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="booking-airline">Airline Code</Label>
+            <Label htmlFor="booking-airline" required>Airline Code</Label>
             <CodeSearchField
               id="booking-airline"
               ariaLabel="Airline code"
@@ -499,7 +499,7 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
           {/* Row: Departure City | Arrival City */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label htmlFor="booking-dep-city">Departure City</Label>
+              <Label htmlFor="booking-dep-city" required>Departure City</Label>
               <CodeSearchField
                 id="booking-dep-city"
                 ariaLabel="Departure city"
@@ -513,7 +513,7 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="booking-arr-city">Arrival City</Label>
+              <Label htmlFor="booking-arr-city" required>Arrival City</Label>
               <CodeSearchField
                 id="booking-arr-city"
                 ariaLabel="Arrival city"
@@ -531,7 +531,7 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
           {/* Row: Departure Date | Arrival Date */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label htmlFor="booking-dep-date">Departure Date</Label>
+              <Label htmlFor="booking-dep-date" required>Departure Date</Label>
               <DateField
                 id="booking-dep-date"
                 ariaLabel="Departure Date"
@@ -541,7 +541,7 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="booking-arr-date">Arrival Date</Label>
+              <Label htmlFor="booking-arr-date" required>Arrival Date</Label>
               <DateField
                 id="booking-arr-date"
                 ariaLabel="Arrival Date"
@@ -604,7 +604,7 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
           )}
           {form.paymentStatus === 'pending' && (
             <div className="space-y-1">
-              <Label htmlFor="booking-pending-amount">Pending Amount</Label>
+              <Label htmlFor="booking-pending-amount" required>Pending Amount</Label>
               <div className="relative">
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-foreground">
                   $

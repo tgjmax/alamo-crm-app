@@ -153,11 +153,11 @@ export function ProfileTab({ user }: ProfileTabProps) {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="profile-name">Name</Label>
+              <Label htmlFor="profile-name" required>Name</Label>
               <Input id="profile-name" value={name} onChange={(e) => setName(e.target.value)} required />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="profile-email">Email</Label>
+              <Label htmlFor="profile-email" required>Email</Label>
               <Input
                 id="profile-email"
                 type="email"
@@ -168,7 +168,7 @@ export function ProfileTab({ user }: ProfileTabProps) {
             </div>
             {emailChanged && (
               <div className="space-y-2">
-                <Label htmlFor="profile-email-current-password">Current password (to confirm email change)</Label>
+                <Label htmlFor="profile-email-current-password" required>Current password (to confirm email change)</Label>
                 <PasswordInput
                   id="profile-email-current-password"
                   fieldLabel="current password for email change"
@@ -194,7 +194,7 @@ export function ProfileTab({ user }: ProfileTabProps) {
         <CardContent>
           <form onSubmit={handlePasswordSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="password-current">Current password</Label>
+              <Label htmlFor="password-current" required>Current password</Label>
               <PasswordInput
                 id="password-current"
                 fieldLabel="current password"
@@ -204,7 +204,7 @@ export function ProfileTab({ user }: ProfileTabProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password-new">New password</Label>
+              <Label htmlFor="password-new" required>New password</Label>
               <PasswordInput
                 id="password-new"
                 fieldLabel="new password"
@@ -215,7 +215,7 @@ export function ProfileTab({ user }: ProfileTabProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password-confirm">Confirm new password</Label>
+              <Label htmlFor="password-confirm" required>Confirm new password</Label>
               <PasswordInput
                 id="password-confirm"
                 fieldLabel="new password confirmation"

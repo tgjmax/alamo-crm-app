@@ -3,7 +3,7 @@ import { Baby, Clock, Luggage, Plane, PlaneLanding, PlaneTakeoff, User, Users, X
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Label, RequiredMark } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { CodeSearchField } from '@/components/code-search-field';
 import { DateField } from '@/components/date-field';
@@ -54,7 +54,7 @@ interface FareInputProps {
 function FareInput({ id, label, ariaLabel, icon, value, onChange, required }: FareInputProps) {
   return (
     <div className="space-y-1">
-      <Label htmlFor={id} className="flex items-center gap-1.5">
+      <Label htmlFor={id} className="flex items-center gap-1.5" required={required}>
         {icon}
         {label}
       </Label>
@@ -181,7 +181,7 @@ export function FareOptionDialog({ open, onOpenChange, initial, onSave }: FareOp
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] items-start gap-3">
             <div className="space-y-1 rounded-md border p-3">
-              <Label htmlFor="fare-airline" className="flex items-center gap-1.5">
+              <Label htmlFor="fare-airline" className="flex items-center gap-1.5" required>
                 <Plane className="h-3.5 w-3.5" />
                 Airline
               </Label>
@@ -217,8 +217,8 @@ export function FareOptionDialog({ open, onOpenChange, initial, onSave }: FareOp
             <p className="text-sm font-medium">Segments</p>
 
             <div className={cn(SEGMENT_GRID, 'text-xs font-medium text-muted-foreground')}>
-              <span>From</span>
-              <span>To</span>
+              <span>From<RequiredMark /></span>
+              <span>To<RequiredMark /></span>
               <span>Date</span>
               <span>Depart</span>
               <span>Arrive</span>
