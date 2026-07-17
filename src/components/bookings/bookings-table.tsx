@@ -11,6 +11,7 @@ import { RecordPaymentDialog } from './record-payment-dialog';
 import { EditBookingDialog } from './edit-booking-dialog';
 import { EditAdjustmentDialog } from './edit-adjustment-dialog';
 import { DeleteBookingDialog, DeleteTarget } from './delete-booking-dialog';
+import { TableSkeleton } from '@/components/ui/table-skeleton';
 import { COMPACT_CELL_CLASS, COMPACT_HEAD_CLASS, columnWidthClass } from '@/components/data-table/table-density';
 import { DataTableFacetedFilter } from '@/components/data-table/data-table-faceted-filter';
 import { DataTableViewOptions } from '@/components/data-table/data-table-view-options';
@@ -67,7 +68,7 @@ export function BookingsTable({ scope, defaultPageSize = 25, queryKeyPrefix }: B
     setPage(1);
   }, [scope?.year, scope?.month, debouncedQuery, paymentStatus, customFilters, sortBy, sortDir, pageSize]);
 
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: [queryKeyPrefix, 'list', { scope, page, pageSize, q: debouncedQuery, paymentStatus, customFilters, sortBy, sortDir }],
     queryFn: () =>
       listBookings({
@@ -182,7 +183,9 @@ export function BookingsTable({ scope, defaultPageSize = 25, queryKeyPrefix }: B
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows.length === 0 ? (
+            {isLoading ? (
+              <TableSkeleton columns={columns.length} rows={pageSize} cellClassName={COMPACT_CELL_CLASS} />
+            ) : table.getRowModel().rows.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
                   No bookings found.

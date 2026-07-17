@@ -157,6 +157,12 @@ describe('SalesPage', () => {
     await waitFor(() => expect(errorSpy).toHaveBeenCalled());
   });
 
+  it('shows skeletons in the summary cards while loading', () => {
+    vi.spyOn(salesApi, 'getSalesSummary').mockReturnValue(new Promise(() => {}));
+    renderWithClient(<SalesPage />);
+    expect(screen.getAllByTestId('summary-skeleton').length).toBeGreaterThan(0);
+  });
+
   it('hides the Print report button for a user without data.viewReports', async () => {
     useAuthStore.setState({
       accessToken: 't',

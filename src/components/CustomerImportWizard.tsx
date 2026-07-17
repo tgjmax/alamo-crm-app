@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import { Spinner } from '@/components/ui/spinner';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { parseXlsxFile } from '../utils/xlsxParse';
 import ColumnMapper, { ColumnMapping, TargetField } from './ColumnMapper';
@@ -140,6 +141,7 @@ export default function CustomerImportWizard({ onClose }: CustomerImportWizardPr
           <>
             <ColumnMapper sourceHeaders={headers} targetFields={TARGET_FIELDS} mapping={mapping} onChange={setMapping} />
             <Button type="button" onClick={handlePreview} disabled={busy}>
+              {busy && <Spinner />}
               {busy ? 'Working…' : 'Preview'}
             </Button>
           </>
@@ -187,6 +189,7 @@ export default function CustomerImportWizard({ onClose }: CustomerImportWizardPr
 
         {report.length > 0 && !committed && (
           <Button type="button" onClick={handleCommit} disabled={busy}>
+            {busy && <Spinner />}
             {busy ? 'Working…' : 'Commit Import'}
           </Button>
         )}

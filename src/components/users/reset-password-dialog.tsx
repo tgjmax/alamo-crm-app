@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
 import { ManagedUser, setUserPassword } from '@/api/users.api';
 import { errorMessage } from '@/utils/apiError';
 
@@ -67,6 +68,7 @@ function ResetPasswordBody({
               Cancel
             </Button>
             <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending && <Spinner />}
               {mutation.isPending ? 'Saving…' : 'Set password'}
             </Button>
           </DialogFooter>

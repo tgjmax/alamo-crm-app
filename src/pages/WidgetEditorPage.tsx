@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { Spinner } from '@/components/ui/spinner';
 import ConditionBuilder from '../components/ConditionBuilder';
 import WidgetView from '../components/WidgetView';
 import {
@@ -277,6 +278,7 @@ export default function WidgetEditorPage() {
 
           <div className="flex items-center gap-2">
             <Button type="button" variant="outline" disabled={busy} onClick={runPreview}>
+              {busy && <Spinner />}
               {busy ? 'Working…' : 'Preview'}
             </Button>
             <Button type="button" disabled={busy || name.trim().length === 0} onClick={() => setSaveOpen(true)}>
@@ -349,6 +351,7 @@ export default function WidgetEditorPage() {
               Cancel
             </Button>
             <Button type="button" disabled={busy} onClick={handleSave}>
+              {busy && <Spinner />}
               {busy ? 'Working…' : 'Save widget'}
             </Button>
           </DialogFooter>

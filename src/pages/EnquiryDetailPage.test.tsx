@@ -59,6 +59,12 @@ describe('EnquiryDetailPage', () => {
     vi.spyOn(flightDataApi, 'searchAirlines').mockResolvedValue([]);
   });
 
+  it('shows a skeleton while the enquiry is loading', () => {
+    vi.spyOn(enquiriesApi, 'getEnquiry').mockReturnValue(new Promise(() => {}));
+    renderWithClient(<EnquiryDetailPage />);
+    expect(screen.getAllByTestId('detail-skeleton').length).toBeGreaterThan(0);
+  });
+
   it('renders enquirer, trip, notes, status, and the saved fare options', async () => {
     renderWithClient(<EnquiryDetailPage />);
     expect(await screen.findByText('Johny Smith')).toBeInTheDocument();

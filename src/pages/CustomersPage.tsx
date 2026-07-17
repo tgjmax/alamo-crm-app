@@ -20,6 +20,7 @@ import { ImportCustomersDialog } from '@/components/customers/import-customers-d
 import { ExportCustomersDialog } from '@/components/customers/export-customers-dialog';
 import { ViewPassportDialog } from '@/components/customers/view-passport-dialog';
 import { ToggleVerifiedDialog } from '@/components/customers/toggle-verified-dialog';
+import { TableSkeleton } from '@/components/ui/table-skeleton';
 import { COMPACT_CELL_CLASS, COMPACT_HEAD_CLASS } from '@/components/data-table/table-density';
 import { DataTableFacetedFilter } from '@/components/data-table/data-table-faceted-filter';
 import { DataTableViewOptions } from '@/components/data-table/data-table-view-options';
@@ -79,7 +80,7 @@ export default function CustomersPage() {
     setPage(1);
   }, [debouncedQuery, status, sortBy, sortDir, pageSize]);
 
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['customers', 'list', { page, pageSize, q: debouncedQuery, status, sortBy, sortDir }],
     queryFn: () => listCustomers({ page, pageSize, q: debouncedQuery || undefined, status, sortBy, sortDir }),
     placeholderData: keepPreviousData,
@@ -219,7 +220,9 @@ export default function CustomersPage() {
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows.length === 0 ? (
+            {isLoading ? (
+              <TableSkeleton columns={columns.length} rows={pageSize} cellClassName={COMPACT_CELL_CLASS} />
+            ) : table.getRowModel().rows.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
                   No customers found.

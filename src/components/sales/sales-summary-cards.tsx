@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency } from '@/utils/currency';
 import { formatPct, pctColorClass } from '@/utils/pctFormat';
 
@@ -28,9 +29,13 @@ export function SalesSummaryCards({ summary }: SalesSummaryCardsProps) {
           <CardTitle className="text-sm font-medium text-muted-foreground">Total Revenue</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-2xl font-semibold tabular-nums text-blue-600 dark:text-blue-400">
-            {summary ? formatCurrency(summary.revenue) : '—'}
-          </p>
+          {summary ? (
+            <p className="text-2xl font-semibold tabular-nums text-blue-600 dark:text-blue-400">
+              {formatCurrency(summary.revenue)}
+            </p>
+          ) : (
+            <Skeleton data-testid="summary-skeleton" className="h-7 w-24" />
+          )}
         </CardContent>
       </Card>
       <Card>
@@ -38,10 +43,16 @@ export function SalesSummaryCards({ summary }: SalesSummaryCardsProps) {
           <CardTitle className="text-sm font-medium text-muted-foreground">vs Last Month</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className={`text-2xl font-semibold tabular-nums ${summary ? pctColorClass(summary.lastMonthChangePct) : ''}`}>
-            {summary ? formatPct(summary.lastMonthChangePct) : '—'}
-          </p>
-          <p className="text-xs text-muted-foreground">{summary ? formatCurrency(summary.lastMonthRevenue) : ''}</p>
+          {summary ? (
+            <>
+              <p className={`text-2xl font-semibold tabular-nums ${pctColorClass(summary.lastMonthChangePct)}`}>
+                {formatPct(summary.lastMonthChangePct)}
+              </p>
+              <p className="text-xs text-muted-foreground">{formatCurrency(summary.lastMonthRevenue)}</p>
+            </>
+          ) : (
+            <Skeleton data-testid="summary-skeleton" className="h-7 w-24" />
+          )}
         </CardContent>
       </Card>
       <Card>
@@ -49,10 +60,16 @@ export function SalesSummaryCards({ summary }: SalesSummaryCardsProps) {
           <CardTitle className="text-sm font-medium text-muted-foreground">vs Last Year</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className={`text-2xl font-semibold tabular-nums ${summary ? pctColorClass(summary.lastYearChangePct) : ''}`}>
-            {summary ? formatPct(summary.lastYearChangePct) : '—'}
-          </p>
-          <p className="text-xs text-muted-foreground">{summary ? formatCurrency(summary.lastYearRevenue) : ''}</p>
+          {summary ? (
+            <>
+              <p className={`text-2xl font-semibold tabular-nums ${pctColorClass(summary.lastYearChangePct)}`}>
+                {formatPct(summary.lastYearChangePct)}
+              </p>
+              <p className="text-xs text-muted-foreground">{formatCurrency(summary.lastYearRevenue)}</p>
+            </>
+          ) : (
+            <Skeleton data-testid="summary-skeleton" className="h-7 w-24" />
+          )}
         </CardContent>
       </Card>
       <Card>
@@ -60,8 +77,16 @@ export function SalesSummaryCards({ summary }: SalesSummaryCardsProps) {
           <CardTitle className="text-sm font-medium text-muted-foreground">Top Airline</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-2xl font-semibold">{summary?.topAirline ? summary.topAirline.code : '—'}</p>
-          <p className="text-xs text-muted-foreground">{summary?.topAirline ? `${summary.topAirline.count} bookings` : ''}</p>
+          {summary ? (
+            <>
+              <p className="text-2xl font-semibold">{summary.topAirline ? summary.topAirline.code : '—'}</p>
+              <p className="text-xs text-muted-foreground">
+                {summary.topAirline ? `${summary.topAirline.count} bookings` : ''}
+              </p>
+            </>
+          ) : (
+            <Skeleton data-testid="summary-skeleton" className="h-7 w-24" />
+          )}
         </CardContent>
       </Card>
       <Card>
@@ -69,7 +94,11 @@ export function SalesSummaryCards({ summary }: SalesSummaryCardsProps) {
           <CardTitle className="text-sm font-medium text-muted-foreground">Refunds</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-2xl font-semibold tabular-nums">{summary ? summary.refundCount : '—'}</p>
+          {summary ? (
+            <p className="text-2xl font-semibold tabular-nums">{summary.refundCount}</p>
+          ) : (
+            <Skeleton data-testid="summary-skeleton" className="h-7 w-24" />
+          )}
         </CardContent>
       </Card>
       <Card>
@@ -77,7 +106,11 @@ export function SalesSummaryCards({ summary }: SalesSummaryCardsProps) {
           <CardTitle className="text-sm font-medium text-muted-foreground">Avg Booking Value</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-2xl font-semibold tabular-nums">{summary ? formatCurrency(summary.avgBookingValue) : '—'}</p>
+          {summary ? (
+            <p className="text-2xl font-semibold tabular-nums">{formatCurrency(summary.avgBookingValue)}</p>
+          ) : (
+            <Skeleton data-testid="summary-skeleton" className="h-7 w-24" />
+          )}
         </CardContent>
       </Card>
       <Card>
@@ -85,8 +118,14 @@ export function SalesSummaryCards({ summary }: SalesSummaryCardsProps) {
           <CardTitle className="text-sm font-medium text-muted-foreground">Pending Payments</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-2xl font-semibold tabular-nums">{summary ? formatCurrency(summary.pendingAmount) : '—'}</p>
-          <p className="text-xs text-muted-foreground">{summary ? `${summary.pendingCount} bookings` : ''}</p>
+          {summary ? (
+            <>
+              <p className="text-2xl font-semibold tabular-nums">{formatCurrency(summary.pendingAmount)}</p>
+              <p className="text-xs text-muted-foreground">{`${summary.pendingCount} bookings`}</p>
+            </>
+          ) : (
+            <Skeleton data-testid="summary-skeleton" className="h-7 w-24" />
+          )}
         </CardContent>
       </Card>
     </div>

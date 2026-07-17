@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ToggleVerifiedDialog } from './toggle-verified-dialog';
@@ -54,5 +54,25 @@ describe('ToggleVerifiedDialog', () => {
     );
     const confirm = screen.getByRole('button', { name: 'Saving…' });
     expect(confirm).toBeDisabled();
+  });
+
+  it('shows a spinner on the confirm button while pending', async () => {
+    render(
+      <ToggleVerifiedDialog open customer={base} isPending onOpenChange={vi.fn()} onConfirm={vi.fn()} />
+    );
+    // The spinner is decorative (aria-hidden) now that it sits beside the "Saving…" label, so it
+    // can't be queried by role — assert its presence via the animate-spin class instead, scoped to
+    // the confirm button so this stays a real assertion that the spinner renders while pending.
+    const confirm = screen.getByRole('button', { name: 'Saving…' });
+    await waitFor(() => {
+      expect(confirm.querySelector('.animate-spin')).toBeInTheDocument();
+    });
+  });
+
+  it('does not show a spinner on the confirm button when not pending', () => {
+    render(
+      <ToggleVerifiedDialog open customer={base} isPending={false} onOpenChange={vi.fn()} onConfirm={vi.fn()} />
+    );
+    expect(screen.getByRole('button', { name: 'Confirm' }).querySelector('.animate-spin')).not.toBeInTheDocument();
   });
 });

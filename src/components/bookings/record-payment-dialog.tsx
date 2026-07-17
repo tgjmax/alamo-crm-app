@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Spinner } from '@/components/ui/spinner';
 import { BookingRow, updateBookingPayment, updatePassengerPayment } from '@/api/bookings.api';
 
 interface RecordPaymentDialogProps {
@@ -119,6 +120,7 @@ export function RecordPaymentDialog({ row, onOpenChange, queryKeyPrefix }: Recor
               Cancel
             </Button>
             <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending && <Spinner />}
               {mutation.isPending ? 'Saving…' : 'Save payment'}
             </Button>
           </DialogFooter>

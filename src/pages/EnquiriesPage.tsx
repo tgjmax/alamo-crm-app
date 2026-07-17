@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { ENQUIRY_PAGE_SIZES, ENQUIRY_STATUSES, EnquiryStatus, listEnquiries } from '@/api/enquiries.api';
 import { EnquiryDialog } from '@/components/enquiries/enquiry-dialog';
 import { EnquiryStatusBadge } from '@/components/enquiries/enquiry-status-badge';
+import { TableSkeleton } from '@/components/ui/table-skeleton';
 import { DataTableFacetedFilter } from '@/components/data-table/data-table-faceted-filter';
 import { DataTablePagination } from '@/components/data-table/data-table-pagination';
 import { COMPACT_CELL_CLASS, COMPACT_HEAD_CLASS } from '@/components/data-table/table-density';
@@ -38,7 +39,7 @@ export default function EnquiriesPage() {
     setPage(1);
   }, [debouncedQuery, status, pageSize]);
 
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['enquiries', 'list', { page, pageSize, q: debouncedQuery, status }],
     queryFn: () => listEnquiries({ page, pageSize, q: debouncedQuery || undefined, status }),
     placeholderData: keepPreviousData,
@@ -79,7 +80,9 @@ export default function EnquiriesPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {enquiries.length === 0 ? (
+            {isLoading ? (
+              <TableSkeleton columns={HEADERS.length} rows={pageSize} cellClassName={COMPACT_CELL_CLASS} />
+            ) : enquiries.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={HEADERS.length} className="h-24 text-center text-muted-foreground">
                   No enquiries found.

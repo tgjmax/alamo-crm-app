@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import { ManagedUser, setUserActive, USERS_QUERY_KEY } from '@/api/users.api';
 import { errorMessage } from '@/utils/apiError';
 
@@ -69,6 +70,7 @@ function SetActiveBody({
             disabled={mutation.isPending}
             onClick={() => mutation.mutate()}
           >
+            {mutation.isPending && <Spinner />}
             {mutation.isPending
               ? deactivating
                 ? 'Deactivating…'

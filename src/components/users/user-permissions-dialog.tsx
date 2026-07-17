@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
 import { ManagedUser, updateUser, USERS_QUERY_KEY } from '@/api/users.api';
 import { UserPermissions, useAuthStore } from '@/stores/authStore';
 import { errorMessage } from '@/utils/apiError';
@@ -158,6 +159,7 @@ function PermissionsBody({ user, onOpenChange }: { user: ManagedUser; onOpenChan
           </Button>
           {!isSuperadmin && (
             <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+              {mutation.isPending && <Spinner />}
               {mutation.isPending ? 'Saving…' : 'Save permissions'}
             </Button>
           )}

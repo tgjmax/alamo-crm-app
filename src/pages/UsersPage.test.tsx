@@ -58,6 +58,13 @@ describe('UsersPage', () => {
     });
   });
 
+  it('shows skeleton rows while users are loading instead of the Loading text', () => {
+    vi.mocked(usersApi.listUsers).mockReturnValue(new Promise(() => {}));
+    renderPage();
+    expect(screen.getAllByTestId('table-skeleton-row').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
+  });
+
   it('renders a row per user with a role badge and a status', async () => {
     renderPage();
     expect(await screen.findByText('Priya M')).toBeInTheDocument();

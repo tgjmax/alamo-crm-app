@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label, RequiredMark } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import { BookingRow, listBookings } from '@/api/bookings.api';
 import { sendInvoice } from '@/api/invoices.api';
@@ -385,6 +386,7 @@ export function SendInvoiceDialog({ open, onOpenChange }: SendInvoiceDialogProps
                 Cancel
               </Button>
               <Button type="submit" disabled={sending}>
+                {sending && <Spinner />}
                 {sending ? 'Sending…' : 'Send invoice'}
               </Button>
             </DialogFooter>

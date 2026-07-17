@@ -47,6 +47,13 @@ describe('EnquiriesPage', () => {
     vi.spyOn(flightDataApi, 'searchAirports').mockResolvedValue([]);
   });
 
+  it('shows skeleton rows while enquiries are loading', () => {
+    vi.mocked(enquiriesApi.listEnquiries).mockReturnValue(new Promise(() => {}));
+    renderWithClient(<EnquiriesPage />);
+    expect(screen.getAllByTestId('table-skeleton-row').length).toBeGreaterThan(0);
+    expect(screen.queryByText('No enquiries found.')).not.toBeInTheDocument();
+  });
+
   it('lists enquiries with enquirer, route, dates (with flexibility), pax, and status', async () => {
     renderWithClient(<EnquiriesPage />);
     expect(await screen.findByText('Johny Smith')).toBeInTheDocument();

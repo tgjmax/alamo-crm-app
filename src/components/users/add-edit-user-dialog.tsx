@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { IconInput } from '@/components/icon-input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Spinner } from '@/components/ui/spinner';
 import { ManagedUser, createUser, updateUser, USERS_QUERY_KEY } from '@/api/users.api';
 import { UserRole } from '@/stores/authStore';
 import { errorMessage } from '@/utils/apiError';
@@ -128,6 +129,7 @@ function Body({
           Cancel
         </Button>
         <Button type="submit" disabled={mutation.isPending}>
+          {mutation.isPending && <Spinner />}
           {mutation.isPending ? 'Saving…' : user ? 'Save changes' : 'Create user'}
         </Button>
       </DialogFooter>

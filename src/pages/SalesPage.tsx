@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { getSalesReport, getSalesSummary } from '../api/sales.api';
 import { BookingsTable } from '@/components/bookings/bookings-table';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import { MonthToggle, MonthValue } from '@/components/sales/month-toggle';
 import { SalesSummaryCards } from '@/components/sales/sales-summary-cards';
 import { useBranding } from '@/hooks/useBranding';
@@ -45,7 +46,7 @@ export default function SalesPage() {
         <div className="flex items-center gap-2">
           {canReport && (
             <Button variant="outline" size="sm" onClick={handlePrint} disabled={downloading}>
-              <Printer className="mr-2 size-4" />
+              {downloading ? <Spinner className="mr-2" /> : <Printer className="mr-2 size-4" />}
               {downloading ? 'Preparing…' : 'Print report'}
             </Button>
           )}

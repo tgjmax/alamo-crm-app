@@ -5,6 +5,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import { Enquiry, sendEnquiryQuote } from '@/api/enquiries.api';
 import { farePriceSummary } from '@/utils/tripFormat';
@@ -162,6 +163,7 @@ export function SendQuoteDialog({ open, onOpenChange, enquiry }: SendQuoteDialog
                 Cancel
               </Button>
               <Button type="submit" disabled={sending || selectedIndexes.length === 0}>
+                {sending && <Spinner />}
                 {sending ? 'Sending…' : 'Send quote'}
               </Button>
             </DialogFooter>

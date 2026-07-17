@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Spinner } from '@/components/ui/spinner';
 import type { CustomerListItem } from '@/api/customers.api';
 
 interface ToggleVerifiedDialogProps {
@@ -37,6 +38,7 @@ export function ToggleVerifiedDialog({
             Cancel
           </Button>
           <Button type="button" onClick={onConfirm} disabled={isPending}>
+            {isPending && <Spinner />}
             {isPending ? 'Saving…' : 'Confirm'}
           </Button>
         </DialogFooter>

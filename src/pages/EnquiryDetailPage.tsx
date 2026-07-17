@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   deleteEnquiry,
   ENQUIRY_STATUSES,
@@ -60,7 +61,30 @@ export default function EnquiryDetailPage() {
   });
 
   if (!enquiry) {
-    return <p className="text-sm text-muted-foreground">Loading…</p>;
+    return (
+      <div className="mx-auto max-w-4xl space-y-4">
+        <Skeleton data-testid="detail-skeleton" className="h-8 w-64" />
+        <Card>
+          <CardHeader>
+            <Skeleton data-testid="detail-skeleton" className="h-6 w-40" />
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 gap-x-8 gap-y-2">
+            <Skeleton data-testid="detail-skeleton" className="h-4 w-full" />
+            <Skeleton data-testid="detail-skeleton" className="h-4 w-full" />
+            <Skeleton data-testid="detail-skeleton" className="h-4 w-full" />
+            <Skeleton data-testid="detail-skeleton" className="h-4 w-full" />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <Skeleton data-testid="detail-skeleton" className="h-6 w-32" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton data-testid="detail-skeleton" className="h-16 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   function saveOption(option: EnquiryFareOption) {

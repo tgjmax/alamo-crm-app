@@ -64,6 +64,13 @@ describe('CustomersPage', () => {
     expect(screen.getByLabelText('Verified')).toBeInTheDocument();
   });
 
+  it('shows skeleton rows while the first load is pending, not the empty state', () => {
+    vi.mocked(customersApi.listCustomers).mockReturnValue(new Promise(() => {})); // never resolves
+    renderWithClient(<CustomersPage />);
+    expect(screen.getAllByTestId('table-skeleton-row').length).toBeGreaterThan(0);
+    expect(screen.queryByText('No customers found.')).not.toBeInTheDocument();
+  });
+
   it('truncates a long Ticketing Name and Email with an ellipsis and a full-text tooltip', async () => {
     const longTicketingCustomer = {
       ...BASE_CUSTOMER,

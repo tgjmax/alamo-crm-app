@@ -8,6 +8,7 @@ import { DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label, RequiredMark } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Spinner } from '@/components/ui/spinner';
 import { BookingDetail, createBooking, DuplicateInvoice, updateBooking, UpdateBookingInput, UpdatePassengerInput } from '@/api/bookings.api';
 import { searchCustomers } from '@/api/customers.api';
 import { AddEditCustomerDialog } from '@/components/customers/add-edit-customer-dialog';
@@ -657,6 +658,7 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
               disabled={saveMutation.isPending}
               onClick={() => saveMutation.mutate({ ...pendingDuplicate.input, confirmDuplicate: true })}
             >
+              {saveMutation.isPending && <Spinner />}
               Save anyway
             </Button>
           </div>
@@ -672,6 +674,7 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
           Cancel
         </Button>
         <Button type="submit" disabled={saveMutation.isPending}>
+          {saveMutation.isPending && <Spinner />}
           {saveMutation.isPending ? 'Saving…' : initial ? 'Save changes' : 'Create booking'}
         </Button>
       </DialogFooter>

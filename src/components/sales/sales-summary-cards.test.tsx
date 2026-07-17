@@ -33,9 +33,10 @@ describe('SalesSummaryCards', () => {
     expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(3);
   });
 
-  it('renders "—" placeholders while loading (summary undefined)', () => {
+  it('renders skeleton placeholders while loading (summary undefined)', () => {
     render(<SalesSummaryCards summary={undefined} />);
-    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId('summary-skeleton').length).toBeGreaterThan(0);
+    expect(screen.queryByText('—')).not.toBeInTheDocument();
   });
 
   it('colors Total Revenue blue, a positive change green, and a negative change red', () => {

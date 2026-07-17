@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
+import { Spinner } from '@/components/ui/spinner';
 import { WidgetTemplateGallery } from '../components/dashboard/widget-template-gallery';
 import {
   listWidgets, getWidgetData, deleteWidget, saveLayout, WidgetSummary, LayoutEntry, WIDGET_PERIOD_LABELS,
@@ -199,6 +200,7 @@ export default function DashboardPage() {
               disabled={deleteMutation.isPending}
               onClick={() => pendingDelete && deleteMutation.mutate(pendingDelete.id)}
             >
+              {deleteMutation.isPending && <Spinner />}
               Confirm delete
             </Button>
           </DialogFooter>

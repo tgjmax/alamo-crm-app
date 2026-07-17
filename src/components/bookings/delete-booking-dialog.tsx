@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Spinner } from '@/components/ui/spinner';
 import { deleteBooking, deletePassenger, getBooking } from '@/api/bookings.api';
 import { errorMessage } from '@/utils/apiError';
 
@@ -136,6 +137,7 @@ function DeleteBookingDialogBody({ target, onOpenChange, queryKeyPrefix }: Delet
           disabled={mutation.isPending || countLoading}
           onClick={() => mutation.mutate()}
         >
+          {mutation.isPending && <Spinner />}
           {mutation.isPending ? 'Deleting…' : isLastPassenger ? 'Delete invoice' : 'Delete'}
         </Button>
       </DialogFooter>

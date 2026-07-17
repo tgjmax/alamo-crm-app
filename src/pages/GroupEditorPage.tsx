@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Spinner } from '@/components/ui/spinner';
 import ConditionBuilder from '../components/ConditionBuilder';
 import { GroupResultsTable } from '../components/groups/group-results-table';
 import {
@@ -181,6 +182,7 @@ export default function GroupEditorPage() {
                 })
               }
             >
+              {busy && <Spinner />}
               {busy ? 'Working…' : 'Preview'}
             </Button>
             <Button type="button" disabled={busy || conditions.length === 0 || name.trim().length === 0} onClick={() => setSaveOpen(true)}>
@@ -247,6 +249,7 @@ export default function GroupEditorPage() {
               Cancel
             </Button>
             <Button type="button" disabled={busy} onClick={handleSave}>
+              {busy && <Spinner />}
               {busy ? 'Working…' : 'Save group'}
             </Button>
           </DialogFooter>

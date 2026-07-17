@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Spinner } from '@/components/ui/spinner';
 
 interface DeleteGroupDialogProps {
   open: boolean;
@@ -28,6 +29,7 @@ export function DeleteGroupDialog({ open, onOpenChange, groupName, onConfirm, is
             Cancel
           </Button>
           <Button type="button" variant="destructive" onClick={onConfirm} disabled={isPending}>
+            {isPending && <Spinner />}
             {isPending ? 'Deleting…' : 'Delete'}
           </Button>
         </DialogFooter>

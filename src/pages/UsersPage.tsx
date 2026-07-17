@@ -19,6 +19,7 @@ import { UserPermissionsDialog } from '@/components/users/user-permissions-dialo
 import { ResetPasswordDialog } from '@/components/users/reset-password-dialog';
 import { SetActiveDialog } from '@/components/users/set-active-dialog';
 import { buildUserColumns } from '@/components/users/user-columns';
+import { TableSkeleton } from '@/components/ui/table-skeleton';
 
 export default function UsersPage() {
   const currentUser = useAuthStore((s) => s.user);
@@ -105,11 +106,7 @@ export default function UsersPage() {
         </TableHeader>
         <TableBody>
           {isLoading ? (
-            <TableRow>
-              <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
-                Loading…
-              </TableCell>
-            </TableRow>
+            <TableSkeleton columns={columns.length} />
           ) : table.getRowModel().rows.length === 0 ? (
             <TableRow>
               <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">

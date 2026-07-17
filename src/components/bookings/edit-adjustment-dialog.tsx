@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
 import { AdjustmentDetail, UpdateAdjustmentInput, getAdjustment, updateAdjustment } from '@/api/bookings.api';
 import { errorMessage } from '@/utils/apiError';
 import { AdjustmentSharedFields, AdjustmentSharedValue } from './adjustment-shared-fields';
@@ -128,6 +129,7 @@ function AdjustmentEditForm({ detail, onDone, onCancel, queryKeyPrefix }: Adjust
           Cancel
         </Button>
         <Button type="submit" disabled={mutation.isPending}>
+          {mutation.isPending && <Spinner />}
           {mutation.isPending ? 'Saving…' : 'Save changes'}
         </Button>
       </DialogFooter>

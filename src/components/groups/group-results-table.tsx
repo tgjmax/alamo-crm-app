@@ -14,6 +14,7 @@ import { buildGroupColumns } from './group-columns';
 import { DataTablePagination } from '@/components/data-table/data-table-pagination';
 import { DataTableViewOptions } from '@/components/data-table/data-table-view-options';
 import { COMPACT_CELL_CLASS, COMPACT_HEAD_CLASS, columnWidthClass } from '@/components/data-table/table-density';
+import { TableSkeleton } from '@/components/ui/table-skeleton';
 
 interface GroupResultsTableProps {
   result: GroupQueryResult | null;
@@ -62,7 +63,35 @@ export function GroupResultsTable({
     getCoreRowModel: getCoreRowModel(),
   });
 
-  if (!result) return null;
+  // Editor pre-preview: idle with nothing to show → render nothing (unchanged).
+  if (!result && !busy) return null;
+
+  // First load (busy, no data yet): show a skeleton table shell instead of a blank flash.
+  if (!result) {
+    return (
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <TableHead
+                    key={header.id}
+                    className={cn('whitespace-nowrap', COMPACT_HEAD_CLASS, columnWidthClass(header.column))}
+                  >
+                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            <TableSkeleton columns={columns.length} rows={pageSize} cellClassName={COMPACT_CELL_CLASS} />
+          </TableBody>
+        </Table>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
