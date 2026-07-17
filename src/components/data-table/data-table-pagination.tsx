@@ -38,8 +38,10 @@ interface DataTablePaginationProps {
   pageSize: number;
   pageSizes: readonly number[];
   total: number;
-  /** Omit on a table with no row selection — the "N of M row(s) selected" caption is then
-   * dropped rather than reading a permanent, meaningless "0 of N". */
+  /** When rows are actually selected (Customers), the "N of M row(s) selected" caption
+   * replaces the total-count caption. Absent or 0 — including every table with no row
+   * selection at all — falls back to "Showing X–Y of Z", surfacing the total row count
+   * instead of a permanent, meaningless "0 of N selected". */
   selectedCount?: number;
   currentPageRowCount?: number;
   onPageChange: (page: number) => void;
@@ -59,10 +61,18 @@ export function DataTablePagination({
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const pageNumbers = getPageNumbers(page, totalPages);
 
+  const hasSelection = selectedCount !== undefined && selectedCount > 0;
+  const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const rangeEnd = Math.min(page * pageSize, total);
+
   return (
     <div className="flex flex-col-reverse items-center justify-between gap-4 sm:flex-row">
       <div className="flex-1 text-sm text-muted-foreground">
-        {selectedCount !== undefined && `${selectedCount} of ${currentPageRowCount} row(s) selected.`}
+        {hasSelection
+          ? `${selectedCount} of ${currentPageRowCount} row(s) selected.`
+          : total === 0
+            ? 'No results.'
+            : `Showing ${rangeStart.toLocaleString()}–${rangeEnd.toLocaleString()} of ${total.toLocaleString()}.`}
       </div>
       <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6 lg:gap-8">
         <div className="flex items-center gap-2">
