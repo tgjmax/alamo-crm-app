@@ -16,6 +16,11 @@ interface DateFieldProps {
   id?: string;
   /** Blocks submit when empty, via the hidden native input's own validation. */
   required?: boolean;
+  /** Earliest selectable date, 'YYYY-MM-DD'. Omitted (the default) means any date — historic
+   * bookings must stay editable, so only NEW-entry forms pass this. Applied to BOTH the calendar
+   * and the hidden native input's `min`: the calendar alone would still let a keyboard or paste
+   * entry through, since the native input is what actually carries the form value. */
+  minDate?: string;
 }
 
 function toIso(date: Date): string {
@@ -28,9 +33,10 @@ function toIso(date: Date): string {
 /** A date input that DISPLAYS 'DD-MMM-YYYY' (native `<input type="date">` display format is
  * locale-controlled and can't be changed) — a popover calendar for sighted users, backed by a
  * visually-hidden native date input that keeps the accessible name, form value, and tests. */
-export function DateField({ ariaLabel, value, onChange, id, required }: DateFieldProps) {
+export function DateField({ ariaLabel, value, onChange, id, required, minDate }: DateFieldProps) {
   const [open, setOpen] = useState(false);
   const selected = value ? new Date(`${value}T00:00:00`) : undefined;
+  const min = minDate ? new Date(`${minDate}T00:00:00`) : undefined;
 
   return (
     <div className="relative">
@@ -41,6 +47,7 @@ export function DateField({ ariaLabel, value, onChange, id, required }: DateFiel
         value={value}
         onChange={(e) => onChange(e.target.value)}
         required={required}
+        min={minDate}
         className="absolute h-px w-px opacity-0"
         tabIndex={-1}
       />
@@ -63,6 +70,8 @@ export function DateField({ ariaLabel, value, onChange, id, required }: DateFiel
             mode="single"
             selected={selected}
             defaultMonth={selected}
+            disabled={min && { before: min }}
+            startMonth={min}
             onSelect={(date) => {
               onChange(date ? toIso(date) : '');
               setOpen(false);

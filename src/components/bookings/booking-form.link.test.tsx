@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { FUTURE_ARR_DATE, FUTURE_DEP_DATE } from '@/test-utils/dates';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -37,8 +38,8 @@ const HISTORIC_BOOKING: BookingDetail = {
     airlineCode: 'QR',
     depCity: 'ORD',
     arrCity: 'COK',
-    depDate: '2026-01-10',
-    arrDate: '2026-01-20',
+    depDate: FUTURE_DEP_DATE,
+    arrDate: FUTURE_ARR_DATE,
   },
   passengers: [{ id: 'p1', passengerName: 'SMITH/JANE', amount: 500 }],
 };
@@ -82,8 +83,8 @@ describe('BookingForm customer-link gate', () => {
     await user.type(screen.getByLabelText(/Airline/i), 'QR');
     await user.type(screen.getByLabelText('Departure city'), 'ORD');
     await user.type(screen.getByLabelText('Arrival city'), 'COK');
-    pickDate('Departure Date', '2026-01-10');
-    pickDate('Arrival Date', '2026-01-20');
+    pickDate('Departure Date', FUTURE_DEP_DATE);
+    pickDate('Arrival Date', FUTURE_ARR_DATE);
     await user.type(screen.getByLabelText(/^Amount$/i), '700');
     await user.click(screen.getByRole('button', { name: 'Create booking' }));
 

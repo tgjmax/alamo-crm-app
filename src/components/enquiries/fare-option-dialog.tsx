@@ -9,6 +9,9 @@ import { CodeSearchField } from '@/components/code-search-field';
 import { DateField } from '@/components/date-field';
 import { searchAirlines, searchAirports } from '@/api/flightData.api';
 import { EnquiryFareOption, EnquirySegment } from '@/api/enquiries.api';
+import { useBranding } from '@/hooks/useBranding';
+import { agencyToday } from '@/utils/agencyTime';
+import { maxIsoDate } from '@/utils/dateFormat';
 import { cn } from '@/lib/utils';
 
 const SEGMENT_GRID = 'grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_152px_92px_92px_auto] items-center gap-2';
@@ -106,6 +109,11 @@ function TimeInput({ ariaLabel, value, onChange }: TimeInputProps) {
 }
 
 export function FareOptionDialog({ open, onOpenChange, initial, onSave }: FareOptionDialogProps) {
+  // A newly quoted itinerary is always for a future flight. Editing an existing option is exempt,
+  // so a fare quoted a while ago stays correctable (e.g. to fix its baggage notes) without being
+  // forced to re-date its segments. Same create/edit split as the enquiry's own travel dates.
+  const { timeZone } = useBranding();
+  const minSegmentDate = initial ? undefined : agencyToday(timeZone);
   const [airlineName, setAirlineName] = useState('');
   const [airlineCode, setAirlineCode] = useState<string | undefined>(undefined);
   const [adultPrice, setAdultPrice] = useState('');
@@ -255,6 +263,8 @@ export function FareOptionDialog({ open, onOpenChange, initial, onSave }: FareOp
                   ariaLabel={`Segment ${index + 1} date`}
                   value={segment.date}
                   onChange={(date) => updateSegment(index, { date })}
+                  // Segments are flown in order, so each also floors at the one before it.
+                  minDate={minSegmentDate && maxIsoDate(minSegmentDate, segments[index - 1]?.date)}
                 />
                 <TimeInput
                   ariaLabel={`Segment ${index + 1} depart time`}

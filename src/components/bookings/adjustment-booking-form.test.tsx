@@ -4,6 +4,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi } from 'vitest';
 import { AdjustmentBookingForm } from './adjustment-booking-form';
 import * as bookingsApi from '@/api/bookings.api';
+import { FUTURE_ARR_DATE, FUTURE_DEP_DATE } from '@/test-utils/dates';
+
+const TODAY = new Date().toISOString().slice(0, 10);
 
 function renderWithClient(ui: React.ReactElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -76,6 +79,42 @@ describe('AdjustmentBookingForm', () => {
     expect(screen.getByLabelText('Adjustment PNR')).toHaveValue('GUDBFX');
     expect(screen.getByLabelText('Adjustment airline code')).toHaveValue('QR');
     expect(screen.getByLabelText('Adjustment departure city')).toHaveValue('DXB');
+  });
+
+  describe('future-only trip dates', () => {
+    it('floors the Reissue trip dates at today', async () => {
+      mockSearch([PAX_A, PAX_B]);
+      renderWithClient(<AdjustmentBookingForm bookingType="Reissue" onDone={vi.fn()} onCancel={vi.fn()} />);
+      await searchAndPickPnr();
+
+      expect(screen.getByLabelText('Adjustment departure date')).toHaveAttribute('min', TODAY);
+      expect(screen.getByLabelText('Adjustment arrival date')).toHaveAttribute('min', TODAY);
+      // The adjustment's own booking date is a ledger date, not a flight date — never floored.
+      expect(screen.getByLabelText('Adjustment booking date')).not.toHaveAttribute('min');
+    });
+
+    it('drops a prefilled trip date that has already departed', async () => {
+      // PAX_A's flight is in the past. A reissue books a NEW flight, so carrying those dates over
+      // would open the form already violating `min` on fields the user never touched.
+      mockSearch([PAX_A, PAX_B]);
+      renderWithClient(<AdjustmentBookingForm bookingType="Reissue" onDone={vi.fn()} onCancel={vi.fn()} />);
+      await searchAndPickPnr();
+
+      expect(screen.getByLabelText('Adjustment departure date')).toHaveValue('');
+      expect(screen.getByLabelText('Adjustment arrival date')).toHaveValue('');
+      // Everything else still prefills — only the departed dates are dropped.
+      expect(screen.getByLabelText('Adjustment departure city')).toHaveValue('DXB');
+    });
+
+    it('keeps a prefilled trip date that is still in the future', async () => {
+      const upcoming = { ...PAX_A, depDate: FUTURE_DEP_DATE, arrDate: FUTURE_ARR_DATE };
+      mockSearch([upcoming, { ...PAX_B, depDate: FUTURE_DEP_DATE, arrDate: FUTURE_ARR_DATE }]);
+      renderWithClient(<AdjustmentBookingForm bookingType="Reissue" onDone={vi.fn()} onCancel={vi.fn()} />);
+      await searchAndPickPnr();
+
+      expect(screen.getByLabelText('Adjustment departure date')).toHaveValue(FUTURE_DEP_DATE);
+      expect(screen.getByLabelText('Adjustment arrival date')).toHaveValue(FUTURE_ARR_DATE);
+    });
   });
 
   it('shows an empty-state message when a PNR matches only adjustment rows', async () => {

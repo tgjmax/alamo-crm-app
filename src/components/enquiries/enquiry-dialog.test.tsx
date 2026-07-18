@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from 'sonner';
@@ -7,6 +7,9 @@ import { EnquiryDialog } from './enquiry-dialog';
 import * as enquiriesApi from '@/api/enquiries.api';
 import type { Enquiry } from '@/api/enquiries.api';
 import * as flightDataApi from '@/api/flightData.api';
+import { FUTURE_DEP_DATE } from '@/test-utils/dates';
+
+const TODAY = new Date().toISOString().slice(0, 10);
 
 vi.mock('@/api/enquiries.api', async () => ({
   ...(await vi.importActual<typeof enquiriesApi>('@/api/enquiries.api')),
@@ -298,5 +301,26 @@ describe('EnquiryDialog success toasts', () => {
 
     await waitFor(() => expect(successSpy).toHaveBeenCalledWith('Enquiry created'));
     successSpy.mockRestore();
+  });
+});
+
+describe('EnquiryDialog future-only travel dates', () => {
+  it('floors each leg at today when creating', () => {
+    renderDialog();
+    expect(screen.getByLabelText('Date 1')).toHaveAttribute('min', TODAY);
+    expect(screen.getByLabelText('Date 2')).toHaveAttribute('min', TODAY);
+  });
+
+  it('raises a later leg to the date of the leg before it', () => {
+    renderDialog();
+    // Legs are flown in order, so leg 2 can't precede leg 1.
+    fireEvent.change(screen.getByLabelText('Date 1'), { target: { value: FUTURE_DEP_DATE } });
+    expect(screen.getByLabelText('Date 2')).toHaveAttribute('min', FUTURE_DEP_DATE);
+  });
+
+  it('does NOT floor the dates when editing, so a stale enquiry stays correctable', () => {
+    renderDialog(savedEnquiry);
+    expect(screen.getByLabelText('Date 1')).not.toHaveAttribute('min');
+    expect(screen.getByLabelText('Date 2')).not.toHaveAttribute('min');
   });
 });

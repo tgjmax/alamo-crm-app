@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { FUTURE_ARR_DATE, FUTURE_DEP_DATE } from '@/test-utils/dates';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -36,8 +37,8 @@ const EXISTING_BOOKING: BookingDetail = {
     airlineCode: 'QR',
     depCity: 'ORD',
     arrCity: 'COK',
-    depDate: '2026-01-10',
-    arrDate: '2026-01-20',
+    depDate: FUTURE_DEP_DATE,
+    arrDate: FUTURE_ARR_DATE,
   },
   passengers: [
     { id: 'p1', passengerName: 'John Smith', amount: 500, customer: 'c1', payment: { status: 'paid', type: 'card', amount: 0 } },
@@ -84,8 +85,8 @@ describe('BookingForm booking date', () => {
     await user.type(screen.getByLabelText(/Airline/i), 'QR');
     await user.type(screen.getByLabelText('Departure city'), 'ORD');
     await user.type(screen.getByLabelText('Arrival city'), 'COK');
-    pickDate('Departure Date', '2026-01-10');
-    pickDate('Arrival Date', '2026-01-20');
+    pickDate('Departure Date', FUTURE_DEP_DATE);
+    pickDate('Arrival Date', FUTURE_ARR_DATE);
     await linkFirstPassenger(user);
     await user.type(screen.getByLabelText(/^Amount$/i), '700');
     await user.click(screen.getByRole('button', { name: /create booking/i }));
@@ -135,8 +136,8 @@ describe('BookingForm booking date', () => {
     // Deliberately leave Departure city empty; every other required field is filled (including
     // the customer link) so Departure city is the SOLE blocker for this assertion.
     await user.type(screen.getByLabelText('Arrival city'), 'COK');
-    pickDate('Departure Date', '2026-01-10');
-    pickDate('Arrival Date', '2026-01-20');
+    pickDate('Departure Date', FUTURE_DEP_DATE);
+    pickDate('Arrival Date', FUTURE_ARR_DATE);
     await linkFirstPassenger(user);
     await user.type(screen.getByLabelText(/^Amount$/i), '700');
     await user.click(screen.getByRole('button', { name: /create booking/i }));
@@ -157,8 +158,8 @@ describe('BookingForm booking date', () => {
     await user.type(screen.getByLabelText(/Airline/i), 'QR');
     await user.type(screen.getByLabelText('Departure city'), 'ORD');
     await user.type(screen.getByLabelText('Arrival city'), 'COK');
-    pickDate('Departure Date', '2026-01-10');
-    pickDate('Arrival Date', '2026-01-20');
+    pickDate('Departure Date', FUTURE_DEP_DATE);
+    pickDate('Arrival Date', FUTURE_ARR_DATE);
     await user.type(screen.getByLabelText(/^Amount$/i), '700'); // no customer picked
     await user.click(screen.getByRole('button', { name: /create booking/i }));
 
@@ -205,8 +206,8 @@ describe('BookingForm booking date', () => {
     await user.type(screen.getByLabelText(/Airline/i), 'QR');
     await user.type(screen.getByLabelText('Departure city'), 'ORD');
     await user.type(screen.getByLabelText('Arrival city'), 'COK');
-    pickDate('Departure Date', '2026-01-10');
-    pickDate('Arrival Date', '2026-01-20');
+    pickDate('Departure Date', FUTURE_DEP_DATE);
+    pickDate('Arrival Date', FUTURE_ARR_DATE);
     await linkFirstPassenger(user);
     await user.type(screen.getByLabelText(/^Amount$/i), '700');
     await user.click(screen.getByRole('button', { name: /create booking/i }));
@@ -230,8 +231,8 @@ describe('BookingForm booking date', () => {
     await user.type(screen.getByLabelText(/Airline/i), 'QR');
     await user.type(screen.getByLabelText('Departure city'), 'ORD');
     await user.type(screen.getByLabelText('Arrival city'), 'COK');
-    pickDate('Departure Date', '2026-01-10');
-    pickDate('Arrival Date', '2026-01-20');
+    pickDate('Departure Date', FUTURE_DEP_DATE);
+    pickDate('Arrival Date', FUTURE_ARR_DATE);
     await user.type(screen.getByLabelText(/^Amount$/i), '700');
     await user.click(screen.getByRole('button', { name: /create booking/i }));
     expect(await screen.findByText(/select a customer/i)).toBeInTheDocument();
@@ -254,5 +255,36 @@ describe('BookingForm booking date', () => {
     await user.click(screen.getByRole('button', { name: 'Select customer for passenger 1' }));
     // The stored name stays visible as guidance while the user searches for the matching customer.
     expect(screen.getByText('Originally recorded as SMITH/JANE')).toBeInTheDocument();
+  });
+
+  describe('future-only trip dates', () => {
+    it('floors Departure/Arrival Date at today when CREATING a booking', () => {
+      renderForm();
+      expect(screen.getByLabelText('Departure Date')).toHaveAttribute('min', TODAY);
+      expect(screen.getByLabelText('Arrival Date')).toHaveAttribute('min', TODAY);
+    });
+
+    it('raises the Arrival Date floor to the chosen Departure Date', () => {
+      renderForm();
+      pickDate('Departure Date', FUTURE_DEP_DATE);
+      // Arrival can't precede its own departure, so the later of the two bounds wins.
+      expect(screen.getByLabelText('Arrival Date')).toHaveAttribute('min', FUTURE_DEP_DATE);
+    });
+
+    it('leaves Booking Date unbounded on create — back-dating the ledger entry is legitimate', () => {
+      renderForm();
+      expect(screen.getByLabelText('Booking Date')).not.toHaveAttribute('min');
+    });
+
+    it('does NOT floor the dates when EDITING, so a historic invoice stays editable', () => {
+      // A bulk-imported invoice has trip dates years in the past. Flooring them here would make it
+      // impossible to fix an unrelated field (a typo'd PNR, say) without also inventing new dates.
+      renderForm({
+        ...EXISTING_BOOKING,
+        booking: { ...EXISTING_BOOKING.booking, depDate: '2024-03-01', arrDate: '2024-03-20' },
+      });
+      expect(screen.getByLabelText('Departure Date')).not.toHaveAttribute('min');
+      expect(screen.getByLabelText('Arrival Date')).not.toHaveAttribute('min');
+    });
   });
 });

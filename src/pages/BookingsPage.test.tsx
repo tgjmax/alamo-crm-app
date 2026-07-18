@@ -1,4 +1,5 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { FUTURE_ARR_DATE, FUTURE_DEP_DATE } from '@/test-utils/dates';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi } from 'vitest';
@@ -248,8 +249,8 @@ describe('BookingsPage', () => {
     await userEvent.type(screen.getByLabelText('Airline code'), 'QR');
     await userEvent.type(screen.getByLabelText('Departure city'), 'DXB');
     await userEvent.type(screen.getByLabelText('Arrival city'), 'COK');
-    await userEvent.type(screen.getByLabelText('Departure Date'), '2026-06-01');
-    await userEvent.type(screen.getByLabelText('Arrival Date'), '2026-06-10');
+    await userEvent.type(screen.getByLabelText('Departure Date'), FUTURE_DEP_DATE);
+    await userEvent.type(screen.getByLabelText('Arrival Date'), FUTURE_ARR_DATE);
     await linkPassenger('Passenger name', { id: 'c1', firstName: 'New', lastName: 'Pax', phone: '5', dob: '02-Sep-1953' });
     await userEvent.type(screen.getByLabelText('Amount'), '500');
     await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));
@@ -309,8 +310,8 @@ describe('BookingsPage', () => {
     await userEvent.type(screen.getByLabelText('Airline code'), 'QR');
     await userEvent.type(screen.getByLabelText('Departure city'), 'DXB');
     await userEvent.type(screen.getByLabelText('Arrival city'), 'COK');
-    await userEvent.type(screen.getByLabelText('Departure Date'), '2026-06-01');
-    await userEvent.type(screen.getByLabelText('Arrival Date'), '2026-06-10');
+    await userEvent.type(screen.getByLabelText('Departure Date'), FUTURE_DEP_DATE);
+    await userEvent.type(screen.getByLabelText('Arrival Date'), FUTURE_ARR_DATE);
     await linkPassenger('Passenger name', { id: 'c1', firstName: 'Shiny', lastName: 'Joseph', phone: '5', dob: '02-Sep-1953' });
     await userEvent.type(screen.getByLabelText('Amount'), '2400');
 
@@ -359,8 +360,8 @@ describe('BookingsPage', () => {
     await userEvent.type(screen.getByLabelText('Airline code'), 'QR');
     await userEvent.type(screen.getByLabelText('Departure city'), 'DXB');
     await userEvent.type(screen.getByLabelText('Arrival city'), 'COK');
-    await userEvent.type(screen.getByLabelText('Departure Date'), '2026-06-01');
-    await userEvent.type(screen.getByLabelText('Arrival Date'), '2026-06-10');
+    await userEvent.type(screen.getByLabelText('Departure Date'), FUTURE_DEP_DATE);
+    await userEvent.type(screen.getByLabelText('Arrival Date'), FUTURE_ARR_DATE);
     await linkPassenger('Passenger name', { id: 'c1', firstName: 'Pend', lastName: 'Pax', phone: '5', dob: '02-Sep-1953' });
     await userEvent.type(screen.getByLabelText('Amount'), '500');
     // The default is shared mode (no per-passenger amount field); uncheck to expose it, then set a
@@ -394,8 +395,8 @@ describe('BookingsPage', () => {
     await userEvent.type(screen.getByLabelText('Airline code'), 'QR');
     await userEvent.type(screen.getByLabelText('Departure city'), 'DXB');
     await userEvent.type(screen.getByLabelText('Arrival city'), 'COK');
-    await userEvent.type(screen.getByLabelText('Departure Date'), '2026-06-01');
-    await userEvent.type(screen.getByLabelText('Arrival Date'), '2026-06-10');
+    await userEvent.type(screen.getByLabelText('Departure Date'), FUTURE_DEP_DATE);
+    await userEvent.type(screen.getByLabelText('Arrival Date'), FUTURE_ARR_DATE);
     await linkPassenger('Passenger name', { id: 'c1', firstName: 'Paid', lastName: 'Pax', phone: '5', dob: '02-Sep-1953' });
     await userEvent.type(screen.getByLabelText('Amount'), '500');
     expect(screen.queryByLabelText('Amount owed')).not.toBeInTheDocument();
@@ -418,8 +419,8 @@ describe('BookingsPage', () => {
     await userEvent.type(screen.getByLabelText('PNR'), 'ABC123');
     await userEvent.type(screen.getByLabelText('Airline code'), 'QR');
     await userEvent.type(screen.getByLabelText('Arrival city'), 'COK');
-    await userEvent.type(screen.getByLabelText('Departure Date'), '2026-06-01');
-    await userEvent.type(screen.getByLabelText('Arrival Date'), '2026-06-10');
+    await userEvent.type(screen.getByLabelText('Departure Date'), FUTURE_DEP_DATE);
+    await userEvent.type(screen.getByLabelText('Arrival Date'), FUTURE_ARR_DATE);
     await linkPassenger('Passenger name', { id: 'c1', firstName: 'New', lastName: 'Pax', phone: '5', dob: '02-Sep-1953' });
     await userEvent.type(screen.getByLabelText('Amount'), '500');
     await userEvent.click(screen.getByRole('button', { name: 'Create booking' }));

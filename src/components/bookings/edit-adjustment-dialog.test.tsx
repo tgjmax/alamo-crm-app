@@ -74,6 +74,15 @@ describe('EditAdjustmentDialog', () => {
     expect(screen.queryByText(/Include SMITH\/JOHN/)).not.toBeInTheDocument();
   });
 
+  it('does not floor the trip dates — a historic adjustment must stay editable', async () => {
+    // The future-only rule applies when ENTERING a new reissue (adjustment-booking-form.tsx), not
+    // when correcting one already on the ledger, whose flight may be years past.
+    renderDialog('a1');
+
+    expect(await screen.findByLabelText('Adjustment departure date')).not.toHaveAttribute('min');
+    expect(screen.getByLabelText('Adjustment arrival date')).not.toHaveAttribute('min');
+  });
+
   it('saves the edited fields', async () => {
     const user = userEvent.setup();
     renderDialog('a1');

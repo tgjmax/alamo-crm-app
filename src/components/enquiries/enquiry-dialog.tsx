@@ -16,6 +16,9 @@ import { MultiCodeSearchField } from '@/components/multi-code-search-field';
 import { CabinSelectField } from '@/components/enquiries/cabin-select-field';
 import { PassengerCountField, PassengerCounts } from '@/components/enquiries/passenger-count-field';
 import { searchAirlines, searchAirports } from '@/api/flightData.api';
+import { useBranding } from '@/hooks/useBranding';
+import { agencyToday } from '@/utils/agencyTime';
+import { maxIsoDate } from '@/utils/dateFormat';
 import {
   CabinClass,
   createEnquiry,
@@ -106,6 +109,12 @@ export function EnquiryDialog({ open, onOpenChange, enquiry }: EnquiryDialogProp
   const [form, setForm] = useState<EnquiryFormState>(emptyForm);
   const queryClient = useQueryClient();
   const isEdit = Boolean(enquiry);
+  // Nobody enquires about a flight that has already left, so a NEW enquiry's travel dates floor at
+  // the agency's today. An EDIT is exempt — a stale enquiry raised weeks ago must stay correctable
+  // (say, to fix a typo'd airport) without being forced to re-date the trip. Same create/edit split
+  // as the booking form's trip dates.
+  const { timeZone } = useBranding();
+  const minTravelDate = isEdit ? undefined : agencyToday(timeZone);
 
   useEffect(() => {
     if (!open) return;
@@ -317,6 +326,9 @@ export function EnquiryDialog({ open, onOpenChange, enquiry }: EnquiryDialogProp
                       ariaLabel={`Date ${index + 1}`}
                       value={segment.date ?? ''}
                       onChange={(date) => updateSegment(index, { date })}
+                      // Legs are flown in order, so each one also floors at the leg before it —
+                      // a return can't precede its outbound. Same-day is allowed (a >= compare).
+                      minDate={minTravelDate && maxIsoDate(minTravelDate, form.segments[index - 1]?.date)}
                     />
                   </div>
                 </div>

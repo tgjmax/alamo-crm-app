@@ -27,3 +27,19 @@ export function agencyYearMonth(
 
   return { year: value('year'), month: value('month') };
 }
+
+/**
+ * Today's calendar date in `timeZone`, as the `YYYY-MM-DD` string every date control in this app
+ * speaks. Used as the earliest selectable Departure/Arrival date when ENTERING a new booking or
+ * reissue — a flight being ticketed now cannot depart in the past. Reckoned in the agency's zone
+ * rather than the viewer's, so an agent on a laptop set to another timezone doesn't lose (or gain)
+ * a day at midnight. `en-CA` formats as `YYYY-MM-DD` natively. `now` is injected for tests.
+ */
+export function agencyToday(timeZone: string, now: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
+}

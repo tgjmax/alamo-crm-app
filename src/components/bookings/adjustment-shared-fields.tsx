@@ -3,6 +3,7 @@ import { IconInput } from '@/components/icon-input';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { maxIsoDate } from '@/utils/dateFormat';
 
 export interface AdjustmentSharedValue {
   bookingDate: string;
@@ -22,6 +23,10 @@ interface AdjustmentSharedFieldsProps {
   bookingType: 'Reissue' | 'Refund';
   value: AdjustmentSharedValue;
   onChange: (patch: Partial<AdjustmentSharedValue>) => void;
+  /** Earliest selectable Departure/Arrival date, 'YYYY-MM-DD'. Passed by the CREATE flow only
+   * (a reissue is a new, future flight); the edit dialog omits it so a historic adjustment stays
+   * editable. Does not apply to the adjustment's own booking date, which is legitimately back-dated. */
+  minTripDate?: string;
 }
 
 /** The fields shared by both create (`AdjustmentBookingForm`) and edit (`EditAdjustmentDialog`)
@@ -29,7 +34,7 @@ interface AdjustmentSharedFieldsProps {
  * city/date inputs, a remark, and the payment status/type/pending-amount block. Extracted
  * verbatim out of `adjustment-booking-form.tsx` — every `aria-label` here is queried by existing
  * tests, so none of them may change. */
-export function AdjustmentSharedFields({ bookingType, value, onChange }: AdjustmentSharedFieldsProps) {
+export function AdjustmentSharedFields({ bookingType, value, onChange, minTripDate }: AdjustmentSharedFieldsProps) {
   return (
     <>
       <div className="space-y-2">
@@ -96,6 +101,7 @@ export function AdjustmentSharedFields({ bookingType, value, onChange }: Adjustm
               type="date"
               value={value.depDate}
               onChange={(e) => onChange({ depDate: e.target.value })}
+              min={minTripDate}
             />
           </div>
           <div className="space-y-2">
@@ -106,6 +112,9 @@ export function AdjustmentSharedFields({ bookingType, value, onChange }: Adjustm
               type="date"
               value={value.arrDate}
               onChange={(e) => onChange({ arrDate: e.target.value })}
+              // Arrival additionally can't precede its own departure. Both bounds vanish when the
+              // edit flow omits `minTripDate`, so a historic adjustment stays correctable.
+              min={minTripDate && maxIsoDate(minTripDate, value.depDate)}
             />
           </div>
         </>

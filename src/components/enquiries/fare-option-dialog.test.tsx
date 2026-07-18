@@ -5,6 +5,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FareOptionDialog } from './fare-option-dialog';
 import * as flightDataApi from '@/api/flightData.api';
 import { EnquiryFareOption } from '@/api/enquiries.api';
+import { FUTURE_DEP_DATE } from '@/test-utils/dates';
+
+const TODAY = new Date().toISOString().slice(0, 10);
 
 vi.mock('@/api/flightData.api');
 
@@ -32,7 +35,7 @@ describe('FareOptionDialog', () => {
     await user.type(screen.getByLabelText('Adult fare'), '220');
     await user.type(screen.getByLabelText('Segment 1 from'), 'IAH');
     await user.type(screen.getByLabelText('Segment 1 to'), 'LAX');
-    await user.type(screen.getByLabelText('Segment 1 date'), '2026-07-08');
+    await user.type(screen.getByLabelText('Segment 1 date'), FUTURE_DEP_DATE);
     await user.click(screen.getByRole('button', { name: 'Save option' }));
 
     expect(onSave).toHaveBeenCalledWith(
@@ -51,7 +54,7 @@ describe('FareOptionDialog', () => {
     await user.type(screen.getByLabelText('Infant fare'), '25');
     await user.type(screen.getByLabelText('Segment 1 from'), 'IAH');
     await user.type(screen.getByLabelText('Segment 1 to'), 'LAX');
-    await user.type(screen.getByLabelText('Segment 1 date'), '2026-07-08');
+    await user.type(screen.getByLabelText('Segment 1 date'), FUTURE_DEP_DATE);
     await user.click(screen.getByRole('button', { name: 'Save option' }));
 
     expect(onSave).toHaveBeenCalledWith(
@@ -68,7 +71,7 @@ describe('FareOptionDialog', () => {
     await user.type(screen.getByLabelText('Adult fare'), '220');
     await user.type(screen.getByLabelText('Segment 1 from'), 'IAH');
     await user.type(screen.getByLabelText('Segment 1 to'), 'LAX');
-    await user.type(screen.getByLabelText('Segment 1 date'), '2026-07-08');
+    await user.type(screen.getByLabelText('Segment 1 date'), FUTURE_DEP_DATE);
     await user.type(screen.getByLabelText('Segment 1 depart time'), '06:20');
     await user.type(screen.getByLabelText('Segment 1 arrive time'), '14:53');
     await user.click(screen.getByRole('button', { name: 'Save option' }));
@@ -89,7 +92,7 @@ describe('FareOptionDialog', () => {
     await user.type(screen.getByLabelText('Adult fare'), '220');
     await user.type(screen.getByLabelText('Segment 1 from'), 'IAH');
     await user.type(screen.getByLabelText('Segment 1 to'), 'LAX');
-    await user.type(screen.getByLabelText('Segment 1 date'), '2026-07-08');
+    await user.type(screen.getByLabelText('Segment 1 date'), FUTURE_DEP_DATE);
 
     const departTime = screen.getByLabelText('Segment 1 depart time');
     await user.type(departTime, '25:00');
@@ -144,5 +147,22 @@ describe('FareOptionDialog', () => {
     expect(onSave).toHaveBeenCalledTimes(1);
     const arg = onSave.mock.calls[0][0] as EnquiryFareOption;
     expect(arg.prices.child).toBe(0);
+  });
+});
+
+describe('FareOptionDialog future-only segment dates', () => {
+  it('floors a newly quoted segment at today', () => {
+    render(<FareOptionDialog open onOpenChange={() => {}} onSave={vi.fn()} />, { wrapper });
+    expect(screen.getByLabelText('Segment 1 date')).toHaveAttribute('min', TODAY);
+  });
+
+  it('does NOT floor the segments when editing an existing option', () => {
+    const existing: EnquiryFareOption = {
+      airlineName: 'Spirit',
+      prices: { adult: 220 },
+      segments: [{ from: 'IAH', to: 'LAX', date: '2024-03-01' }],
+    };
+    render(<FareOptionDialog open onOpenChange={() => {}} initial={existing} onSave={vi.fn()} />, { wrapper });
+    expect(screen.getByLabelText('Segment 1 date')).not.toHaveAttribute('min');
   });
 });

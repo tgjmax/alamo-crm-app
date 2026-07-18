@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { BookingRow, createAdjustment, listBookings } from '@/api/bookings.api';
+import { useBranding } from '@/hooks/useBranding';
+import { agencyToday } from '@/utils/agencyTime';
 import { AdjustmentSharedFields } from './adjustment-shared-fields';
 
 interface AdjustmentBookingFormProps {
@@ -22,7 +24,18 @@ interface PnrGroup {
   passengers: BookingRow[];
 }
 
+/** A prefilled 'YYYY-MM-DD' date, or '' when it is absent or already in the past. Both arguments
+ * are zero-padded ISO day strings, so a lexicographic compare is a date compare. */
+function futureOnly(date: string | undefined, min: string): string {
+  return date && date >= min ? date : '';
+}
+
 export function AdjustmentBookingForm({ bookingType, onDone, onCancel }: AdjustmentBookingFormProps) {
+  // A reissue books a new, future flight, so its trip dates floor at the agency's today. The EDIT
+  // dialog (edit-adjustment-dialog.tsx) deliberately passes no floor — a historic adjustment must
+  // stay editable. See the same split in booking-form.tsx.
+  const { timeZone } = useBranding();
+  const minTripDate = agencyToday(timeZone);
   const [pnrQuery, setPnrQuery] = useState('');
   const [debouncedPnrQuery, setDebouncedPnrQuery] = useState('');
   const [selectedGroup, setSelectedGroup] = useState<PnrGroup | null>(null);
@@ -86,8 +99,12 @@ export function AdjustmentBookingForm({ bookingType, onDone, onCancel }: Adjustm
       airlineCode: first.airlineCode ?? '',
       depCity: first.depCity ?? '',
       arrCity: first.arrCity ?? '',
-      depDate: first.depDate?.slice(0, 10) ?? '',
-      arrDate: first.arrDate?.slice(0, 10) ?? '',
+      // Prefilled from the ORIGINAL flight, but dropped when it has already departed: a reissue
+      // books a new future flight, so the old dates were going to be replaced anyway — and keeping
+      // them would open the form already violating `minTripDate`, failing validation on a field the
+      // user never touched. Cities/airline/PNR still prefill regardless (usually unchanged).
+      depDate: futureOnly(first.depDate?.slice(0, 10), minTripDate),
+      arrDate: futureOnly(first.arrDate?.slice(0, 10), minTripDate),
     }));
     setSucceeded(new Set());
     setFailedNames([]);
@@ -218,6 +235,7 @@ export function AdjustmentBookingForm({ bookingType, onDone, onCancel }: Adjustm
             bookingType={bookingType}
             value={shared}
             onChange={(patch) => setShared({ ...shared, ...patch })}
+            minTripDate={minTripDate}
           />
         </>
       )}

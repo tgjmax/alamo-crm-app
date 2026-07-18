@@ -36,3 +36,14 @@ export function formatDisplayDate(value: string | undefined): string {
   if (!monthAbbr) return value;
   return `${day} ${monthAbbr} ${year}`;
 }
+
+/**
+ * The later of two 'YYYY-MM-DD' dates, ignoring blanks. Used to build a date field's lower bound
+ * from more than one rule at once — e.g. an Arrival Date that must be both in the future AND on or
+ * after the chosen Departure Date. Zero-padded ISO day strings sort lexicographically, so a string
+ * compare is a date compare; no Date objects (and no timezone hazard) involved.
+ */
+export function maxIsoDate(...dates: (string | undefined)[]): string | undefined {
+  const present = dates.filter((d): d is string => Boolean(d));
+  return present.length ? present.reduce((a, b) => (a >= b ? a : b)) : undefined;
+}

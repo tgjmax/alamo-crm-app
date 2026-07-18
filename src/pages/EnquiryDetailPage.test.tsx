@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import { FUTURE_DEP_DATE } from '@/test-utils/dates';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi } from 'vitest';
@@ -109,7 +110,7 @@ describe('EnquiryDetailPage', () => {
     await userEvent.type(screen.getByLabelText('Adult fare'), '470');
     await userEvent.type(screen.getByLabelText('Segment 1 from'), 'IAH');
     await userEvent.type(screen.getByLabelText('Segment 1 to'), 'LAX');
-    await userEvent.type(screen.getByLabelText('Segment 1 date'), '2026-07-08');
+    await userEvent.type(screen.getByLabelText('Segment 1 date'), FUTURE_DEP_DATE);
     await userEvent.type(screen.getByLabelText('Segment 1 depart time'), '07:36');
     await userEvent.type(screen.getByLabelText('Segment 1 arrive time'), '09:05');
     await userEvent.type(screen.getByLabelText('Baggage notes'), 'Carry-on baggage is allowed.');
@@ -124,7 +125,7 @@ describe('EnquiryDetailPage', () => {
             airlineName: 'United Airlines',
             prices: { adult: 470, child: undefined, infant: undefined },
             baggageNotes: 'Carry-on baggage is allowed.',
-            segments: [{ from: 'IAH', to: 'LAX', date: '2026-07-08', departTime: '07:36', arriveTime: '09:05' }],
+            segments: [{ from: 'IAH', to: 'LAX', date: FUTURE_DEP_DATE, departTime: '07:36', arriveTime: '09:05' }],
           },
         ],
       });

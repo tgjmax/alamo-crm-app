@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { FUTURE_ARR_DATE, FUTURE_DEP_DATE } from '@/test-utils/dates';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AxiosError, AxiosResponse } from 'axios';
@@ -60,8 +61,8 @@ const EXISTING_BOOKING: BookingDetail = {
     airlineCode: 'QR',
     depCity: 'ORD',
     arrCity: 'COK',
-    depDate: '2026-01-10',
-    arrDate: '2026-01-20',
+    depDate: FUTURE_DEP_DATE,
+    arrDate: FUTURE_ARR_DATE,
   },
   passengers: [
     { id: 'p1', passengerName: 'John Smith', amount: 500, customer: 'c1', payment: { status: 'paid', type: 'card', amount: 0 } },
@@ -77,8 +78,8 @@ async function fillAndSubmit(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/Airline/i), 'QR');
   await user.type(screen.getByLabelText('Departure city'), 'ORD');
   await user.type(screen.getByLabelText('Arrival city'), 'COK');
-  fireEvent.change(screen.getByLabelText('Departure Date'), { target: { value: '2026-01-10' } });
-  fireEvent.change(screen.getByLabelText('Arrival Date'), { target: { value: '2026-01-20' } });
+  fireEvent.change(screen.getByLabelText('Departure Date'), { target: { value: FUTURE_DEP_DATE } });
+  fireEvent.change(screen.getByLabelText('Arrival Date'), { target: { value: FUTURE_ARR_DATE } });
   await user.type(screen.getByLabelText(/Passenger name/i), 'Jane');
   await user.click(await screen.findByText('Smith/Jane'));
   await user.type(screen.getByLabelText(/^Amount$/i), '700');
