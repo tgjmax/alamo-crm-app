@@ -249,7 +249,8 @@ describe('BookingForm booking date', () => {
     };
     renderForm(historic);
 
-    expect(screen.getByText('Not linked — select a customer')).toBeInTheDocument();
+    // Grandfathered: informational, not a blocking error (see booking-form.link.test.tsx).
+    expect(screen.getByText('Not linked (historic entry)')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Select customer for passenger 1' }));
     // The stored name stays visible as guidance while the user searches for the matching customer.
     expect(screen.getByText('Originally recorded as SMITH/JANE')).toBeInTheDocument();

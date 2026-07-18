@@ -1,4 +1,4 @@
-import { FormEvent, ReactNode, useState } from 'react';
+import { FormEvent, ReactNode, useMemo, useState } from 'react';
 import { Hash, Plane, PlaneLanding, PlaneTakeoff, StickyNote, Ticket, User, X } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -186,6 +186,25 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
   // True once the user has tried to submit with an unlinked passenger — drives the inline
   // "pick a customer" message. Every non-voided passenger must be tied to a Customer record.
   const [linkAttempted, setLinkAttempted] = useState(false);
+  // Passengers that were ALREADY stored unlinked when this form opened — historic rows, typically
+  // bulk-imported from the old spreadsheet, whose real-world passenger may have no Customer record
+  // at all. They are grandfathered past the link gate: linking is mandatory for anything NEW, but
+  // requiring it here would mean a years-old invoice couldn't be edited (to fix a PNR, say) without
+  // first inventing a customer for it. Computed once from `initial` — the component is remounted per
+  // record (see the note above), so this can't go stale.
+  const grandfathered = useMemo(
+    () => new Set((initial?.passengers ?? []).filter((p) => !p.customer).map((p) => p.id)),
+    [initial]
+  );
+
+  /** Whether a row must be linked before this form can be saved. A grandfathered row is exempt only
+   * while it still holds its stored name — clearing the name (via ✕, or on a row the user blanked)
+   * means they're re-entering the passenger, and re-entered data follows the new-data rule. */
+  function needsCustomer(p: PassengerRow): boolean {
+    if (p.customer) return false;
+    if (p.id && grandfathered.has(p.id) && p.name.trim().length > 0) return false;
+    return true;
+  }
   const queryClient = useQueryClient();
 
   const searchQuery = search?.query ?? '';
@@ -248,8 +267,9 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
 
     // Every non-voided passenger must be linked to a Customer (picked from autocomplete or
     // inline-created). The name control never accepts hand-typed final values, so an unlinked row
-    // here means the user never picked (or re-picked) anyone.
-    if (!form.voided && passengers.some((p) => !p.customer)) {
+    // here means the user never picked (or re-picked) anyone — EXCEPT a grandfathered historic row,
+    // which stays saveable as-is (see `needsCustomer`).
+    if (!form.voided && passengers.some(needsCustomer)) {
       setLinkAttempted(true);
       return;
     }
@@ -447,7 +467,11 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
                 <div className="space-y-1">
                   <IconInput aria-label={nameLabel} icon={<User />} value={passenger.name} readOnly />
                   <div className="flex items-center gap-2">
-                    <p className="text-sm text-destructive">Not linked — select a customer</p>
+                    {/* Muted, not destructive, for a grandfathered row: it is saveable as-is, so
+                        colouring it like a blocking error would be a lie. Linking is still offered. */}
+                    <p className={needsCustomer(passenger) ? 'text-sm text-destructive' : 'text-sm text-muted-foreground'}>
+                      Not linked{needsCustomer(passenger) ? ' — select a customer' : ' (historic entry)'}
+                    </p>
                     <Button
                       type="button"
                       variant="outline"
@@ -485,7 +509,7 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
                   {searching && !passenger.customer && passenger.name.trim().length > 0 && (
                     <p className="mt-1 text-xs text-muted-foreground">Originally recorded as {passenger.name}</p>
                   )}
-                  {linkAttempted && !passenger.customer && (
+                  {linkAttempted && needsCustomer(passenger) && (
                     <p role="alert" className="mt-1 text-sm text-destructive">
                       Select a customer from the list, or add a new one.
                     </p>
