@@ -12,6 +12,8 @@ export interface PassengerInput {
   passengerName: string;
   amount: number;
   customer?: string;
+  remark?: string;
+  payment?: PaymentInput;
 }
 
 /** The booking a save collided with, returned on a 409 DUPLICATE_BOOKING_WARNING. */
@@ -33,8 +35,6 @@ export interface CreateBookingInput {
   arrCity?: string;
   depDate?: string;
   arrDate?: string;
-  remark?: string;
-  payment?: PaymentInput;
   passengers: PassengerInput[];
   /** Send `true` to save despite a duplicate-invoice warning the user has already seen. */
   confirmDuplicate?: boolean;
@@ -141,10 +141,6 @@ export async function addPassenger(bookingId: string, input: PassengerInput): Pr
   return res.data;
 }
 
-export async function updateBookingPayment(bookingId: string, payment: PaymentInput): Promise<void> {
-  await apiClient.patch(`/bookings/${bookingId}/payment`, payment);
-}
-
 export interface AdjustmentInput {
   bookingType: 'Reissue' | 'Refund';
   bookingDate: string;
@@ -190,6 +186,10 @@ export interface ImportBookingRow {
   arrDate?: string;
   remark?: string;
   pendingAmount?: number;
+  /** Optional per-row payment status/type (raw cell text). The backend parses these tolerantly and
+   * falls back to the batch `PaymentDefault` when blank/unmapped/unrecognized. */
+  paymentStatus?: string;
+  paymentType?: string;
 }
 
 export interface PaymentDefault {
@@ -237,6 +237,8 @@ export interface BookingDetailPassenger {
   passengerName: string;
   amount: number;
   customer?: string;
+  remark?: string;
+  payment?: PaymentInput;
 }
 
 export interface BookingDetail {
@@ -251,8 +253,6 @@ export interface BookingDetail {
     arrCity?: string;
     depDate?: string;
     arrDate?: string;
-    remark?: string;
-    payment?: PaymentInput;
   };
   passengers: BookingDetailPassenger[];
 }
@@ -264,6 +264,8 @@ export interface UpdatePassengerInput {
   passengerName: string;
   amount: number;
   customer?: string;
+  remark?: string;
+  payment?: PaymentInput;
 }
 
 export interface UpdateBookingInput extends Omit<CreateBookingInput, 'passengers'> {

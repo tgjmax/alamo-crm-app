@@ -1,9 +1,19 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi } from 'vitest';
 import * as XLSX from 'xlsx';
 import BookingImportWizard from './BookingImportWizard';
 import * as bookingsApi from '../api/bookings.api';
+
+function renderWizard(onClose: () => void = () => {}) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <BookingImportWizard onClose={onClose} />
+    </QueryClientProvider>
+  );
+}
 
 function buildTestFile(): File {
   const worksheet = XLSX.utils.aoa_to_sheet([
@@ -43,7 +53,7 @@ describe('BookingImportWizard', () => {
       { index: 0, status: 'would_import' },
       { index: 1, status: 'would_import' },
     ]);
-    render(<BookingImportWizard onClose={() => {}} />);
+    renderWizard();
 
     await userEvent.upload(screen.getByLabelText('Booking import file'), buildTestFile());
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Map Booking Date' })).toBeInTheDocument());
@@ -78,7 +88,7 @@ describe('BookingImportWizard', () => {
         { index: 0, status: 'imported' },
         { index: 1, status: 'needs_manual_linking' },
       ]);
-    render(<BookingImportWizard onClose={() => {}} />);
+    renderWizard();
 
     await userEvent.upload(screen.getByLabelText('Booking import file'), buildTestFile());
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Map Booking Date' })).toBeInTheDocument());
@@ -98,6 +108,34 @@ describe('BookingImportWizard', () => {
     expect(await screen.findByText(/1 of 2 row\(s\) imported\./)).toBeInTheDocument();
   });
 
+  it('invalidates the bookings list cache after a successful commit (so new rows show without a refresh)', async () => {
+    vi.spyOn(bookingsApi, 'importBookings')
+      .mockResolvedValueOnce([
+        { index: 0, status: 'would_import' },
+        { index: 1, status: 'would_import' },
+      ])
+      .mockResolvedValueOnce([
+        { index: 0, status: 'imported' },
+        { index: 1, status: 'imported' },
+      ]);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidateSpy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <BookingImportWizard onClose={() => {}} />
+      </QueryClientProvider>
+    );
+
+    await userEvent.upload(screen.getByLabelText('Booking import file'), buildTestFile());
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Map Booking Date' })).toBeInTheDocument());
+    await mapAllColumns();
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
+    await screen.findByText(/2 of 2 row\(s\) ready to import\./);
+    await userEvent.click(screen.getByRole('button', { name: 'Commit Import' }));
+
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['bookings'] }));
+  });
+
   it('maps a Pending Amount column and sends it per-row when importing as pending', async () => {
     vi.spyOn(bookingsApi, 'importBookings').mockResolvedValueOnce([{ index: 0, status: 'would_import' }]);
     const worksheet = XLSX.utils.aoa_to_sheet([
@@ -111,7 +149,7 @@ describe('BookingImportWizard', () => {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
 
-    render(<BookingImportWizard onClose={() => {}} />);
+    renderWizard();
     await userEvent.upload(screen.getByLabelText('Booking import file'), file);
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Map Booking Date' })).toBeInTheDocument());
     await selectOption('Map Booking Date', 'Date');
@@ -128,6 +166,41 @@ describe('BookingImportWizard', () => {
     });
   });
 
+  it('maps per-row Payment Status/Type columns and sends the raw cell text per-row', async () => {
+    vi.spyOn(bookingsApi, 'importBookings').mockResolvedValueOnce([
+      { index: 0, status: 'would_import' },
+      { index: 1, status: 'would_import' },
+    ]);
+    const worksheet = XLSX.utils.aoa_to_sheet([
+      ['Date', 'Invoice', 'Name of PAX', 'Amount', 'Pay Status', 'Pay Type'],
+      ['2026-05-04', '0000150', 'MIX/ANN', '300', 'Paid', 'Card'],
+      ['2026-05-04', '0000150', 'MIX/BOB', '400', 'Pending', 'Cash'],
+    ]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
+    const arrayBuffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
+    const file = new File([arrayBuffer], 'per-row-payment.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+
+    renderWizard();
+    await userEvent.upload(screen.getByLabelText('Booking import file'), file);
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Map Booking Date' })).toBeInTheDocument());
+    await selectOption('Map Booking Date', 'Date');
+    await selectOption('Map Invoice', 'Invoice');
+    await selectOption('Map Name of PAX', 'Name of PAX');
+    await selectOption('Map Amount', 'Amount');
+    await selectOption('Map Payment Status', 'Pay Status');
+    await selectOption('Map Payment Type', 'Pay Type');
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
+
+    await waitFor(() => {
+      const [rows] = vi.mocked(bookingsApi.importBookings).mock.calls[0];
+      expect(rows[0]).toEqual(expect.objectContaining({ paymentStatus: 'Paid', paymentType: 'Card' }));
+      expect(rows[1]).toEqual(expect.objectContaining({ paymentStatus: 'Pending', paymentType: 'Cash' }));
+    });
+  });
+
   it('maps a Voided column and sends it as a real boolean', async () => {
     vi.spyOn(bookingsApi, 'importBookings').mockResolvedValueOnce([{ index: 0, status: 'would_import' }]);
     const worksheet = XLSX.utils.aoa_to_sheet([
@@ -141,7 +214,7 @@ describe('BookingImportWizard', () => {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
 
-    render(<BookingImportWizard onClose={() => {}} />);
+    renderWizard();
     await userEvent.upload(screen.getByLabelText('Booking import file'), file);
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Map Booking Date' })).toBeInTheDocument());
     await selectOption('Map Booking Date', 'Date');
@@ -170,7 +243,7 @@ describe('BookingImportWizard', () => {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
 
-    render(<BookingImportWizard onClose={() => {}} />);
+    renderWizard();
     await userEvent.upload(screen.getByLabelText('Booking import file'), file);
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Map Booking Date' })).toBeInTheDocument());
     await selectOption('Map Booking Date', 'Date');
@@ -216,7 +289,7 @@ describe('BookingImportWizard', () => {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
 
-    render(<BookingImportWizard onClose={() => {}} />);
+    renderWizard();
     await userEvent.upload(screen.getByLabelText('Booking import file'), file);
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Map Booking Date' })).toBeInTheDocument());
     await selectOption('Map Booking Date', 'Date');
@@ -238,7 +311,7 @@ describe('BookingImportWizard', () => {
       { index: 0, status: 'flagged_duplicate', reason: 'John Smith is already on invoice 000005' },
       { index: 1, status: 'would_import' },
     ]);
-    render(<BookingImportWizard onClose={() => {}} />);
+    renderWizard();
 
     await userEvent.upload(screen.getByLabelText('Booking import file'), buildTestFile());
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Map Booking Date' })).toBeInTheDocument());
@@ -252,7 +325,7 @@ describe('BookingImportWizard', () => {
 
   it('shows an error and re-enables Preview when the import request fails', async () => {
     vi.spyOn(bookingsApi, 'importBookings').mockRejectedValueOnce(new Error('network down'));
-    render(<BookingImportWizard onClose={() => {}} />);
+    renderWizard();
 
     await userEvent.upload(screen.getByLabelText('Booking import file'), buildTestFile());
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Map Booking Date' })).toBeInTheDocument());

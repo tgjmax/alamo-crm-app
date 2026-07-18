@@ -24,14 +24,16 @@ const DETAIL: bookingsApi.BookingDetail = {
     arrCity: 'COK',
     depDate: '2026-05-08',
     arrDate: '2026-05-28',
-    remark: '',
-    payment: { status: 'paid', type: 'card', amount: 0 },
   },
   passengers: [
-    { id: 'p1', passengerName: 'SMITH/JOHN', amount: 300, customer: 'c1' },
-    { id: 'p2', passengerName: 'SMITH/JANE', amount: 450, customer: 'c2' },
+    { id: 'p1', passengerName: 'SMITH/JOHN', amount: 300, customer: 'c1', payment: { status: 'paid', type: 'card', amount: 0 } },
+    { id: 'p2', passengerName: 'SMITH/JANE', amount: 450, customer: 'c2', payment: { status: 'paid', type: 'card', amount: 0 } },
   ],
 };
+
+/** The default per-passenger payment object every submitted row now carries (this fixture's
+ * passengers are both seeded Paid/Card with amount 0 and no paid-on date). */
+const DEFAULT_PAYMENT = { status: 'paid' as const, type: 'card' as const, amount: 0 };
 
 function renderDialog() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -82,9 +84,9 @@ describe('EditBookingDialog', () => {
     const [id, input] = vi.mocked(bookingsApi.updateBooking).mock.calls[0];
     expect(id).toBe('b1');
     expect(input.passengers).toEqual([
-      { id: 'p1', passengerName: 'SMITH/JOHN', amount: 300, customer: 'c1' },
-      { id: 'p2', passengerName: 'SMITH/JANE', amount: 450, customer: 'c2' },
-      { passengerName: 'Smith/Bob', amount: 200, customer: 'c3' },
+      { id: 'p1', passengerName: 'SMITH/JOHN', amount: 300, customer: 'c1', payment: DEFAULT_PAYMENT },
+      { id: 'p2', passengerName: 'SMITH/JANE', amount: 450, customer: 'c2', payment: DEFAULT_PAYMENT },
+      { passengerName: 'Smith/Bob', amount: 200, customer: 'c3', payment: DEFAULT_PAYMENT },
     ]);
   });
 
@@ -98,7 +100,9 @@ describe('EditBookingDialog', () => {
 
     await waitFor(() => expect(bookingsApi.updateBooking).toHaveBeenCalled());
     const [, input] = vi.mocked(bookingsApi.updateBooking).mock.calls[0];
-    expect(input.passengers).toEqual([{ id: 'p1', passengerName: 'SMITH/JOHN', amount: 300, customer: 'c1' }]);
+    expect(input.passengers).toEqual([
+      { id: 'p1', passengerName: 'SMITH/JOHN', amount: 300, customer: 'c1', payment: DEFAULT_PAYMENT },
+    ]);
   });
 
   // Regression guard for the refetch-mid-edit bug already fixed once in this codebase (see
@@ -121,29 +125,35 @@ describe('EditBookingDialog', () => {
     // prop identity would never change, and this guard test would be hollow, unable to detect a
     // regression if a reset-on-initial-change effect were accidentally re-introduced.
     //
-    // The refetch also changes `invoiceNumber` (not just `remark`). `EditBookingDialog` renders
-    // `<DialogTitle>Edit booking #{data.booking.invoiceNumber}</DialogTitle>` OUTSIDE `BookingForm`
-    // — it re-renders directly from the query data, with no form state in the way. That makes it a
-    // deterministic DOM signal that the refetched data has actually propagated into the component
-    // tree and React has flushed. `waitFor(() => expect(getBooking).toHaveBeenCalledTimes(2))` only
-    // proves the MOCK FUNCTION was invoked twice — that resolves as soon as the queryFn call
-    // happens, which is before React has committed the new data to the tree (let alone run any
-    // hypothetical reset effect reacting to it). Asserting on the Remark field right after that
-    // `waitFor` races ahead of the re-render, so a reset-on-initial-change bug could still wipe the
-    // form a tick later without this test ever seeing it. Waiting for the title to show the new
-    // invoice number is the proof the new data landed; only then is asserting "the form didn't
-    // reset" meaningful.
+    // The refetch also changes `invoiceNumber` and passenger 1's stored `remark` (not just proving
+    // *a* change happened — this forces the SAME field the test is asserting on to genuinely differ
+    // server-side). `EditBookingDialog` renders `<DialogTitle>Edit booking
+    // #{data.booking.invoiceNumber}</DialogTitle>` OUTSIDE `BookingForm` — it re-renders directly
+    // from the query data, with no form state in the way. That makes it a deterministic DOM signal
+    // that the refetched data has actually propagated into the component tree and React has
+    // flushed. `waitFor(() => expect(getBooking).toHaveBeenCalledTimes(2))` only proves the MOCK
+    // FUNCTION was invoked twice — that resolves as soon as the queryFn call happens, which is
+    // before React has committed the new data to the tree (let alone run any hypothetical reset
+    // effect reacting to it). Asserting on the Remark field right after that `waitFor` races ahead
+    // of the re-render, so a reset-on-initial-change bug could still wipe the form a tick later
+    // without this test ever seeing it. Waiting for the title to show the new invoice number is the
+    // proof the new data landed; only then is asserting "the form didn't reset" meaningful.
     vi.mocked(bookingsApi.getBooking).mockResolvedValue({
       ...DETAIL,
-      booking: { ...DETAIL.booking, invoiceNumber: '99999', remark: 'changed server-side' },
+      booking: { ...DETAIL.booking, invoiceNumber: '99999' },
+      passengers: [
+        { ...DETAIL.passengers[0], remark: 'changed server-side' },
+        DETAIL.passengers[1],
+      ],
     });
     await client.refetchQueries({ queryKey: ['bookings', 'detail', 'b1'] });
     await screen.findByText(/99999/);
 
-    // The form must NOT have been re-seeded from the refetched data: the Remark field keeps what
-    // the user typed (not the server's 'changed server-side'), and — the strongest check — the
-    // Invoice number input inside the form still shows the ORIGINAL '10432', proving the form's own
-    // state is independent of the query data even though the title (outside the form) moved on.
+    // The form must NOT have been re-seeded from the refetched data: passenger 1's Remark field
+    // keeps what the user typed (not the server's 'changed server-side'), and — the strongest check
+    // — the Invoice number input inside the form still shows the ORIGINAL '10432', proving the
+    // form's own state is independent of the query data even though the title (outside the form)
+    // moved on.
     expect(screen.getByLabelText('Remark')).toHaveValue('follow up needed');
     expect(screen.getByLabelText('Invoice number')).toHaveValue('10432');
   });
@@ -164,8 +174,8 @@ describe('EditBookingDialog', () => {
     const [, input] = vi.mocked(bookingsApi.updateBooking).mock.calls[0];
     expect(input.voided).toBe(true);
     expect(input.passengers).toEqual([
-      { id: 'p1', passengerName: 'SMITH/JOHN', amount: 300, customer: 'c1' },
-      { id: 'p2', passengerName: 'SMITH/JANE', amount: 450, customer: 'c2' },
+      { id: 'p1', passengerName: 'SMITH/JOHN', amount: 300, customer: 'c1', payment: DEFAULT_PAYMENT },
+      { id: 'p2', passengerName: 'SMITH/JANE', amount: 450, customer: 'c2', payment: DEFAULT_PAYMENT },
     ]);
   });
 
@@ -191,7 +201,9 @@ describe('EditBookingDialog', () => {
 
     await waitFor(() => expect(bookingsApi.updateBooking).toHaveBeenCalled());
     const [, input] = vi.mocked(bookingsApi.updateBooking).mock.calls[0];
-    expect(input.passengers[1]).toEqual({ id: 'p2', passengerName: 'Doe/Jane', amount: 450, customer: 'c2' });
+    expect(input.passengers[1]).toEqual({
+      id: 'p2', passengerName: 'Doe/Jane', amount: 450, customer: 'c2', payment: DEFAULT_PAYMENT,
+    });
   });
 
   it('a linked passenger name is read-only; changing it requires re-picking a customer', async () => {
@@ -211,13 +223,18 @@ describe('EditBookingDialog', () => {
 
     await waitFor(() => expect(bookingsApi.updateBooking).toHaveBeenCalled());
     const [, input] = vi.mocked(bookingsApi.updateBooking).mock.calls[0];
-    expect(input.passengers[0]).toEqual({ id: 'p1', passengerName: 'Person/New', amount: 300, customer: 'c9' });
+    expect(input.passengers[0]).toEqual({
+      id: 'p1', passengerName: 'Person/New', amount: 300, customer: 'c9', payment: DEFAULT_PAYMENT,
+    });
   });
 
   it('renders 0 (not empty) in the Amount owed input for a pending payment stored with amount 0', async () => {
     vi.mocked(bookingsApi.getBooking).mockResolvedValue({
       ...DETAIL,
-      booking: { ...DETAIL.booking, payment: { status: 'pending', type: 'card', amount: 0 } },
+      passengers: [
+        { ...DETAIL.passengers[0], payment: { status: 'pending', type: 'card', amount: 0 } },
+        DETAIL.passengers[1],
+      ],
     });
     renderDialog();
 
@@ -226,14 +243,18 @@ describe('EditBookingDialog', () => {
   });
 
   // FIX 1: neither this form nor `edit-adjustment-dialog.tsx` sends `payment.paidOn` — only
-  // `record-payment-dialog.tsx` lets staff set it. But `PATCH /bookings/:id` replaces `payment`
-  // as a whole object, so saving ANY unrelated field (a remark typo, say) after a payment was
-  // recorded with a paid-on date silently erases that date forever, with no indication.
+  // `record-payment-dialog.tsx` lets staff set it. But `PATCH /bookings/:id` replaces each
+  // submitted passenger's `payment` as a whole object, so saving ANY unrelated field (a remark
+  // typo, say) after a payment was recorded with a paid-on date silently erases that date forever,
+  // with no indication.
   it('preserves an existing payment.paidOn when saving an unrelated field', async () => {
     const user = userEvent.setup();
     vi.mocked(bookingsApi.getBooking).mockResolvedValue({
       ...DETAIL,
-      booking: { ...DETAIL.booking, payment: { status: 'pending', type: 'card', amount: 150, paidOn: '2026-07-01' } },
+      passengers: [
+        { ...DETAIL.passengers[0], payment: { status: 'pending', type: 'card', amount: 150, paidOn: '2026-07-01' } },
+        DETAIL.passengers[1],
+      ],
     });
     renderDialog();
 
@@ -243,7 +264,7 @@ describe('EditBookingDialog', () => {
 
     await waitFor(() => expect(bookingsApi.updateBooking).toHaveBeenCalled());
     const [, input] = vi.mocked(bookingsApi.updateBooking).mock.calls[0];
-    expect(input.payment?.paidOn).toBe('2026-07-01');
+    expect(input.passengers[0].payment?.paidOn).toBe('2026-07-01');
   });
 
   // FIX 5: adding a blank passenger row and THEN ticking "Mark as voided" hides the Passengers
@@ -262,8 +283,8 @@ describe('EditBookingDialog', () => {
     await waitFor(() => expect(bookingsApi.updateBooking).toHaveBeenCalled());
     const [, input] = vi.mocked(bookingsApi.updateBooking).mock.calls[0];
     expect(input.passengers).toEqual([
-      { id: 'p1', passengerName: 'SMITH/JOHN', amount: 300, customer: 'c1' },
-      { id: 'p2', passengerName: 'SMITH/JANE', amount: 450, customer: 'c2' },
+      { id: 'p1', passengerName: 'SMITH/JOHN', amount: 300, customer: 'c1', payment: DEFAULT_PAYMENT },
+      { id: 'p2', passengerName: 'SMITH/JANE', amount: 450, customer: 'c2', payment: DEFAULT_PAYMENT },
     ]);
   });
 

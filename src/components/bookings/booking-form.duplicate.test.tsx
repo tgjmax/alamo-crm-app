@@ -62,10 +62,10 @@ const EXISTING_BOOKING: BookingDetail = {
     arrCity: 'COK',
     depDate: '2026-01-10',
     arrDate: '2026-01-20',
-    remark: '',
-    payment: { status: 'paid', type: 'card', amount: 0 },
   },
-  passengers: [{ id: 'p1', passengerName: 'John Smith', amount: 500, customer: 'c1' }],
+  passengers: [
+    { id: 'p1', passengerName: 'John Smith', amount: 500, customer: 'c1', payment: { status: 'paid', type: 'card', amount: 0 } },
+  ],
 };
 
 async function fillAndSubmit(user: ReturnType<typeof userEvent.setup>) {

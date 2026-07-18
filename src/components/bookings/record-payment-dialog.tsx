@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
-import { BookingRow, updateBookingPayment, updatePassengerPayment } from '@/api/bookings.api';
+import { BookingRow, updatePassengerPayment } from '@/api/bookings.api';
 
 interface RecordPaymentDialogProps {
   row: BookingRow | null;
@@ -39,9 +39,7 @@ export function RecordPaymentDialog({ row, onOpenChange, queryKeyPrefix }: Recor
       paidOn?: string;
     }) => {
       if (!row) return Promise.reject(new Error('No row selected'));
-      return row.bookingType === 'New' && row.bookingId
-        ? updateBookingPayment(row.bookingId, payment)
-        : updatePassengerPayment(row.id, payment);
+      return updatePassengerPayment(row.id, payment);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [queryKeyPrefix] });

@@ -34,16 +34,6 @@ const emptyForm = {
   arrCity: '',
   depDate: '',
   arrDate: '',
-  remark: '',
-  paymentStatus: 'paid' as 'paid' | 'pending',
-  paymentType: 'card' as 'card' | 'check' | 'cash',
-  pendingAmount: '',
-  // Never rendered — neither this form nor its `paymentStatus`/`paymentType`/`pendingAmount`
-  // siblings expose a "paid on" control. It only exists so an existing booking's `payment.paidOn`
-  // (set via record-payment-dialog.tsx) survives a wholesale `PATCH /bookings/:id`, which replaces
-  // `payment` as a whole object — any field this form doesn't send is erased server-side. On
-  // CREATE there is nothing to preserve, so this stays '' and is never submitted (see handleSubmit).
-  paidOn: '',
 };
 
 interface PassengerRow {
@@ -53,9 +43,27 @@ interface PassengerRow {
   name: string;
   amount: string;
   customer?: string;
+  paymentStatus: 'paid' | 'pending';
+  paymentType: 'card' | 'check' | 'cash';
+  pendingAmount: string;
+  // Never rendered — this row has no "paid on" control. It only exists so an existing passenger's
+  // `payment.paidOn` (set via record-payment-dialog.tsx) survives a wholesale `PATCH /bookings/:id`,
+  // which replaces each submitted passenger's `payment` as a whole object — any field this form
+  // doesn't send is erased server-side. On a brand-new row there is nothing to preserve, so this
+  // stays '' and is never submitted (see handleSubmit).
+  paidOn: string;
+  remark: string;
 }
 
-const EMPTY_PASSENGER: PassengerRow = { name: '', amount: '' };
+const EMPTY_PASSENGER: PassengerRow = {
+  name: '',
+  amount: '',
+  paymentStatus: 'paid',
+  paymentType: 'card',
+  pendingAmount: '',
+  paidOn: '',
+  remark: '',
+};
 
 function formStateFrom(initial?: BookingDetail): typeof emptyForm {
   if (!initial) return emptyForm;
@@ -70,13 +78,6 @@ function formStateFrom(initial?: BookingDetail): typeof emptyForm {
     arrCity: b.arrCity ?? '',
     depDate: b.depDate ?? '',
     arrDate: b.arrDate ?? '',
-    remark: b.remark ?? '',
-    paymentStatus: b.payment?.status ?? 'paid',
-    paymentType: b.payment?.type ?? 'card',
-    // `!= null` (not truthy) so a pending payment stored with amount 0 still seeds '0', not ''
-    // into this `required` input.
-    pendingAmount: b.payment?.amount != null ? String(b.payment.amount) : '',
-    paidOn: b.payment?.paidOn ?? '',
   };
 }
 
@@ -87,7 +88,63 @@ function passengerRowsFrom(initial?: BookingDetail): PassengerRow[] {
     name: p.passengerName,
     amount: String(p.amount),
     customer: p.customer,
+    paymentStatus: p.payment?.status ?? 'paid',
+    paymentType: p.payment?.type ?? 'card',
+    // `!= null` (not truthy) so a pending payment stored with amount 0 still seeds '0', not ''
+    // into this `required` input.
+    pendingAmount: p.payment?.amount != null ? String(p.payment.amount) : '',
+    paidOn: p.payment?.paidOn ?? '',
+    remark: p.remark ?? '',
   }));
+}
+
+/** The single payment+remark applied to every passenger when the "same for all" checkbox is on. */
+interface SharedPayment {
+  paymentStatus: 'paid' | 'pending';
+  paymentType: 'card' | 'check' | 'cash';
+  // Invisible round-trip, same reason as PassengerRow.paidOn: preserve a stored paidOn through a
+  // wholesale PATCH. Seeded from passenger 1; shared mode only defaults on when every passenger's
+  // paidOn is already identical, so there is nothing to lose by collapsing to one.
+  paidOn: string;
+  remark: string;
+}
+
+function sharedStateFrom(initial?: BookingDetail): SharedPayment {
+  const p = initial?.passengers[0];
+  return {
+    paymentStatus: p?.payment?.status ?? 'paid',
+    paymentType: p?.payment?.type ?? 'card',
+    paidOn: p?.payment?.paidOn ?? '',
+    remark: p?.remark ?? '',
+  };
+}
+
+/**
+ * Whether the dialog opens in shared mode (the "same payment & remark for all passengers" checkbox
+ * checked). A NEW booking always does. An EXISTING one does only when every passenger already
+ * carries the same status / type / paidOn / remark AND is either all paid or all
+ * pending-owing-its-OWN-full-ticket — the only pending shape shared mode can represent, since it
+ * has no per-passenger "amount owed" field. Any real difference (mixed status/type/remark, a
+ * partial balance, differing paid-on) opens per-passenger, so nothing is silently flattened on save.
+ */
+function isShareable(initial?: BookingDetail): boolean {
+  if (!initial || initial.passengers.length === 0) return true;
+  const first = initial.passengers[0];
+  const status = (p: BookingDetail['passengers'][number]) => p.payment?.status ?? 'paid';
+  const type = (p: BookingDetail['passengers'][number]) => p.payment?.type ?? 'card';
+  const paidOn = (p: BookingDetail['passengers'][number]) => p.payment?.paidOn ?? '';
+  const remark = (p: BookingDetail['passengers'][number]) => p.remark ?? '';
+  // A pending passenger is shareable only if it owes its own full ticket amount.
+  const pendingOwesFullTicket = (p: BookingDetail['passengers'][number]) =>
+    status(p) !== 'pending' || (p.payment?.amount ?? 0) === p.amount;
+  return initial.passengers.every(
+    (p) =>
+      status(p) === status(first) &&
+      type(p) === type(first) &&
+      paidOn(p) === paidOn(first) &&
+      remark(p) === remark(first) &&
+      pendingOwesFullTicket(p)
+  );
 }
 
 interface BookingFormProps {
@@ -113,6 +170,11 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
   // send-quote-dialog.tsx's `wasOpen`-gated reset effect — so don't reintroduce it here.)
   const [form, setForm] = useState(() => formStateFrom(initial));
   const [passengers, setPassengers] = useState<PassengerRow[]>(() => passengerRowsFrom(initial));
+  // "Same payment & remark for all passengers." On (default for a new or all-identical booking) =>
+  // one shared payment/remark block; off => per-passenger fields. Seeded by isShareable in a lazy
+  // initializer (never a reset effect — the dialog remounts per record, see the note below).
+  const [shareAll, setShareAll] = useState(() => isShareable(initial));
+  const [shared, setShared] = useState<SharedPayment>(() => sharedStateFrom(initial));
   // Which passenger row's autocomplete is active, and what it has typed.
   const [search, setSearch] = useState<{ index: number; query: string } | null>(null);
   // Which passenger row an inline "add new customer" should fill on success.
@@ -206,42 +268,79 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
       arrCity: form.voided ? undefined : form.arrCity || undefined,
       depDate: form.voided ? undefined : form.depDate || undefined,
       arrDate: form.voided ? undefined : form.arrDate || undefined,
-      remark: form.remark || undefined,
-      payment: form.voided
-        ? undefined
-        : {
-            status: form.paymentStatus,
-            type: form.paymentType,
-            amount: form.paymentStatus === 'pending' ? Number(form.pendingAmount) : 0,
-            // Round-tripped invisibly: this form has no "paid on" control of its own. On CREATE,
-            // `form.paidOn` is always '' (never seeded from anything), so this is always
-            // `undefined` there and the field is simply absent from the payload, matching
-            // pre-existing CREATE behavior exactly. On EDIT, it carries through whatever
-            // record-payment-dialog.tsx already set, so saving an unrelated field here (a remark
-            // typo fix, say) doesn't silently erase it via the wholesale PATCH.
-            paidOn: form.paidOn || undefined,
-          },
       // A voided invoice hides the Passengers section, but the `VOID` placeholder is CREATE-only
       // (`!initial`): the backend requires >=1 passenger on every booking, and a brand-new voided
-      // invoice has no stored passengers yet, so it needs a dummy row to satisfy that. In EDIT
-      // mode there ARE stored passengers, and `PATCH /bookings/:id` treats `passengers[]` as the
-      // complete desired end state — a stored passenger omitted from the array is DELETED, and an
-      // entry with no `id` is indistinguishable from "start fresh". Submitting the id-less VOID
+      // invoice has no stored passengers yet, so it needs a dummy row to satisfy that. It carries no
+      // payment — a voided placeholder is just a name+amount stand-in, nothing was ever paid on it.
+      // In EDIT mode there ARE stored passengers, and `PATCH /bookings/:id` treats `passengers[]` as
+      // the complete desired end state — a stored passenger omitted from the array is DELETED, and
+      // an entry with no `id` is indistinguishable from "start fresh". Submitting the id-less VOID
       // placeholder here would delete every real passenger on the invoice. `voided` only relaxes
       // the backend's pnr/airlineCode requirement; it does not require a dummy passenger, so in
-      // edit mode we send the stored rows with their ids, exactly like the non-voided path — don't
-      // collapse these two branches back together.
+      // edit mode we send the stored rows with their ids (and their own payment/remark), exactly
+      // like the non-voided path — don't collapse these two branches back together.
       passengers:
         form.voided && !initial
           ? [{ passengerName: 'VOID', amount: 0 }]
-          : storedRows.map<UpdatePassengerInput>((p) => ({
-              // A row with no id is a passenger the user just added — the backend creates it.
-              ...(p.id ? { id: p.id } : {}),
-              passengerName: p.name,
-              amount: Number(p.amount),
-              ...(p.customer ? { customer: p.customer } : {}),
-            })),
+          : storedRows.map<UpdatePassengerInput>((p) => {
+              // In shared mode every passenger takes the one shared payment/remark; otherwise each
+              // takes its own row values.
+              const status = shareAll ? shared.paymentStatus : p.paymentStatus;
+              const type = shareAll ? shared.paymentType : p.paymentType;
+              const remark = shareAll ? shared.remark : p.remark;
+              const paidOn = shareAll ? shared.paidOn : p.paidOn;
+              // Paid => owes 0. Pending: shared mode has no amount field, so each passenger owes its
+              // OWN full ticket amount (cap-safe: owed == own amount); per-passenger mode uses the
+              // row's entered "amount owed".
+              const owed = status !== 'pending' ? 0 : shareAll ? Number(p.amount) : Number(p.pendingAmount);
+              return {
+                // A row with no id is a passenger the user just added — the backend creates it.
+                ...(p.id ? { id: p.id } : {}),
+                passengerName: p.name,
+                amount: Number(p.amount),
+                ...(p.customer ? { customer: p.customer } : {}),
+                remark: remark || undefined,
+                payment: {
+                  status,
+                  type,
+                  amount: owed,
+                  // Round-tripped invisibly (no "paid on" control here). On CREATE it is always ''
+                  // => undefined => absent, matching prior behavior. On a stored row/edit it carries
+                  // through whatever record-payment-dialog.tsx set, so saving an unrelated field
+                  // doesn't erase it via the wholesale PATCH.
+                  paidOn: paidOn || undefined,
+                },
+              };
+            }),
     });
+  }
+
+  /** Toggle the shared-payment checkbox. Checking adopts passenger 1's payment/remark as the shared
+   * values (applied to everyone on save). Unchecking seeds every passenger row from the shared
+   * values (all rows start identical; the user then differentiates) — a pending row is seeded with
+   * its OWN full ticket amount, matching what shared mode would have submitted. */
+  function toggleShareAll(checked: boolean) {
+    if (checked) {
+      const first = passengers[0];
+      setShared({
+        paymentStatus: first.paymentStatus,
+        paymentType: first.paymentType,
+        paidOn: first.paidOn,
+        remark: first.remark,
+      });
+    } else {
+      setPassengers((rows) =>
+        rows.map((row) => ({
+          ...row,
+          paymentStatus: shared.paymentStatus,
+          paymentType: shared.paymentType,
+          paidOn: shared.paidOn,
+          remark: shared.remark,
+          pendingAmount: shared.paymentStatus === 'pending' ? row.amount : row.pendingAmount,
+        }))
+      );
+    }
+    setShareAll(checked);
   }
 
   return (
@@ -295,7 +394,19 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
           VOID passenger is submitted instead, since the backend requires ≥1 passenger). */}
       {!form.voided && (
       <div className="space-y-2 rounded-md border p-3">
-        <p className="text-sm font-medium">Passengers<RequiredMark /></p>
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium">Passengers<RequiredMark /></p>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="booking-share-payment"
+              checked={shareAll}
+              onCheckedChange={(checked) => toggleShareAll(checked === true)}
+            />
+            <Label htmlFor="booking-share-payment" className="font-normal">
+              Same payment &amp; remark for all passengers
+            </Label>
+          </div>
+        </div>
         {passengers.map((passenger, index) => {
           const nameLabel = index === 0 ? 'Passenger name' : `Passenger name ${index + 1}`;
           const searching = search?.index === index;
@@ -306,8 +417,13 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
               : passenger.name.trim().length > 0
                 ? 'unlinked'
                 : 'search';
+          const paymentStatusLabel = index === 0 ? 'Payment status' : `Payment status ${index + 1}`;
+          const paymentTypeLabel = index === 0 ? 'Payment type' : `Payment type ${index + 1}`;
+          const pendingAmountLabel = index === 0 ? 'Amount owed' : `Amount owed ${index + 1}`;
+          const remarkLabel = index === 0 ? 'Remark' : `Remark ${index + 1}`;
           return (
-          <div key={index} className="flex items-start gap-2">
+          <div key={index} className="space-y-2 rounded-md border p-2">
+          <div className="flex items-start gap-2">
             <div className="relative flex-1">
               {mode === 'selected' && (
                 <div className="flex items-center gap-2">
@@ -445,21 +561,155 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
               <X className="h-4 w-4" />
             </Button>
           </div>
+          {/* Row: Payment Status | Payment Type (Paid only) / Amount owed (Pending only) | Remark —
+              per-passenger, rendered only when NOT sharing one payment/remark across all passengers
+              (see the shared block below). */}
+          {!shareAll && (
+          <div className="grid grid-cols-12 gap-2">
+            <div className="col-span-3 space-y-1">
+              <Label className="text-xs font-normal text-muted-foreground">{paymentStatusLabel}</Label>
+              <Select
+                value={passenger.paymentStatus}
+                onValueChange={(v) => updatePassenger(index, { paymentStatus: v as 'paid' | 'pending' })}
+              >
+                <SelectTrigger aria-label={paymentStatusLabel} className="h-9 w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="paid">Paid</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {passenger.paymentStatus === 'paid' && (
+              <div className="col-span-3 space-y-1">
+                <Label className="text-xs font-normal text-muted-foreground">{paymentTypeLabel}</Label>
+                <Select
+                  value={passenger.paymentType}
+                  onValueChange={(v) => updatePassenger(index, { paymentType: v as 'card' | 'check' | 'cash' })}
+                >
+                  <SelectTrigger aria-label={paymentTypeLabel} className="h-9 w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="card">Card</SelectItem>
+                    <SelectItem value="check">Check</SelectItem>
+                    <SelectItem value="cash">Cash</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {passenger.paymentStatus === 'pending' && (
+              <div className="col-span-3 space-y-1">
+                <Label htmlFor={`passenger-pending-amount-${index}`} required className="text-xs font-normal">
+                  {pendingAmountLabel}
+                </Label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-foreground">
+                    $
+                  </span>
+                  <Input
+                    id={`passenger-pending-amount-${index}`}
+                    aria-label={pendingAmountLabel}
+                    type="number"
+                    className="h-9 pl-6"
+                    value={passenger.pendingAmount}
+                    onChange={(e) => updatePassenger(index, { pendingAmount: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+            )}
+            <div className="col-span-6 space-y-1">
+              <Label htmlFor={`passenger-remark-${index}`} className="text-xs font-normal text-muted-foreground">
+                {remarkLabel}
+              </Label>
+              <IconInput
+                id={`passenger-remark-${index}`}
+                aria-label={remarkLabel}
+                icon={<StickyNote />}
+                value={passenger.remark}
+                onChange={(e) => updatePassenger(index, { remark: e.target.value })}
+                placeholder="Optional note"
+              />
+            </div>
+          </div>
+          )}
+          </div>
           );
         })}
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          onClick={() => {
-            // Reset the submit-attempt flag so a fresh blank row doesn't inherit the red
-            // "Select a customer" alert from a previous failed submit before it's even been used.
-            setLinkAttempted(false);
-            setPassengers((rows) => [...rows, { ...EMPTY_PASSENGER }]);
-          }}
-        >
-          Add passenger
-        </Button>
+        {/* Shared payment/remark: one block applied to every passenger. Pending has NO amount field
+            here — each passenger owes its own full ticket amount (see handleSubmit). */}
+        {shareAll && (
+          <div className="grid grid-cols-12 gap-2 rounded-md border p-2">
+            <div className="col-span-3 space-y-1">
+              <Label className="text-xs font-normal text-muted-foreground">Payment status</Label>
+              <Select
+                value={shared.paymentStatus}
+                onValueChange={(v) => setShared({ ...shared, paymentStatus: v as 'paid' | 'pending' })}
+              >
+                <SelectTrigger aria-label="Payment status" className="h-9 w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="paid">Paid</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {shared.paymentStatus === 'paid' && (
+              <div className="col-span-3 space-y-1">
+                <Label className="text-xs font-normal text-muted-foreground">Payment type</Label>
+                <Select
+                  value={shared.paymentType}
+                  onValueChange={(v) => setShared({ ...shared, paymentType: v as 'card' | 'check' | 'cash' })}
+                >
+                  <SelectTrigger aria-label="Payment type" className="h-9 w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="card">Card</SelectItem>
+                    <SelectItem value="check">Check</SelectItem>
+                    <SelectItem value="cash">Cash</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className={cn('space-y-1', shared.paymentStatus === 'paid' ? 'col-span-6' : 'col-span-9')}>
+              <Label htmlFor="booking-shared-remark" className="text-xs font-normal text-muted-foreground">
+                Remark
+              </Label>
+              <IconInput
+                id="booking-shared-remark"
+                aria-label="Remark"
+                icon={<StickyNote />}
+                value={shared.remark}
+                onChange={(e) => setShared({ ...shared, remark: e.target.value })}
+                placeholder="Optional note"
+              />
+            </div>
+            {shared.paymentStatus === 'pending' && (
+              <p className="col-span-12 text-xs text-muted-foreground">
+                Each passenger owes their full ticket amount.
+              </p>
+            )}
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              // Reset the submit-attempt flag so a fresh blank row doesn't inherit the red
+              // "Select a customer" alert from a previous failed submit before it's even been used.
+              setLinkAttempted(false);
+              setPassengers((rows) => [...rows, { ...EMPTY_PASSENGER }]);
+            }}
+          >
+            Add passenger
+          </Button>
+        </div>
       </div>
       )}
 
@@ -555,75 +805,6 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
         </>
       )}
 
-      {/* Row: Remark */}
-      <div className="space-y-1">
-        <Label htmlFor="booking-remark">Remark</Label>
-        <IconInput
-          id="booking-remark"
-          icon={<StickyNote />}
-          value={form.remark}
-          onChange={(e) => setForm({ ...form, remark: e.target.value })}
-          placeholder={form.voided ? 'e.g. VOID' : 'Optional note'}
-        />
-      </div>
-
-      {/* Row: Payment Status | Payment Type (Paid only) | Pending Amount (Pending only) */}
-      {!form.voided && (
-        <div className="grid grid-cols-3 gap-3">
-          <div className="space-y-1">
-            <Label>Payment Status</Label>
-            <Select
-              value={form.paymentStatus}
-              onValueChange={(v) => setForm({ ...form, paymentStatus: v as 'paid' | 'pending' })}
-            >
-              <SelectTrigger aria-label="Payment status" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="paid">Paid</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {form.paymentStatus === 'paid' && (
-            <div className="space-y-1">
-              <Label>Payment Type</Label>
-              <Select
-                value={form.paymentType}
-                onValueChange={(v) => setForm({ ...form, paymentType: v as 'card' | 'check' | 'cash' })}
-              >
-                <SelectTrigger aria-label="Payment type" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="card">Card</SelectItem>
-                  <SelectItem value="check">Check</SelectItem>
-                  <SelectItem value="cash">Cash</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-          {form.paymentStatus === 'pending' && (
-            <div className="space-y-1">
-              <Label htmlFor="booking-pending-amount" required>Pending Amount</Label>
-              <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-foreground">
-                  $
-                </span>
-                <Input
-                  id="booking-pending-amount"
-                  aria-label="Amount owed"
-                  type="number"
-                  className="pl-6"
-                  value={form.pendingAmount}
-                  onChange={(e) => setForm({ ...form, pendingAmount: e.target.value })}
-                  required
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      )}
       {pendingDuplicate && (
         <div className="rounded-md border border-amber-500/50 bg-amber-50 p-3 text-sm dark:bg-amber-950/30">
           <p className="font-medium">

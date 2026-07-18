@@ -1,4 +1,5 @@
 import { ChangeEvent, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -57,6 +58,7 @@ interface CustomerImportWizardProps {
 }
 
 export default function CustomerImportWizard({ onClose }: CustomerImportWizardProps) {
+  const queryClient = useQueryClient();
   const [headers, setHeaders] = useState<string[]>([]);
   const [rawRows, setRawRows] = useState<string[][]>([]);
   const [mapping, setMapping] = useState<ColumnMapping>({});
@@ -105,6 +107,8 @@ export default function CustomerImportWizard({ onClose }: CustomerImportWizardPr
       const results = await importCustomers(rows, false);
       setReport(results);
       setCommitted(true);
+      // Refresh the Customers list so imported rows appear without a manual page reload.
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
     } catch {
       setError('Import request failed. Check your connection and try again.');
     } finally {

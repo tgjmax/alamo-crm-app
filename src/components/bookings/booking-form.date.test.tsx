@@ -38,10 +38,10 @@ const EXISTING_BOOKING: BookingDetail = {
     arrCity: 'COK',
     depDate: '2026-01-10',
     arrDate: '2026-01-20',
-    remark: '',
-    payment: { status: 'paid', type: 'card', amount: 0 },
   },
-  passengers: [{ id: 'p1', passengerName: 'John Smith', amount: 500, customer: 'c1' }],
+  passengers: [
+    { id: 'p1', passengerName: 'John Smith', amount: 500, customer: 'c1', payment: { status: 'paid', type: 'card', amount: 0 } },
+  ],
 };
 
 const TODAY = new Date().toISOString().slice(0, 10);
@@ -214,7 +214,10 @@ describe('BookingForm booking date', () => {
     await waitFor(() => expect(createBooking).toHaveBeenCalledTimes(1));
     const input = vi.mocked(createBooking).mock.calls[0][0];
     // Linking a customer stores the ticketing name (LastName/GivenName), not the dropdown label.
-    expect(input.passengers).toEqual([{ passengerName: 'Smith/Jane', amount: 700, customer: 'c1' }]);
+    // Every submitted passenger carries its own (here, default) payment object.
+    expect(input.passengers).toEqual([
+      { passengerName: 'Smith/Jane', amount: 700, customer: 'c1', payment: { status: 'paid', type: 'card', amount: 0 } },
+    ]);
   });
 
   it('clears the pending "select a customer" alert when a new passenger row is added', async () => {

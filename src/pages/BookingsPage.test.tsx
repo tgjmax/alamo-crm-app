@@ -264,8 +264,11 @@ describe('BookingsPage', () => {
           airlineCode: 'QR',
           depCity: 'DXB',
           arrCity: 'COK',
-          // Linked name is `lastName/givenName`.
-          passengers: [{ passengerName: 'Pax/New', amount: 500, customer: 'c1' }],
+          // Linked name is `lastName/givenName`. Every submitted passenger now carries its own
+          // (here, default) payment object.
+          passengers: [
+            { passengerName: 'Pax/New', amount: 500, customer: 'c1', payment: { status: 'paid', type: 'card', amount: 0 } },
+          ],
         })
       );
     });
@@ -320,8 +323,8 @@ describe('BookingsPage', () => {
     await waitFor(() => {
       const [firstCallArgs] = vi.mocked(bookingsApi.createBooking).mock.calls[0];
       expect(firstCallArgs.passengers).toEqual([
-        { passengerName: 'Joseph/Shiny', amount: 2400, customer: 'c1' },
-        { passengerName: 'Joseph/Anton', amount: 1800, customer: 'c2' },
+        { passengerName: 'Joseph/Shiny', amount: 2400, customer: 'c1', payment: { status: 'paid', type: 'card', amount: 0 } },
+        { passengerName: 'Joseph/Anton', amount: 1800, customer: 'c2', payment: { status: 'paid', type: 'card', amount: 0 } },
       ]);
     });
   });
@@ -342,7 +345,7 @@ describe('BookingsPage', () => {
     expect(screen.queryByLabelText('Passenger name 2')).not.toBeInTheDocument();
   });
 
-  it('requires and submits an Amount owed value when Payment status is Pending', async () => {
+  it('submits a per-passenger Amount owed when "same for all" is unchecked and status is Pending', async () => {
     vi.spyOn(bookingsApi, 'createBooking').mockResolvedValue({
       id: 'b4',
       invoiceNumber: '0000202',
@@ -360,6 +363,9 @@ describe('BookingsPage', () => {
     await userEvent.type(screen.getByLabelText('Arrival Date'), '2026-06-10');
     await linkPassenger('Passenger name', { id: 'c1', firstName: 'Pend', lastName: 'Pax', phone: '5', dob: '02-Sep-1953' });
     await userEvent.type(screen.getByLabelText('Amount'), '500');
+    // The default is shared mode (no per-passenger amount field); uncheck to expose it, then set a
+    // partial balance ($200 of the $500 ticket) that only per-passenger mode can represent.
+    await userEvent.click(screen.getByRole('checkbox', { name: /same payment & remark for all passengers/i }));
     await userEvent.click(screen.getByRole('combobox', { name: 'Payment status' }));
     await userEvent.click(await screen.findByRole('option', { name: 'Pending' }));
     await userEvent.type(screen.getByLabelText('Amount owed'), '200');
@@ -368,7 +374,9 @@ describe('BookingsPage', () => {
     await waitFor(() => {
       expect(bookingsApi.createBooking).toHaveBeenCalled();
       const [firstCallArgs] = vi.mocked(bookingsApi.createBooking).mock.calls[0];
-      expect(firstCallArgs.payment).toEqual({ status: 'pending', type: 'card', amount: 200 });
+      // Payment lives on the passenger; per-passenger mode submits the entered partial balance.
+      const passengers = firstCallArgs.passengers;
+      expect(passengers[0].payment).toEqual({ status: 'pending', type: 'card', amount: 200 });
     });
   });
 
@@ -396,7 +404,8 @@ describe('BookingsPage', () => {
     await waitFor(() => {
       expect(bookingsApi.createBooking).toHaveBeenCalled();
       const [firstCallArgs] = vi.mocked(bookingsApi.createBooking).mock.calls[0];
-      expect(firstCallArgs.payment).toEqual({ status: 'paid', type: 'card', amount: 0 });
+      const passengers = firstCallArgs.passengers;
+      expect(passengers[0].payment).toEqual({ status: 'paid', type: 'card', amount: 0 });
     });
   });
 
@@ -457,7 +466,9 @@ describe('BookingsPage', () => {
           arrCity: undefined,
           depDate: undefined,
           arrDate: undefined,
-          payment: undefined,
+          // The VOID placeholder carries no payment (nothing was ever paid on it) and no
+          // `payment` key exists on the top-level payload at all any more — payment lives on
+          // each passenger now.
           passengers: [{ passengerName: 'VOID', amount: 0 }],
         })
       );
@@ -697,12 +708,12 @@ describe('BookingsPage', () => {
       useAuthStore.setState({ accessToken: null, user: null });
     });
 
-    it('shows Record Payment only on pending rows, and routes a New row to the booking payment endpoint', async () => {
+    it('shows Record Payment only on pending rows, and routes a New row to the passenger payment endpoint', async () => {
       vi.spyOn(bookingsApi, 'listBookings').mockResolvedValue({
         bookings: [{ ...BASE_ROW, id: 'p8', paymentStatus: 'pending', paymentAmount: 150, bookingType: 'New', bookingId: 'bk1' }],
         total: 1, page: 1, pageSize: 25,
       });
-      const updateSpy = vi.spyOn(bookingsApi, 'updateBookingPayment').mockResolvedValue(undefined);
+      const updateSpy = vi.spyOn(bookingsApi, 'updatePassengerPayment').mockResolvedValue(undefined);
       renderWithClient(<BookingsPage />);
 
       await screen.findByText('0000150');
@@ -713,7 +724,7 @@ describe('BookingsPage', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Save payment' }));
 
       await waitFor(() => {
-        expect(updateSpy).toHaveBeenCalledWith('bk1', { status: 'pending', type: 'card', amount: 50 });
+        expect(updateSpy).toHaveBeenCalledWith('p8', { status: 'pending', type: 'card', amount: 50 });
       });
     });
 
@@ -754,7 +765,7 @@ describe('BookingsPage', () => {
         }],
         total: 1, page: 1, pageSize: 25,
       });
-      const updateSpy = vi.spyOn(bookingsApi, 'updateBookingPayment').mockResolvedValue(undefined);
+      const updateSpy = vi.spyOn(bookingsApi, 'updatePassengerPayment').mockResolvedValue(undefined);
       renderWithClient(<BookingsPage />);
 
       await screen.findByText('0000150');
@@ -769,7 +780,7 @@ describe('BookingsPage', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Save payment' }));
 
       await waitFor(() => {
-        expect(updateSpy).toHaveBeenCalledWith('bk1', { status: 'pending', type: 'check', amount: 150, paidOn: '2026-05-01' });
+        expect(updateSpy).toHaveBeenCalledWith('p10', { status: 'pending', type: 'check', amount: 150, paidOn: '2026-05-01' });
       });
     });
 

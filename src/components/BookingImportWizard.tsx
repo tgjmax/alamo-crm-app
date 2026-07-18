@@ -1,4 +1,5 @@
 import { ChangeEvent, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -30,6 +31,8 @@ const TARGET_FIELDS: TargetField[] = [
   { key: 'arrDate', label: 'Arr Date' },
   { key: 'remark', label: 'Remark' },
   { key: 'pendingAmount', label: 'Pending Amount' },
+  { key: 'paymentStatus', label: 'Payment Status' },
+  { key: 'paymentType', label: 'Payment Type' },
 ];
 
 const BLANK_AMOUNT_VALUES = new Set(['', 'null', '--']);
@@ -86,6 +89,10 @@ function buildRows(headers: string[], rawRows: string[][], mapping: ColumnMappin
       arrDate: get('arrDate'),
       remark: get('remark'),
       pendingAmount: parseAmount(get('pendingAmount')),
+      // Raw per-row status/type text; the backend parses tolerantly and falls back to the batch
+      // payment default when blank/unmapped/unrecognized.
+      paymentStatus: get('paymentStatus'),
+      paymentType: get('paymentType'),
     };
   });
 }
@@ -95,6 +102,7 @@ interface BookingImportWizardProps {
 }
 
 export default function BookingImportWizard({ onClose }: BookingImportWizardProps) {
+  const queryClient = useQueryClient();
   const [headers, setHeaders] = useState<string[]>([]);
   const [rawRows, setRawRows] = useState<string[][]>([]);
   const [mapping, setMapping] = useState<ColumnMapping>({});
@@ -141,6 +149,10 @@ export default function BookingImportWizard({ onClose }: BookingImportWizardProp
       const results = await importBookings(rows, paymentDefault, false);
       setReport(results);
       setCommitted(true);
+      // The Bookings/Sales tables cache their list queries under these prefixes; without this the
+      // freshly-imported rows don't appear until a manual page refresh.
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['sales'] });
     } catch {
       setError('Import request failed. Check your connection and try again.');
     } finally {
