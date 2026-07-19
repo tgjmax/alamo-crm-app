@@ -43,6 +43,13 @@ export function canSendQuotes(user: AuthUser | null): boolean {
   return isAdminOrAbove(user) || Boolean(user?.permissions?.enquiries.sendQuote);
 }
 
+/** Gates every affordance that issues PATCH /api/enquiries/:id — the Edit dialog, the status
+ *  picker, and the fare-option add/edit/remove controls. Mirrors the backend's
+ *  `enquiries.edit` gate (enquiry.routes.ts). */
+export function canEditEnquiries(user: AuthUser | null): boolean {
+  return isAdminOrAbove(user) || Boolean(user?.permissions?.enquiries.edit);
+}
+
 export function canDeleteEnquiries(user: AuthUser | null): boolean {
   return isAdminOrAbove(user) || Boolean(user?.permissions?.enquiries.delete);
 }

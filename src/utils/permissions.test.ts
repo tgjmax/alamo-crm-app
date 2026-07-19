@@ -3,7 +3,7 @@ import {
   canViewSalesReports, canEditBookings, canDeleteBookings, canEditOrganization,
   isAdminOrAbove, canManageUsers, canImportExport,
   canCreateBookings, canCreateAdjustments, canCreateCustomers, canEditCustomers, canDeleteCustomers,
-  canSendInvoices, canSendQuotes, canResetPasswordOf, canViewAudit, canViewUserHistory,
+  canSendInvoices, canSendQuotes, canEditEnquiries, canResetPasswordOf, canViewAudit, canViewUserHistory,
 } from './permissions';
 import { AuthUser } from '../stores/authStore';
 
@@ -11,7 +11,7 @@ const AGENT_PERMISSIONS_BASE = {
   bookings: { create: false, edit: false, delete: false, createAdjustment: false, viewAll: false, import: false, export: false, sendInvoice: false },
   customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
   groups: { createShared: false },
-  enquiries: { sendQuote: false, delete: false },
+  enquiries: { sendQuote: false, edit: false, delete: false },
 };
 
 function agent(overrides: Partial<AuthUser['permissions']> = {}): AuthUser {
@@ -25,7 +25,7 @@ function agent(overrides: Partial<AuthUser['permissions']> = {}): AuthUser {
       customers: { create: true, edit: false, delete: false, viewPassport: false, import: false, export: false },
       groups: { createShared: false },
       data: { viewReports: false },
-      enquiries: { sendQuote: false, delete: false },
+      enquiries: { sendQuote: false, edit: false, delete: false },
       ...overrides,
     },
   } as AuthUser;
@@ -261,7 +261,7 @@ describe('canImportExport', () => {
         customers: { create: true, edit: true, delete: true, viewPassport: true, import: false, export: true },
         groups: { createShared: true },
         data: { viewReports: true },
-        enquiries: { sendQuote: false, delete: false },
+        enquiries: { sendQuote: false, edit: false, delete: false },
       },
     };
     expect(canImportExport(granted, 'customers', 'export')).toBe(true);
@@ -331,7 +331,7 @@ describe('canResetPasswordOf', () => {
         customers: { create: true, edit: true, delete: true, viewPassport: true, import: false, export: true },
         groups: { createShared: true },
         data: { viewReports: true },
-        enquiries: { sendQuote: false, delete: false },
+        enquiries: { sendQuote: false, edit: false, delete: false },
       },
     };
     expect(canResetPasswordOf(grantedAdmin, { role: 'agent', permissions: PRIVILEGED_AGENT_PERMS })).toBe(true);
@@ -358,11 +358,34 @@ describe('canSendQuotes', () => {
   });
 
   it('is true for an agent with enquiries.sendQuote', () => {
-    expect(canSendQuotes(agent({ enquiries: { sendQuote: true, delete: true } }))).toBe(true);
+    expect(canSendQuotes(agent({ enquiries: { sendQuote: true, edit: true, delete: true } }))).toBe(true);
   });
 
   it('is false for a null user', () => {
     expect(canSendQuotes(null)).toBe(false);
+  });
+});
+
+describe('canEditEnquiries', () => {
+  it('is true for a superadmin and an admin regardless of permissions', () => {
+    expect(canEditEnquiries(SUPER)).toBe(true);
+    expect(canEditEnquiries(ADMIN)).toBe(true);
+  });
+
+  it('is false for an agent without enquiries.edit', () => {
+    expect(canEditEnquiries(agent())).toBe(false);
+  });
+
+  it('is true for an agent with enquiries.edit', () => {
+    expect(canEditEnquiries(agent({ enquiries: { sendQuote: false, edit: true, delete: false } }))).toBe(true);
+  });
+
+  it('is not implied by enquiries.delete', () => {
+    expect(canEditEnquiries(agent({ enquiries: { sendQuote: false, edit: false, delete: true } }))).toBe(false);
+  });
+
+  it('is false for a null user', () => {
+    expect(canEditEnquiries(null)).toBe(false);
   });
 });
 

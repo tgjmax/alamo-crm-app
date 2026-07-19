@@ -70,7 +70,7 @@ const DELETER = {
     customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
     groups: { createShared: false },
     data: { viewReports: false },
-    enquiries: { sendQuote: false, delete: true },
+    enquiries: { sendQuote: false, edit: true, delete: true },
   },
 };
 
@@ -81,6 +81,10 @@ describe('EnquiryDetailPage', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // The edit affordances (status picker, fare-option add/edit/remove, Edit button) are gated
+    // by `enquiries.edit`, so the default here must hold it or those tests render nothing to
+    // drive. Tests asserting a NARROWER permission set still override this explicitly.
+    useAuthStore.setState({ accessToken: 't', user: DELETER });
     vi.spyOn(enquiriesApi, 'getEnquiry').mockResolvedValue(ENQUIRY);
     vi.spyOn(flightDataApi, 'searchAirports').mockResolvedValue([]);
     vi.spyOn(flightDataApi, 'searchAirlines').mockResolvedValue([]);
@@ -215,7 +219,7 @@ describe('EnquiryDetailPage', () => {
     // Deleting an enquiry used to be ungated, so any authenticated user could destroy one.
     useAuthStore.setState({
       accessToken: 't',
-      user: { ...DELETER, permissions: { ...DELETER.permissions, enquiries: { sendQuote: false, delete: false } } },
+      user: { ...DELETER, permissions: { ...DELETER.permissions, enquiries: { sendQuote: false, edit: true, delete: false } } },
     });
     renderWithClient(<EnquiryDetailPage />);
     await screen.findByText('Johny Smith');
@@ -261,7 +265,7 @@ describe('EnquiryDetailPage', () => {
         customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
         groups: { createShared: false },
         data: { viewReports: false },
-        enquiries: { sendQuote: false, delete: false },
+        enquiries: { sendQuote: false, edit: false, delete: false },
       },
     };
     const AGENT_WITH_SEND_QUOTE = {
@@ -269,7 +273,7 @@ describe('EnquiryDetailPage', () => {
       id: 'u3',
       permissions: {
         ...AGENT_NO_SEND_QUOTE.permissions,
-        enquiries: { sendQuote: true, delete: true },
+        enquiries: { sendQuote: true, edit: true, delete: true },
       },
     };
 

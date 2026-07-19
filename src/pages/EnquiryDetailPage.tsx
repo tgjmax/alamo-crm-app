@@ -24,7 +24,7 @@ import { FareOptionDialog } from '@/components/enquiries/fare-option-dialog';
 import { SendQuoteDialog } from '@/components/enquiries/send-quote-dialog';
 import { AuditHistoryPanel } from '@/components/audit/audit-history-panel';
 import { useAuthStore } from '@/stores/authStore';
-import { canDeleteEnquiries, canSendQuotes, canViewAudit } from '@/utils/permissions';
+import { canDeleteEnquiries, canEditEnquiries, canSendQuotes, canViewAudit } from '@/utils/permissions';
 import { formatDisplayDate } from '@/utils/dateFormat';
 import { farePriceSummary, formatItinerary, formatPax, formatSegmentDates } from '@/utils/tripFormat';
 
@@ -35,6 +35,10 @@ export default function EnquiryDetailPage() {
   const user = useAuthStore((s) => s.user);
   const canSendQuote = canSendQuotes(user);
   const canDeleteEnquiry = canDeleteEnquiries(user);
+  // Every control below that mutates the enquiry issues the SAME PATCH /api/enquiries/:id,
+  // which is gated by `enquiries.edit` server-side — so they share one gate here rather than
+  // each growing its own. Hidden, not disabled: a control that can only ever 403 is a dead end.
+  const canEditEnquiry = canEditEnquiries(user);
   const canViewHistory = canViewAudit(user);
 
   const [showEdit, setShowEdit] = useState(false);
@@ -109,34 +113,45 @@ export default function EnquiryDetailPage() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-2xl font-bold tracking-tight">Enquiry — {enquiry.enquirer.name}</h2>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2">
-            <Label>Status</Label>
-            <Select
-              value={enquiry.status}
-              onValueChange={(v) => updateMutation.mutate({ status: v as EnquiryStatus })}
+          {canEditEnquiry ? (
+            <div className="flex items-center gap-2">
+              <Label>Status</Label>
+              <Select
+                value={enquiry.status}
+                onValueChange={(v) => updateMutation.mutate({ status: v as EnquiryStatus })}
+              >
+                <SelectTrigger aria-label="Status" className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ENQUIRY_STATUSES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {s}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            // Read-only fallback: the status is still worth SEEING without the ability to change
+            // it — dropping it entirely would hide information a viewer legitimately needs.
+            <div className="flex items-center gap-2">
+              <Label>Status</Label>
+              <EnquiryStatusBadge status={enquiry.status} />
+            </div>
+          )}
+          {canEditEnquiry && (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              aria-label="Edit"
+              title="Edit"
+              onClick={() => setShowEdit(true)}
             >
-              <SelectTrigger aria-label="Status" className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ENQUIRY_STATUSES.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            aria-label="Edit"
-            title="Edit"
-            onClick={() => setShowEdit(true)}
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
+              <Pencil className="h-4 w-4" />
+            </Button>
+          )}
           {canDeleteEnquiry && (
             <Button
               type="button"
@@ -252,29 +267,31 @@ export default function EnquiryDetailPage() {
                   Option {index + 1}: {option.airlineName}
                   {option.airlineCode && ` (${option.airlineCode})`} — {farePriceSummary(option)}
                 </p>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    aria-label={`Edit option ${index + 1}`}
-                    title="Edit"
-                    onClick={() => setOptionDialog({ open: true, index })}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    aria-label={`Remove option ${index + 1}`}
-                    title="Remove"
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => removeOption(index)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+                {canEditEnquiry && (
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      aria-label={`Edit option ${index + 1}`}
+                      title="Edit"
+                      onClick={() => setOptionDialog({ open: true, index })}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      aria-label={`Remove option ${index + 1}`}
+                      title="Remove"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => removeOption(index)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
               <div className="mt-2 space-y-1 text-muted-foreground">
                 {option.segments.map((segment, i) => (
@@ -289,9 +306,11 @@ export default function EnquiryDetailPage() {
               </div>
             </div>
           ))}
-          <Button type="button" variant="secondary" size="sm" onClick={() => setOptionDialog({ open: true, index: null })}>
-            Add fare option
-          </Button>
+          {canEditEnquiry && (
+            <Button type="button" variant="secondary" size="sm" onClick={() => setOptionDialog({ open: true, index: null })}>
+              Add fare option
+            </Button>
+          )}
         </CardContent>
       </Card>
 

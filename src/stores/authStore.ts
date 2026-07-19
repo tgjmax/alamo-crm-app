@@ -11,7 +11,7 @@ export interface UserPermissions {
   };
   groups: { createShared: boolean };
   data: { viewReports: boolean };
-  enquiries: { sendQuote: boolean; delete: boolean };
+  enquiries: { sendQuote: boolean; edit: boolean; delete: boolean };
 }
 
 export type UserRole = 'superadmin' | 'admin' | 'agent';

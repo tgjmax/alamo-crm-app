@@ -37,6 +37,7 @@ const ALL_TOGGLES: Toggle[] = [
   { module: 'groups', action: 'createShared', label: 'Create shared groups' },
   { module: 'data', action: 'viewReports', label: 'View sales reports' },
   { module: 'enquiries', action: 'sendQuote', label: 'Send quotes to customers' },
+  { module: 'enquiries', action: 'edit', label: 'Edit enquiries' },
   { module: 'enquiries', action: 'delete', label: 'Delete enquiries' },
 ];
 

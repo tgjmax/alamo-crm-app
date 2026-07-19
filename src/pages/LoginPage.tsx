@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PasswordInput } from '@/components/password-input';
-import { useBranding } from '@/hooks/useBranding';
+import { useQueryClient } from '@tanstack/react-query';
+import { useBranding, BRANDING_QUERY_KEY } from '@/hooks/useBranding';
 import { loginRequest } from '../api/auth.api';
 import { useAuthStore } from '../stores/authStore';
 import { errorMessage } from '@/utils/apiError';
@@ -17,6 +18,7 @@ export default function LoginPage() {
   const setSession = useAuthStore((s) => s.setSession);
   const router = useRouter();
   const branding = useBranding();
+  const queryClient = useQueryClient();
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -24,6 +26,12 @@ export default function LoginPage() {
     try {
       const { accessToken, user } = await loginRequest(email, password);
       setSession(accessToken, user);
+      // The branding cached while this page was anonymous is deliberately incomplete — the API
+      // withholds `invoiceTerms` from callers with no token. Without this the terms-less copy
+      // would satisfy `useBranding` for its full 4-minute staleTime, long enough for the
+      // send-invoice dialog to open with empty terms. Must run AFTER setSession so the refetch
+      // carries the new access token.
+      await queryClient.invalidateQueries({ queryKey: BRANDING_QUERY_KEY });
       await router.navigate({ to: '/dashboard' });
     } catch (err) {
       // Surface the server's own message — it distinguishes a bad password (401

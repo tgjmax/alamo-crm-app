@@ -17,7 +17,7 @@ const BASE_PERMISSIONS = {
   customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
   groups: { createShared: false },
   data: { viewReports: false },
-  enquiries: { sendQuote: false, delete: false },
+  enquiries: { sendQuote: false, edit: false, delete: false },
 };
 
 function user(role: ManagedUser['role']): ManagedUser {
@@ -80,7 +80,7 @@ describe('UserPermissionsDialog', () => {
           },
           groups: { createShared: false },
           data: { viewReports: false },
-          enquiries: { sendQuote: false, delete: false },
+          enquiries: { sendQuote: false, edit: false, delete: false },
         },
       })
     );
@@ -94,8 +94,8 @@ describe('UserPermissionsDialog', () => {
     expect(screen.getByLabelText('View sales reports')).toBeInTheDocument();
     expect(screen.getByLabelText('Send invoices to customers')).toBeInTheDocument();
     expect(screen.getByLabelText('Send quotes to customers')).toBeInTheDocument();
-    // 15 pre-existing + sendQuote + enquiries.delete = 18.
-    expect(screen.getAllByRole('checkbox')).toHaveLength(18);
+    // 15 pre-existing + sendQuote + enquiries.edit + enquiries.delete = 19.
+    expect(screen.getAllByRole('checkbox')).toHaveLength(19);
   });
 
   it('shows ONLY the four import/export toggles for an admin — NOT the two new send toggles', () => {
@@ -152,7 +152,7 @@ describe('UserPermissionsDialog', () => {
         customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
         groups: { createShared: false },
         data: { viewReports: false },
-        enquiries: { sendQuote: false, delete: false },
+        enquiries: { sendQuote: false, edit: false, delete: false },
       },
     };
     useAuthStore.setState({ user: adminNoExport });
@@ -176,7 +176,7 @@ describe('UserPermissionsDialog', () => {
         customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: true },
         groups: { createShared: false },
         data: { viewReports: false },
-        enquiries: { sendQuote: false, delete: false },
+        enquiries: { sendQuote: false, edit: false, delete: false },
       },
     };
     useAuthStore.setState({ user: adminWithExport });

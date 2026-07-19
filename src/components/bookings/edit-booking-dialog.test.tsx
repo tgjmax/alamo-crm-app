@@ -27,7 +27,7 @@ const AGENT_PERMISSIONS: UserPermissions = {
   customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
   groups: { createShared: false },
   data: { viewReports: false },
-  enquiries: { sendQuote: false, delete: false },
+  enquiries: { sendQuote: false, edit: false, delete: false },
 };
 
 const DETAIL: bookingsApi.BookingDetail = {

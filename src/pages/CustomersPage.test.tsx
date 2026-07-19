@@ -212,7 +212,7 @@ describe('CustomersPage', () => {
           customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
           groups: { createShared: false },
           data: { viewReports: false },
-          enquiries: { sendQuote: false, delete: false },
+          enquiries: { sendQuote: false, edit: false, delete: false },
         },
       },
     });
@@ -613,7 +613,7 @@ describe('CustomersPage', () => {
         customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
         groups: { createShared: false },
         data: { viewReports: false },
-        enquiries: { sendQuote: false, delete: false },
+        enquiries: { sendQuote: false, edit: false, delete: false },
       },
     };
     const ADMIN_WITH_EXPORT = {
@@ -659,7 +659,7 @@ describe('CustomersPage', () => {
         customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
         groups: { createShared: false },
         data: { viewReports: false },
-        enquiries: { sendQuote: false, delete: false },
+        enquiries: { sendQuote: false, edit: false, delete: false },
       },
     };
     const AGENT_WITH_CREATE = {
