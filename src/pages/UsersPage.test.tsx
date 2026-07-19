@@ -17,7 +17,7 @@ const PERMS = {
   customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
   groups: { createShared: false },
   data: { viewReports: false },
-  enquiries: { sendQuote: false },
+  enquiries: { sendQuote: false, delete: false },
 };
 
 // A privileged agent -- holds customers.export, one of the four ADMIN_RESTRICTED keys an

@@ -43,6 +43,10 @@ export function canSendQuotes(user: AuthUser | null): boolean {
   return isAdminOrAbove(user) || Boolean(user?.permissions?.enquiries.sendQuote);
 }
 
+export function canDeleteEnquiries(user: AuthUser | null): boolean {
+  return isAdminOrAbove(user) || Boolean(user?.permissions?.enquiries.delete);
+}
+
 export function canCreateCustomers(user: AuthUser | null): boolean {
   return isAdminOrAbove(user) || Boolean(user?.permissions?.customers.create);
 }

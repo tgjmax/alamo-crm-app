@@ -23,7 +23,7 @@ import { EnquiryStatusBadge } from '@/components/enquiries/enquiry-status-badge'
 import { FareOptionDialog } from '@/components/enquiries/fare-option-dialog';
 import { SendQuoteDialog } from '@/components/enquiries/send-quote-dialog';
 import { useAuthStore } from '@/stores/authStore';
-import { canSendQuotes } from '@/utils/permissions';
+import { canDeleteEnquiries, canSendQuotes } from '@/utils/permissions';
 import { formatDisplayDate } from '@/utils/dateFormat';
 import { farePriceSummary, formatItinerary, formatPax, formatSegmentDates } from '@/utils/tripFormat';
 
@@ -33,6 +33,7 @@ export default function EnquiryDetailPage() {
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
   const canSendQuote = canSendQuotes(user);
+  const canDeleteEnquiry = canDeleteEnquiries(user);
 
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
@@ -134,17 +135,19 @@ export default function EnquiryDetailPage() {
           >
             <Pencil className="h-4 w-4" />
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            aria-label="Delete"
-            title="Delete"
-            className="text-destructive hover:text-destructive"
-            onClick={() => setShowDelete(true)}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          {canDeleteEnquiry && (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              aria-label="Delete"
+              title="Delete"
+              className="text-destructive hover:text-destructive"
+              onClick={() => setShowDelete(true)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
           {canSendQuote && (
             <Button type="button" size="sm" disabled={enquiry.fareOptions.length === 0} onClick={() => setShowSendQuote(true)}>
               Send Quote

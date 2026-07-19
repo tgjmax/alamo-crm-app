@@ -52,7 +52,25 @@ const ENQUIRY: enquiriesApi.Enquiry = {
   createdAt: '2026-07-12T10:00:00.000Z',
 };
 
+const DELETER = {
+  id: 'ud',
+  name: 'Deleter',
+  email: 'deleter@a.test',
+  role: 'agent' as const,
+  permissions: {
+    bookings: { create: false, edit: false, delete: false, createAdjustment: false, viewAll: false, import: false, export: false, sendInvoice: false },
+    customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
+    groups: { createShared: false },
+    data: { viewReports: false },
+    enquiries: { sendQuote: false, delete: true },
+  },
+};
+
 describe('EnquiryDetailPage', () => {
+  afterEach(() => {
+    useAuthStore.setState({ accessToken: null, user: null });
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(enquiriesApi, 'getEnquiry').mockResolvedValue(ENQUIRY);
@@ -157,6 +175,7 @@ describe('EnquiryDetailPage', () => {
 
   it('deletes the enquiry after confirm and navigates back to the list', async () => {
     const del = vi.spyOn(enquiriesApi, 'deleteEnquiry').mockResolvedValue(undefined);
+    useAuthStore.setState({ accessToken: 't', user: DELETER });
     renderWithClient(<EnquiryDetailPage />);
     await screen.findByText('Johny Smith');
 
@@ -171,6 +190,7 @@ describe('EnquiryDetailPage', () => {
 
   it('toasts "Enquiry deleted" after a successful delete', async () => {
     const del = vi.spyOn(enquiriesApi, 'deleteEnquiry').mockResolvedValue(undefined);
+    useAuthStore.setState({ accessToken: 't', user: DELETER });
     const successSpy = vi.spyOn(toast, 'success');
     renderWithClient(<EnquiryDetailPage />);
     await screen.findByText('Johny Smith');
@@ -181,6 +201,17 @@ describe('EnquiryDetailPage', () => {
     await waitFor(() => expect(successSpy).toHaveBeenCalledWith('Enquiry deleted'));
     expect(del).toHaveBeenCalledWith('e1');
     successSpy.mockRestore();
+  });
+
+  it('hides Delete from a user without enquiries.delete', async () => {
+    // Deleting an enquiry used to be ungated, so any authenticated user could destroy one.
+    useAuthStore.setState({
+      accessToken: 't',
+      user: { ...DELETER, permissions: { ...DELETER.permissions, enquiries: { sendQuote: false, delete: false } } },
+    });
+    renderWithClient(<EnquiryDetailPage />);
+    await screen.findByText('Johny Smith');
+    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
   });
 
   describe('Send Quote permission gating', () => {
@@ -196,7 +227,7 @@ describe('EnquiryDetailPage', () => {
         customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
         groups: { createShared: false },
         data: { viewReports: false },
-        enquiries: { sendQuote: false },
+        enquiries: { sendQuote: false, delete: false },
       },
     };
     const AGENT_WITH_SEND_QUOTE = {
@@ -204,7 +235,7 @@ describe('EnquiryDetailPage', () => {
       id: 'u3',
       permissions: {
         ...AGENT_NO_SEND_QUOTE.permissions,
-        enquiries: { sendQuote: true },
+        enquiries: { sendQuote: true, delete: true },
       },
     };
 

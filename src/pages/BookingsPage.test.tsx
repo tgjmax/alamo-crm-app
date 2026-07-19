@@ -922,7 +922,7 @@ describe('BookingsPage', () => {
         customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
         groups: { createShared: false },
         data: { viewReports: false },
-        enquiries: { sendQuote: false },
+        enquiries: { sendQuote: false, delete: false },
       },
     };
     const ADMIN_WITH_EXPORT = {
@@ -968,7 +968,7 @@ describe('BookingsPage', () => {
         customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
         groups: { createShared: false },
         data: { viewReports: false },
-        enquiries: { sendQuote: false },
+        enquiries: { sendQuote: false, delete: false },
       },
     };
     const AGENT_WITH_SEND_INVOICE = {
@@ -1011,7 +1011,7 @@ describe('BookingsPage', () => {
         customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
         groups: { createShared: false },
         data: { viewReports: false },
-        enquiries: { sendQuote: false },
+        enquiries: { sendQuote: false, delete: false },
       },
     };
     const AGENT_CREATE_ONLY = {
@@ -1094,7 +1094,7 @@ describe('BookingsPage', () => {
         customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
         groups: { createShared: false },
         data: { viewReports: false },
-        enquiries: { sendQuote: false },
+        enquiries: { sendQuote: false, delete: false },
       },
     };
     const AGENT_WITH_CUSTOMER_CREATE = {

@@ -32,7 +32,7 @@ const EXISTING_USER: usersApi.ManagedUser = {
     customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
     groups: { createShared: false },
     data: { viewReports: false },
-    enquiries: { sendQuote: false },
+    enquiries: { sendQuote: false, delete: false },
   },
   active: true,
 };
