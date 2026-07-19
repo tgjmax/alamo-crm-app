@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { toast } from 'sonner';
 import GroupResultsPage from './GroupResultsPage';
 import * as groupsApi from '@/api/groups.api';
 import { useAuthStore } from '@/stores/authStore';
@@ -20,6 +21,7 @@ vi.mock('@/api/groups.api', async () => {
     getGroupFields: vi.fn(),
     deleteGroup: vi.fn(),
     updateGroupView: vi.fn(),
+    updateGroupExclusions: vi.fn(),
   };
 });
 vi.mock('@tanstack/react-router', async () => {
@@ -64,6 +66,8 @@ const RESULT: groupsApi.GroupQueryResult = {
   pageSize: 25,
 };
 
+const ROW = RESULT.rows[0];
+
 const DEFAULT_PARAMS = { page: 1, pageSize: 25, sortBy: undefined, sortDir: undefined };
 
 function renderPage() {
@@ -81,6 +85,7 @@ beforeEach(() => {
     owner: { id: 'u1', name: 'Anna' },
     sharedWith: { mode: 'private', users: [] },
     conditions: [{ field: 'airlineCode', operator: 'equals', value: 'QR' }],
+    excludedCount: 0,
   });
   vi.mocked(groupsApi.getGroupResults).mockResolvedValue(RESULT);
   vi.mocked(groupsApi.getGroupFields).mockResolvedValue([
@@ -90,6 +95,7 @@ beforeEach(() => {
   // calls array between tests in this file) — without this, a "does not persist" assertion could
   // see a PRIOR test's persist call and fail for the wrong reason.
   vi.mocked(groupsApi.updateGroupView).mockClear();
+  vi.mocked(groupsApi.updateGroupExclusions).mockClear();
 });
 
 describe('GroupResultsPage', () => {
@@ -206,6 +212,7 @@ describe('GroupResultsPage', () => {
       owner: { id: 'u1', name: 'Anna' },
       sharedWith: { mode: 'private', users: [] },
       conditions: [{ field: 'airlineCode', operator: 'equals', value: 'QR' }],
+      excludedCount: 0,
       view: { hiddenColumns: ['remark'], sort: { id: 'amount', desc: true } },
     });
     renderPage();
@@ -277,12 +284,14 @@ describe('GroupResultsPage', () => {
             id: 'g1', name: 'Qatar bookings', owner: { id: 'u1', name: 'Anna' },
             sharedWith: { mode: 'private', users: [] },
             conditions: [{ field: 'airlineCode', operator: 'equals', value: 'QR' }],
+            excludedCount: 0,
             view: { hiddenColumns: ['remark'] },
           }
         : {
             id: 'g2', name: 'Refunds', owner: { id: 'u1', name: 'Anna' },
             sharedWith: { mode: 'private', users: [] },
             conditions: [{ field: 'airlineCode', operator: 'equals', value: 'EK' }],
+            excludedCount: 0,
             view: { hiddenColumns: ['depCity'] },
           }
     );
@@ -309,5 +318,80 @@ describe('GroupResultsPage', () => {
 
     await waitFor(() => expect(screen.getByText('Remark')).toBeInTheDocument());
     expect(screen.queryByText('Dep City')).not.toBeInTheDocument();
+  });
+
+  it('excludes the selected rows and clears the selection', async () => {
+    const user = userEvent.setup();
+    vi.mocked(groupsApi.updateGroupExclusions).mockResolvedValue(1);
+
+    renderPage();
+
+    await user.click(await screen.findByRole('checkbox', { name: `Select ${ROW.passengerName}` }));
+    await user.click(screen.getByRole('button', { name: /exclude selected \(1\)/i }));
+
+    await waitFor(() => {
+      expect(groupsApi.updateGroupExclusions).toHaveBeenCalledWith('g1', { add: [ROW.id] });
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /exclude selected/i })).not.toBeInTheDocument();
+    });
+  });
+
+  it('toasts on a failed exclude', async () => {
+    const user = userEvent.setup();
+    const errorToast = vi.spyOn(toast, 'error');
+    vi.mocked(groupsApi.updateGroupExclusions).mockRejectedValue(new Error('nope'));
+
+    renderPage();
+
+    await user.click(await screen.findByRole('checkbox', { name: `Select ${ROW.passengerName}` }));
+    await user.click(screen.getByRole('button', { name: /exclude selected \(1\)/i }));
+
+    await waitFor(() => expect(errorToast).toHaveBeenCalled());
+  });
+
+  // Regression for a real race: MutationObserver.setOptions() re-runs on every render and replaces
+  // an in-flight mutation's callbacks with the LATEST render's closure. If onSuccess reads the live
+  // `selectedIds` state instead of the variables that were actually submitted, selecting more rows
+  // while the first request is still pending makes the eventual toast report the WRONG count.
+  it('reports the submitted count in the toast, not a later selection made while the request is in flight', async () => {
+    const user = userEvent.setup();
+    const successToast = vi.spyOn(toast, 'success');
+    let resolveExclude: (value: number) => void = () => {};
+    const pending = new Promise<number>((resolve) => {
+      resolveExclude = resolve;
+    });
+    vi.mocked(groupsApi.updateGroupExclusions).mockReturnValue(pending);
+
+    renderPage();
+
+    // Select 1 row and click Exclude — the request goes out with exactly 1 id.
+    await user.click(await screen.findByRole('checkbox', { name: `Select ${RESULT.rows[0].passengerName}` }));
+    await user.click(screen.getByRole('button', { name: /exclude selected \(1\)/i }));
+    await waitFor(() => {
+      expect(groupsApi.updateGroupExclusions).toHaveBeenCalledWith('g1', { add: [RESULT.rows[0].id] });
+    });
+
+    // While that request is still in flight (nothing disables the checkboxes), select a second row.
+    await user.click(await screen.findByRole('checkbox', { name: `Select ${RESULT.rows[1].passengerName}` }));
+
+    // Now let the original (1-row) request resolve.
+    resolveExclude(1);
+
+    await waitFor(() => expect(successToast).toHaveBeenCalled());
+    expect(successToast).toHaveBeenCalledWith('Row excluded');
+    expect(successToast).not.toHaveBeenCalledWith('2 rows excluded');
+  });
+
+  it('opens the excluded-rows dialog from the Excluded button', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText('Jane Doe');
+
+    expect(screen.queryByText('Excluded rows')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /excluded \(0\)/i }));
+
+    expect(await screen.findByText('Excluded rows')).toBeInTheDocument();
   });
 });

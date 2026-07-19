@@ -1,6 +1,7 @@
 import { ColumnDef } from '@tanstack/react-table';
 import { GroupResultRow } from '@/api/groups.api';
 import { formatDisplayDate } from '@/utils/dateFormat';
+import { Checkbox } from '@/components/ui/checkbox';
 import { CopyableText } from '@/components/data-table/copyable-text';
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header';
 import { PaymentStatusBadge } from '@/components/data-table/payment-status-badge';
@@ -8,10 +9,50 @@ import { RemarkCell } from '@/components/data-table/remark-cell';
 import { REMARK_WIDTH_CLASS } from '@/components/data-table/table-density';
 import { formatCurrency } from '@/utils/currency';
 
+interface BuildGroupColumnsOptions {
+  /** Adds a leading select-checkbox column. Off by default — the editor's live preview has no
+   * saved group to exclude rows from, so it renders the table without one. */
+  selectable?: boolean;
+}
+
 /** Mirrors buildBookingColumns() in ../bookings/booking-columns.tsx, minus the row-actions column
  * (the group page is a read-only browser of a saved segment). Keep the two in step. */
-export function buildGroupColumns(): ColumnDef<GroupResultRow>[] {
+export function buildGroupColumns({ selectable = false }: BuildGroupColumnsOptions = {}): ColumnDef<GroupResultRow>[] {
+  const selectColumn: ColumnDef<GroupResultRow>[] = selectable
+    ? [
+        {
+          id: 'select',
+          header: ({ table }) => (
+            <Checkbox
+              checked={
+                table.getIsAllPageRowsSelected() ? true : table.getIsSomePageRowsSelected() ? 'indeterminate' : false
+              }
+              onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+              aria-label="Select all"
+            />
+          ),
+          cell: ({ row }) => (
+            <Checkbox
+              checked={row.getIsSelected()}
+              onCheckedChange={(value) => row.toggleSelected(!!value)}
+              aria-label={`Select ${row.original.passengerName}`}
+            />
+          ),
+          enableSorting: false,
+          enableHiding: false,
+          // A fixed width is load-bearing here, not cosmetic. The Remark column claims the table's
+          // leftover width via `2xl:w-full 2xl:max-w-0` (see REMARK_WIDTH_CLASS) — but `max-w-0`
+          // caps how far Remark can actually grow, so the slack lands on whichever column has NO
+          // width constraint. Without this, that column is the checkbox, which stretches and leaves
+          // a large empty gap to its right. Ungated (not 2xl:) because a checkbox wants the same
+          // tiny width at every breakpoint.
+          meta: { widthClass: 'w-8' },
+        },
+      ]
+    : [];
+
   return [
+    ...selectColumn,
     {
       id: 'date',
       accessorKey: 'date',

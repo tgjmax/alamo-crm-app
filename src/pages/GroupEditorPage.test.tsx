@@ -170,6 +170,7 @@ describe('GroupEditorPage', () => {
     vi.spyOn(groupsApi, 'getGroup').mockResolvedValue({
       id: 'g1', name: 'Old name', owner: { id: 'u1', name: 'Admin' }, sharedWith: { mode: 'private', users: [] },
       conditions: [{ field: 'airlineCode', operator: 'equals', value: 'QR' }],
+      excludedCount: 0,
     });
     const update = vi.spyOn(groupsApi, 'updateGroup').mockResolvedValue({ id: 'g1' });
     vi.spyOn(groupsApi, 'listGroups').mockResolvedValue([]);

@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { OnChangeFn, SortingState, Updater, VisibilityState } from '@tanstack/react-table';
+import { OnChangeFn, RowSelectionState, SortingState, Updater, VisibilityState } from '@tanstack/react-table';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams, useRouter } from '@tanstack/react-router';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Spinner } from '@/components/ui/spinner';
 import { GroupResultsTable } from '@/components/groups/group-results-table';
 import {
   DEFAULT_GROUP_PAGE_SIZE,
@@ -16,9 +18,11 @@ import {
   GroupDetail,
   GroupFieldMeta,
   GroupSortBy,
+  updateGroupExclusions,
 } from '@/api/groups.api';
 import { OPERATOR_LABELS } from '@/utils/conditionLabels';
 import { DeleteGroupDialog } from '@/components/groups/delete-group-dialog';
+import { ExcludedRowsDialog } from '@/components/groups/excluded-rows-dialog';
 import { useAuthStore } from '@/stores/authStore';
 import { useGroupView } from '@/hooks/useGroupView';
 import { isAdminOrAbove } from '@/utils/permissions';
@@ -54,6 +58,41 @@ function GroupResultsSection({ group, canPersistView }: GroupResultsSectionProps
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() =>
     Object.fromEntries((group.view?.hiddenColumns ?? []).map((id) => [id, false]))
   );
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const queryClient = useQueryClient();
+
+  const selectedIds = Object.keys(rowSelection);
+
+  // The mutation carries its ids as VARIABLES (never closes over `selectedIds`) because
+  // MutationObserver.setOptions() re-runs on every render and swaps an in-flight mutation's
+  // callbacks for the latest render's closure — if onSuccess read `selectedIds` directly, selecting
+  // more rows while the first request is still pending would make the eventual toast/deselect use
+  // the WRONG (later) count. TanStack's second onSuccess argument is the variables that were
+  // actually submitted, so it always reflects what this particular request sent, regardless of how
+  // many times the component has re-rendered since.
+  const excludeMutation = useMutation({
+    mutationFn: (ids: string[]) => updateGroupExclusions(group.id, { add: ids }),
+    onSuccess: (_data, submittedIds) => {
+      // Deselect only the ids that were actually submitted — not the whole selection — so a
+      // selection made while the request was in flight survives. Functional update so this reads
+      // the CURRENT state, not a stale closure.
+      setRowSelection((prev) => {
+        const next = { ...prev };
+        for (const id of submittedIds) delete next[id];
+        return next;
+      });
+      // Excluding can drop the last row(s) off the current page (e.g. excluding all 3 rows on page
+      // 4 of 4 leaves the user stranded on an empty page). Reset to page 1 rather than computing the
+      // new page count.
+      setPage(1);
+      // Refetch both the visible rows and the group (whose excludedCount drives the badge).
+      queryClient.invalidateQueries({ queryKey: ['groups', group.id] });
+      toast.success(submittedIds.length === 1 ? 'Row excluded' : `${submittedIds.length} rows excluded`);
+    },
+    onError: () => {
+      toast.error('Could not exclude those rows. Please try again.');
+    },
+  });
 
   const sortBy = sorting[0]?.id as GroupSortBy | undefined;
   const sortDir = sorting[0] ? (sorting[0].desc ? 'desc' : 'asc') : undefined;
@@ -87,6 +126,22 @@ function GroupResultsSection({ group, canPersistView }: GroupResultsSectionProps
       pageSize={pageSize}
       sorting={sorting}
       columnVisibility={columnVisibility}
+      rowSelection={rowSelection}
+      onRowSelectionChange={setRowSelection}
+      toolbarActions={
+        selectedIds.length > 0 ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={excludeMutation.isPending}
+            onClick={() => excludeMutation.mutate(selectedIds)}
+          >
+            {excludeMutation.isPending && <Spinner className="mr-2" />}
+            Exclude selected ({selectedIds.length})
+          </Button>
+        ) : null
+      }
       onPageChange={setPage}
       onPageSizeChange={handlePageSizeChange}
       onSortingChange={handleSortingChange}
@@ -101,6 +156,7 @@ export default function GroupResultsPage() {
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showExcluded, setShowExcluded] = useState(false);
 
   const { data: group } = useQuery({ queryKey: ['groups', groupId], queryFn: () => getGroup(groupId) });
   const { data: fields = [] } = useQuery({ queryKey: ['groups', 'fields'], queryFn: getGroupFields });
@@ -139,6 +195,9 @@ export default function GroupResultsPage() {
             )}
           </div>
           <div className="flex shrink-0 gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setShowExcluded(true)}>
+              Excluded ({group?.excludedCount ?? 0})
+            </Button>
             <Button asChild variant="outline" size="sm">
               <Link to="/groups/$groupId/edit" params={{ groupId }}>
                 Edit conditions
@@ -167,6 +226,15 @@ export default function GroupResultsPage() {
         onConfirm={() => deleteMutation.mutate()}
         isPending={deleteMutation.isPending}
       />
+
+      {group && (
+        <ExcludedRowsDialog
+          open={showExcluded}
+          onOpenChange={setShowExcluded}
+          groupId={group.id}
+          view={group.view}
+        />
+      )}
     </div>
   );
 }

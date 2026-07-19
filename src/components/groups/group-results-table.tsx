@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { ReactNode, useMemo } from 'react';
 import {
   OnChangeFn,
+  RowSelectionState,
   SortingState,
   VisibilityState,
   flexRender,
@@ -27,12 +28,20 @@ interface GroupResultsTableProps {
   onPageSizeChange: (pageSize: number) => void;
   onSortingChange: OnChangeFn<SortingState>;
   onColumnVisibilityChange: OnChangeFn<VisibilityState>;
+  /** Omit BOTH of these to render no selection column at all (the editor preview's case). */
+  rowSelection?: RowSelectionState;
+  onRowSelectionChange?: OnChangeFn<RowSelectionState>;
+  /** Rendered beside the result count — e.g. the "Exclude selected (N)" button. */
+  toolbarActions?: ReactNode;
 }
 
 /** Fully controlled and fetch-free: the parent owns page/pageSize/sorting/columnVisibility and
  * feeds them into its own query. That is what lets GroupResultsPage (TanStack Query) and
  * GroupEditorPage (an imperative, button-triggered preview) share one table. Do not move fetching
- * in here, and do not make any of these props optional with an internal default. */
+ * in here, and do not make page/pageSize/sorting/columnVisibility optional with an internal
+ * default. `rowSelection`/`onRowSelectionChange`/`toolbarActions` ARE optional, and that is a
+ * different thing: omitting them renders no selection column at all, which is what the editor's
+ * live preview needs (there is no saved group there to exclude rows from). */
 export function GroupResultsTable({
   result,
   busy,
@@ -44,20 +53,26 @@ export function GroupResultsTable({
   onPageSizeChange,
   onSortingChange,
   onColumnVisibilityChange,
+  rowSelection,
+  onRowSelectionChange,
+  toolbarActions,
 }: GroupResultsTableProps) {
-  const columns = useMemo(() => buildGroupColumns(), []);
+  const selectable = Boolean(onRowSelectionChange);
+  const columns = useMemo(() => buildGroupColumns({ selectable }), [selectable]);
   const rows = result?.rows ?? [];
   const total = result?.total ?? 0;
 
   const table = useReactTable({
     data: rows,
     columns,
-    state: { sorting, columnVisibility },
+    state: { sorting, columnVisibility, rowSelection: rowSelection ?? {} },
     pageCount: Math.max(1, Math.ceil(total / pageSize)),
     manualPagination: true,
     manualSorting: true,
     manualFiltering: true,
     getRowId: (row) => row.id,
+    enableRowSelection: selectable,
+    onRowSelectionChange,
     onSortingChange,
     onColumnVisibilityChange,
     getCoreRowModel: getCoreRowModel(),
@@ -100,6 +115,7 @@ export function GroupResultsTable({
           {total} result{total === 1 ? '' : 's'}
         </p>
         <DataTableViewOptions table={table} />
+        {toolbarActions}
       </div>
 
       <div className={cn('rounded-md border', busy && 'opacity-70')}>
@@ -148,7 +164,7 @@ export function GroupResultsTable({
         pageSize={pageSize}
         pageSizes={GROUP_PAGE_SIZES}
         total={total}
-        selectedCount={0}
+        selectedCount={Object.keys(rowSelection ?? {}).length}
         currentPageRowCount={rows.length}
         onPageChange={onPageChange}
         onPageSizeChange={onPageSizeChange}

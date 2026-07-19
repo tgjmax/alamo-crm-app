@@ -3,7 +3,7 @@ import { apiClient } from './client';
 import * as groupsApi from './groups.api';
 import {
   getGroupFields, listGroups, getGroup, createGroup, updateGroup, deleteGroup, getGroupResults, previewGroup,
-  updateGroupView,
+  updateGroupView, updateGroupExclusions,
 } from './groups.api';
 
 describe('groups.api', () => {
@@ -57,5 +57,35 @@ describe('groups.api', () => {
     const result = await updateGroupView('g1', view);
     expect(patch).toHaveBeenCalledWith('/groups/g1/view', view);
     expect(result).toEqual(view);
+  });
+});
+
+describe('group exclusions', () => {
+  it('sends add deltas and returns the new count', async () => {
+    const patch = vi.spyOn(apiClient, 'patch').mockResolvedValueOnce({ data: { excludedCount: 3 } });
+
+    const count = await updateGroupExclusions('g1', { add: ['p1', 'p2'] });
+
+    expect(patch).toHaveBeenCalledWith('/groups/g1/exclusions', { add: ['p1', 'p2'] });
+    expect(count).toBe(3);
+  });
+
+  it('sends remove deltas', async () => {
+    const patch = vi.spyOn(apiClient, 'patch').mockResolvedValueOnce({ data: { excludedCount: 0 } });
+
+    const count = await updateGroupExclusions('g1', { remove: ['p1'] });
+
+    expect(patch).toHaveBeenCalledWith('/groups/g1/exclusions', { remove: ['p1'] });
+    expect(count).toBe(0);
+  });
+
+  it('forwards excluded=true so the Excluded dialog can list checked-off rows', async () => {
+    const get = vi.spyOn(apiClient, 'get').mockResolvedValueOnce({ data: { rows: [], total: 0, page: 1, pageSize: 25 } });
+
+    await getGroupResults('g1', { page: 1, pageSize: 25, excluded: true });
+
+    expect(get).toHaveBeenCalledWith('/groups/g1/results', {
+      params: { page: 1, pageSize: 25, excluded: true },
+    });
   });
 });

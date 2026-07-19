@@ -50,6 +50,8 @@ export interface GroupDetail {
   owner: { id: string; name: string };
   sharedWith: GroupSharing;
   conditions: GroupCondition[];
+  /** How many rows have been checked off. Drives the "Excluded (N)" button's badge. */
+  excludedCount: number;
   view?: GroupView;
 }
 
@@ -65,6 +67,10 @@ export interface GroupResultParams {
   pageSize: number;
   sortBy?: GroupSortBy;
   sortDir?: 'asc' | 'desc';
+  /** true → list ONLY the excluded rows (the restore view). The backend ignores the group's
+   * conditions in this mode, so a row that has since stopped matching is still listed and can
+   * still be restored. Omit or false for the normal view, which hides excluded rows. */
+  excluded?: boolean;
 }
 
 export interface GroupView {
@@ -140,6 +146,18 @@ export async function deleteGroup(id: string): Promise<void> {
 export async function getGroupResults(id: string, params: GroupResultParams): Promise<GroupQueryResult> {
   const res = await apiClient.get<GroupQueryResult>(`/groups/${id}/results`, { params });
   return res.data;
+}
+
+export interface ExclusionUpdate {
+  add?: string[];
+  remove?: string[];
+}
+
+/** Deltas, never the whole array — two agents can be checking rows off in the same group at once,
+ * and a whole-array write would silently discard the other's progress. Returns the new count. */
+export async function updateGroupExclusions(id: string, update: ExclusionUpdate): Promise<number> {
+  const res = await apiClient.patch<{ excludedCount: number }>(`/groups/${id}/exclusions`, update);
+  return res.data.excludedCount;
 }
 
 export async function previewGroup(
