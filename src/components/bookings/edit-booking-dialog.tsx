@@ -1,6 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { getBooking } from '@/api/bookings.api';
+import { AuditHistoryPanel } from '@/components/audit/audit-history-panel';
+import { useAuthStore } from '@/stores/authStore';
+import { canViewAudit } from '@/utils/permissions';
 import { BookingForm } from './booking-form';
 
 interface EditBookingDialogProps {
@@ -11,6 +14,7 @@ interface EditBookingDialogProps {
 }
 
 export function EditBookingDialog({ bookingId, onOpenChange, queryKeyPrefix }: EditBookingDialogProps) {
+  const user = useAuthStore((s) => s.user);
   const { data, isLoading, isError } = useQuery({
     queryKey: [queryKeyPrefix, 'detail', bookingId],
     queryFn: () => getBooking(bookingId as string),
@@ -34,6 +38,14 @@ export function EditBookingDialog({ bookingId, onOpenChange, queryKeyPrefix }: E
             onDone={() => onOpenChange(false)}
             onCancel={() => onOpenChange(false)}
           />
+        )}
+        {/* bookingRef, NOT targetId — an invoice's history spans the Booking header AND its
+            passengers, including a passenger that's since been deleted (whose id the frontend
+            no longer has). The backend supports bookingRef as an $or across both. */}
+        {canViewAudit(user) && bookingId && (
+          <div className="mt-6 border-t pt-4">
+            <AuditHistoryPanel filter={{ bookingRef: bookingId }} title="Invoice history" />
+          </div>
         )}
       </DialogContent>
     </Dialog>

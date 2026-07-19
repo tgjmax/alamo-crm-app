@@ -11,7 +11,7 @@ import {
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header';
 import { ManagedUser } from '@/api/users.api';
 import { AuthUser, UserRole } from '@/stores/authStore';
-import { canResetPasswordOf, ROLE_LABELS } from '@/utils/permissions';
+import { canResetPasswordOf, canViewUserHistory, ROLE_LABELS } from '@/utils/permissions';
 
 const ROLE_BADGE: Record<UserRole, string> = {
   superadmin: 'bg-purple-100 text-purple-800 hover:bg-purple-100',
@@ -34,6 +34,7 @@ export interface BuildUserColumnsOptions {
   onPermissions: (user: ManagedUser) => void;
   onReset: (user: ManagedUser) => void;
   onSetActive: (user: ManagedUser) => void;
+  onViewHistory: (user: ManagedUser) => void;
 }
 
 export function buildUserColumns({
@@ -42,6 +43,7 @@ export function buildUserColumns({
   onPermissions,
   onReset,
   onSetActive,
+  onViewHistory,
 }: BuildUserColumnsOptions): ColumnDef<ManagedUser>[] {
   return [
     {
@@ -85,6 +87,7 @@ export function buildUserColumns({
         // (mirrors customer-row-actions.tsx).
         if (user.id === currentUser?.id) return null;
         const canReset = canResetPasswordOf(currentUser, user);
+        const canHistory = canViewUserHistory(currentUser);
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -106,6 +109,11 @@ export function buildUserColumns({
               <DropdownMenuItem onClick={() => onSetActive(user)}>
                 {user.active ? 'Deactivate' : 'Reactivate'}
               </DropdownMenuItem>
+              {/* Super-Admin-only — see canViewUserHistory: an Admin's query would always
+                  come back empty (the backend narrows Admins to ledger actions only). */}
+              {canHistory && (
+                <DropdownMenuItem onClick={() => onViewHistory(user)}>View history</DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         );

@@ -18,6 +18,7 @@ import { AddEditUserDialog } from '@/components/users/add-edit-user-dialog';
 import { UserPermissionsDialog } from '@/components/users/user-permissions-dialog';
 import { ResetPasswordDialog } from '@/components/users/reset-password-dialog';
 import { SetActiveDialog } from '@/components/users/set-active-dialog';
+import { UserHistoryDialog } from '@/components/users/user-history-dialog';
 import { buildUserColumns } from '@/components/users/user-columns';
 import { TableSkeleton } from '@/components/ui/table-skeleton';
 
@@ -28,6 +29,7 @@ export default function UsersPage() {
   const [permissionsFor, setPermissionsFor] = useState<ManagedUser | null>(null);
   const [resettingFor, setResettingFor] = useState<ManagedUser | null>(null);
   const [settingActiveFor, setSettingActiveFor] = useState<ManagedUser | null>(null);
+  const [historyFor, setHistoryFor] = useState<ManagedUser | null>(null);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 
@@ -41,6 +43,7 @@ export default function UsersPage() {
         onPermissions: setPermissionsFor,
         onReset: setResettingFor,
         onSetActive: setSettingActiveFor,
+        onViewHistory: setHistoryFor,
       }),
     [currentUser]
   );
@@ -139,6 +142,7 @@ export default function UsersPage() {
       <UserPermissionsDialog user={permissionsFor} onOpenChange={(open) => !open && setPermissionsFor(null)} />
       <ResetPasswordDialog user={resettingFor} onOpenChange={(open) => !open && setResettingFor(null)} />
       <SetActiveDialog user={settingActiveFor} onOpenChange={(open) => !open && setSettingActiveFor(null)} />
+      <UserHistoryDialog user={historyFor} onOpenChange={(open) => !open && setHistoryFor(null)} />
     </div>
   );
 }

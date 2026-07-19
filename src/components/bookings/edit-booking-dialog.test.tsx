@@ -1,16 +1,34 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AxiosError } from 'axios';
 import { EditBookingDialog } from './edit-booking-dialog';
 import * as bookingsApi from '@/api/bookings.api';
 import * as customersApi from '@/api/customers.api';
 import * as flightDataApi from '@/api/flightData.api';
+import * as auditApi from '@/api/audit.api';
+import { useAuthStore } from '@/stores/authStore';
+import { UserPermissions } from '@/stores/authStore';
 
 vi.mock('@/api/bookings.api');
 vi.mock('@/api/customers.api');
 vi.mock('@/api/flightData.api');
+// audit.api's AUDIT_ACTION_LABELS/auditActionLabel are constants/pure functions the panel needs
+// for real — a bare `vi.mock('@/api/audit.api')` would automock them to `undefined` and break
+// the "Booking edited" label lookup. Spread the real module, mock only the fetch.
+vi.mock('@/api/audit.api', async (importActual) => ({
+  ...(await importActual<typeof auditApi>()),
+  listAuditEntries: vi.fn(),
+}));
+
+const AGENT_PERMISSIONS: UserPermissions = {
+  bookings: { create: false, edit: false, delete: false, createAdjustment: false, viewAll: false, import: false, export: false, sendInvoice: false },
+  customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
+  groups: { createShared: false },
+  data: { viewReports: false },
+  enquiries: { sendQuote: false, delete: false },
+};
 
 const DETAIL: bookingsApi.BookingDetail = {
   booking: {
@@ -53,6 +71,15 @@ beforeEach(() => {
   vi.mocked(flightDataApi.searchAirlines).mockResolvedValue([]);
   vi.mocked(bookingsApi.getBooking).mockResolvedValue(DETAIL);
   vi.mocked(bookingsApi.updateBooking).mockResolvedValue(DETAIL);
+});
+
+// This file never used to touch the auth store; the two audit-history tests below are the
+// first to. Reset it after every test so a seeded user can't leak into whichever test runs
+// next in this file — this codebase has been bitten by exactly that leakage before (see
+// BookingsPage.test.tsx's notes in CLAUDE.md).
+afterEach(() => {
+  cleanup();
+  useAuthStore.setState({ accessToken: null, user: null });
 });
 
 describe('EditBookingDialog', () => {
@@ -314,5 +341,50 @@ describe('EditBookingDialog', () => {
       await screen.findByText('Cannot delete: 1 reissue recorded against this booking — delete those first.')
     ).toBeInTheDocument();
     expect(screen.queryByText(/check your connection/i)).not.toBeInTheDocument();
+  });
+
+  it('shows the invoice history to a superadmin', async () => {
+    useAuthStore.setState({
+      accessToken: 't',
+      user: { id: 'u1', name: 'Root', email: 'r@example.com', role: 'superadmin' },
+    });
+    vi.mocked(auditApi.listAuditEntries).mockResolvedValue({
+      entries: [
+        {
+          id: 'a1',
+          actor: { id: 'u1', name: 'Priya Nair', email: 'p@example.com' },
+          action: 'booking.update',
+          targetCollection: 'bookings',
+          targetId: 'b1',
+          summary: { changes: [{ path: 'pnr', from: 'ABC123', to: 'XYZ789' }] },
+          createdAt: '2026-07-18T10:00:00.000Z',
+        },
+      ],
+      total: 1,
+      page: 1,
+      pageSize: 25,
+    });
+
+    renderDialog();
+    // The panel is mounted with title="Invoice history" (per the brief — an invoice's history
+    // spans the Booking header AND its passengers), so the rendered heading is "Invoice
+    // history", not the panel's bare default "History".
+    expect(await screen.findByText('Invoice history')).toBeInTheDocument();
+    expect(await screen.findByText('Booking edited')).toBeInTheDocument();
+    // Uses bookingRef, NOT targetId — an invoice's history spans the header AND its
+    // passengers, including a deleted passenger the frontend no longer has an id for.
+    expect(auditApi.listAuditEntries).toHaveBeenCalledWith(
+      expect.objectContaining({ bookingRef: 'b1' })
+    );
+  });
+
+  it('hides the history from an agent', async () => {
+    useAuthStore.setState({
+      accessToken: 't',
+      user: { id: 'u2', name: 'Agent', email: 'a@example.com', role: 'agent', permissions: AGENT_PERMISSIONS },
+    });
+    renderDialog();
+    await screen.findByLabelText(/invoice number/i);
+    expect(screen.queryByText('Invoice history')).not.toBeInTheDocument();
   });
 });

@@ -106,6 +106,27 @@ describe('AppShell', () => {
     expect(screen.queryByRole('link', { name: 'Users' })).not.toBeInTheDocument();
   });
 
+  it('shows the Audit log link to an admin', async () => {
+    renderAuthedApp('/customers');
+    expect(await screen.findByRole('link', { name: 'Audit log' })).toBeInTheDocument();
+  });
+
+  it('hides the Audit log link from an agent', async () => {
+    useAuthStore.setState({
+      accessToken: 't',
+      user: { id: '2', name: 'G', email: 'g@t.test', role: 'agent' },
+    });
+    const router = createAppRouter(createMemoryHistory({ initialEntries: ['/customers'] }));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
+    );
+    await screen.findByRole('link', { name: 'Dashboard' });
+    expect(screen.queryByRole('link', { name: 'Audit log' })).not.toBeInTheDocument();
+  });
+
   it('highlights the current page in the sidebar and updates on navigation', async () => {
     const router = renderAuthedApp('/customers');
     await screen.findByRole('link', { name: 'Customers' });

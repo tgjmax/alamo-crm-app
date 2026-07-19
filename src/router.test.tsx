@@ -88,4 +88,32 @@ describe('app router', () => {
     renderApp('/sales');
     expect(await screen.findByRole('heading', { name: 'Sales' })).toBeInTheDocument();
   });
+
+  it('redirects an agent without a manage-users/admin role away from /audit', async () => {
+    useAuthStore.setState({
+      accessToken: 't',
+      user: {
+        id: '1', name: 'Agent', email: 'a@alamo.test', role: 'agent',
+        permissions: {
+          bookings: { create: false, edit: false, delete: false, createAdjustment: false, viewAll: false, import: false, export: false, sendInvoice: false },
+          customers: { create: false, edit: false, delete: false, viewPassport: false, import: false, export: false },
+          groups: { createShared: false },
+          data: { viewReports: false },
+          enquiries: { sendQuote: false, delete: false },
+        },
+      },
+    });
+    const router = renderApp('/audit');
+    await screen.findByRole('heading', { name: 'Dashboard' });
+    expect(router.state.location.pathname).toBe('/dashboard');
+  });
+
+  it('lets an admin view /audit', async () => {
+    useAuthStore.setState({
+      accessToken: 't',
+      user: { id: '1', name: 'Admin', email: 'a@alamo.test', role: 'admin' },
+    });
+    renderApp('/audit');
+    expect(await screen.findByRole('heading', { name: 'Audit log' })).toBeInTheDocument();
+  });
 });

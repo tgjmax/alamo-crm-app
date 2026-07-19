@@ -22,8 +22,9 @@ import { EnquiryDialog } from '@/components/enquiries/enquiry-dialog';
 import { EnquiryStatusBadge } from '@/components/enquiries/enquiry-status-badge';
 import { FareOptionDialog } from '@/components/enquiries/fare-option-dialog';
 import { SendQuoteDialog } from '@/components/enquiries/send-quote-dialog';
+import { AuditHistoryPanel } from '@/components/audit/audit-history-panel';
 import { useAuthStore } from '@/stores/authStore';
-import { canDeleteEnquiries, canSendQuotes } from '@/utils/permissions';
+import { canDeleteEnquiries, canSendQuotes, canViewAudit } from '@/utils/permissions';
 import { formatDisplayDate } from '@/utils/dateFormat';
 import { farePriceSummary, formatItinerary, formatPax, formatSegmentDates } from '@/utils/tripFormat';
 
@@ -34,6 +35,7 @@ export default function EnquiryDetailPage() {
   const user = useAuthStore((s) => s.user);
   const canSendQuote = canSendQuotes(user);
   const canDeleteEnquiry = canDeleteEnquiries(user);
+  const canViewHistory = canViewAudit(user);
 
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
@@ -224,6 +226,14 @@ export default function EnquiryDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {canViewHistory && (
+        <Card>
+          <CardContent className="pt-6">
+            <AuditHistoryPanel filter={{ targetCollection: 'enquiries', targetId: enquiryId }} />
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

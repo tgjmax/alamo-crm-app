@@ -7,7 +7,15 @@ import { toast } from 'sonner';
 import EnquiryDetailPage from './EnquiryDetailPage';
 import * as enquiriesApi from '../api/enquiries.api';
 import * as flightDataApi from '../api/flightData.api';
+import * as auditApi from '../api/audit.api';
 import { useAuthStore } from '../stores/authStore';
+
+// A bare `vi.mock('../api/audit.api')` would automock AUDIT_ACTION_LABELS/auditActionLabel to
+// `undefined`, breaking the history panel's action-label lookup — spread the real module.
+vi.mock('../api/audit.api', async (importActual) => ({
+  ...(await importActual<typeof auditApi>()),
+  listAuditEntries: vi.fn(),
+}));
 
 const navigateMock = vi.fn();
 vi.mock('@tanstack/react-router', async (importOriginal) => ({
@@ -212,6 +220,32 @@ describe('EnquiryDetailPage', () => {
     renderWithClient(<EnquiryDetailPage />);
     await screen.findByText('Johny Smith');
     expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
+  });
+
+  // --- Audit history mount: gated on canViewAudit(user) — an Agent must not see it. ---
+
+  it('shows the enquiry history to a superadmin', async () => {
+    vi.mocked(auditApi.listAuditEntries).mockResolvedValue({ entries: [], total: 0, page: 1, pageSize: 25 });
+    useAuthStore.setState({
+      accessToken: 't',
+      user: { id: 'u0', name: 'Super', email: 'super@a.test', role: 'superadmin' },
+    });
+    renderWithClient(<EnquiryDetailPage />);
+    await screen.findByText('Johny Smith');
+
+    expect(await screen.findByText('History')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(auditApi.listAuditEntries).toHaveBeenCalledWith(
+        expect.objectContaining({ targetCollection: 'enquiries', targetId: 'e1' })
+      )
+    );
+  });
+
+  it('hides the history from an agent', async () => {
+    useAuthStore.setState({ accessToken: 't', user: DELETER });
+    renderWithClient(<EnquiryDetailPage />);
+    await screen.findByText('Johny Smith');
+    expect(screen.queryByText('History')).not.toBeInTheDocument();
   });
 
   describe('Send Quote permission gating', () => {

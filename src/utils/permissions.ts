@@ -67,6 +67,25 @@ export function canManageUsers(user: AuthUser | null): boolean {
   return isAdminOrAbove(user);
 }
 
+/** Both roles read the log; the BACKEND narrows an Admin to ledger actions only
+ *  (it hides user-management entries, which are what watch Admins). The frontend
+ *  does not re-implement that narrowing — it would drift. */
+export function canViewAudit(user: AuthUser | null): boolean {
+  return isAdminOrAbove(user);
+}
+
+/**
+ * "View history" on a USER row specifically — NOT the same gate as `canViewAudit`.
+ * Every entry with `targetCollection: 'users'` is a user-management action, and the
+ * backend's `listAuditEntries` narrows an Admin to LEDGER actions only (see the comment
+ * on `canViewAudit`) — so an Admin querying a user's history always gets zero rows back.
+ * Showing the action to an Admin is therefore a dead end, not just a permission mismatch.
+ * Super-Admin-only, matching what the backend can actually return.
+ */
+export function canViewUserHistory(user: AuthUser | null): boolean {
+  return user?.role === 'superadmin';
+}
+
 /** The four permissions a Super Admin grants per-admin — mirrors the backend's
  *  ADMIN_RESTRICTED set (permission.middleware.ts) exactly, keyed on the permission PATH. */
 const ADMIN_RESTRICTED_PATHS = new Set(['bookings.import', 'bookings.export', 'customers.import', 'customers.export']);

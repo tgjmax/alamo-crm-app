@@ -13,7 +13,7 @@ import {
   SidebarRail,
   SidebarTrigger,
 } from '@/components/ui/sidebar';
-import { LayoutDashboard, Users, BookOpen, TrendingUp, Filter, Settings, LogOut, MessageSquareText, UserCog } from 'lucide-react';
+import { LayoutDashboard, Users, BookOpen, TrendingUp, Filter, Settings, LogOut, MessageSquareText, UserCog, ScrollText } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,7 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuthStore } from '../stores/authStore';
-import { canViewSalesReports, canManageUsers, ROLE_LABELS } from '../utils/permissions';
+import { canViewSalesReports, canManageUsers, canViewAudit, ROLE_LABELS } from '../utils/permissions';
 import { logoutRequest } from '../api/auth.api';
 import { useBranding } from '@/hooks/useBranding';
 import { useApplyTheme } from '../hooks/useApplyTheme';
@@ -33,6 +33,7 @@ export default function AppShell() {
   const router = useRouter();
   const showSales = canViewSalesReports(user);
   const showUsers = canManageUsers(user);
+  const showAudit = canViewAudit(user);
   const branding = useBranding();
   useApplyTheme();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -157,6 +158,20 @@ export default function AppShell() {
                     <Link to="/users">
                       <UserCog />
                       <span>Users</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {showAudit && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive('/audit')}
+                    className="h-10 text-base font-medium [&>svg]:size-5 data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground data-[active=true]:hover:bg-sidebar-primary data-[active=true]:hover:text-sidebar-primary-foreground"
+                  >
+                    <Link to="/audit">
+                      <ScrollText />
+                      <span>Audit log</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

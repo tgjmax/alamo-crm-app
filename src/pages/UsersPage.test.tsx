@@ -5,11 +5,18 @@ import { vi } from 'vitest';
 import UsersPage from './UsersPage';
 import { useAuthStore } from '@/stores/authStore';
 import * as usersApi from '@/api/users.api';
+import * as auditApi from '@/api/audit.api';
 
 vi.mock('@/api/users.api', async (importActual) => ({
   ...(await importActual<typeof usersApi>()),
   listUsers: vi.fn(),
   setUserActive: vi.fn(),
+}));
+// A bare `vi.mock('@/api/audit.api')` would automock AUDIT_ACTION_LABELS/auditActionLabel to
+// `undefined`, breaking the history panel's action-label lookup — spread the real module.
+vi.mock('@/api/audit.api', async (importActual) => ({
+  ...(await importActual<typeof auditApi>()),
+  listAuditEntries: vi.fn(),
 }));
 
 const PERMS = {
@@ -221,5 +228,56 @@ describe('UsersPage', () => {
     // 'agent' < 'superadmin') would lead with Admin instead.
     expect(rows[0]).toHaveTextContent('Super Admin');
     expect(rows[rows.length - 1]).toHaveTextContent('Agent');
+  });
+
+  // --- Audit history mount: gated on canViewUserHistory(currentUser), Super-Admin-only —
+  //     NOT the same gate as canViewAudit(currentUser), which also allows an Admin. An Admin's
+  //     query would always come back empty (the backend narrows Admins to ledger actions only,
+  //     and every 'users'-collection entry is a user-management action), so the row action must
+  //     be hidden from an Admin too, not just an Agent. ---
+
+  it('offers View history on another user\'s row for a superadmin, opening the account history panel', async () => {
+    vi.mocked(auditApi.listAuditEntries).mockResolvedValue({ entries: [], total: 0, page: 1, pageSize: 25 });
+    renderPage(); // default logged-in user in this fixture (u1) is a superadmin
+    await screen.findByText('Priya M');
+    await userEvent.click(screen.getByRole('button', { name: 'Actions for Priya M' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'View history' }));
+
+    expect(await screen.findByText('Account history')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(auditApi.listAuditEntries).toHaveBeenCalledWith(
+        expect.objectContaining({ targetCollection: 'users', targetId: 'u2' })
+      )
+    );
+  });
+
+  it('hides View history from an agent', async () => {
+    useAuthStore.setState({
+      accessToken: 't',
+      user: { id: 'u2', name: 'Priya M', email: 'p@a.test', role: 'agent' },
+    });
+    renderPage();
+    await screen.findByText('Alex K');
+    await userEvent.click(screen.getByRole('button', { name: 'Actions for Alex K' }));
+    expect(screen.queryByRole('menuitem', { name: 'View history' })).not.toBeInTheDocument();
+    // The row still has other actions, so this isn't just an empty menu being suppressed.
+    expect(await screen.findByRole('menuitem', { name: 'Edit' })).toBeInTheDocument();
+  });
+
+  // The bug this closes: an Admin (unlike an Agent) previously DID see "View history" (it was
+  // gated on canViewAudit, which is true for Admin-or-above) but the backend narrows an Admin's
+  // /audit query to ledger actions only, so a 'users'-collection query always came back empty —
+  // the row action was a dead end for every Admin, on every row.
+  it('hides View history from an admin', async () => {
+    useAuthStore.setState({
+      accessToken: 't',
+      user: { id: 'u2', name: 'Priya M', email: 'p@a.test', role: 'admin' },
+    });
+    renderPage();
+    await screen.findByText('Alex K');
+    await userEvent.click(screen.getByRole('button', { name: 'Actions for Alex K' }));
+    expect(screen.queryByRole('menuitem', { name: 'View history' })).not.toBeInTheDocument();
+    // The row still has other actions, so this isn't just an empty menu being suppressed.
+    expect(await screen.findByRole('menuitem', { name: 'Edit' })).toBeInTheDocument();
   });
 });

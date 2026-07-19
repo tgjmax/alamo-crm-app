@@ -38,6 +38,26 @@ export function formatDisplayDate(value: string | undefined): string {
 }
 
 /**
+ * Formats an ISO datetime string (e.g. an audit entry's `createdAt`) for display as
+ * 'DD Mon YYYY, HH:MM AM/PM' (locale-dependent time formatting via `toLocaleString`).
+ * Unlike `formatDisplayDate`, this INCLUDES time-of-day — the audit log needs it because
+ * two entries can land on the same calendar day, and only the time tells you their order.
+ * Falsy or unparseable input passes through unchanged rather than being silently misformatted.
+ */
+export function formatDisplayDateTime(iso: string | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString(undefined, {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+/**
  * The later of two 'YYYY-MM-DD' dates, ignoring blanks. Used to build a date field's lower bound
  * from more than one rule at once — e.g. an Arrival Date that must be both in the future AND on or
  * after the chosen Departure Date. Zero-padded ISO day strings sort lexicographically, so a string

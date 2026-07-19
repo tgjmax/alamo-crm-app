@@ -19,10 +19,11 @@ import WidgetEditorPage from './pages/WidgetEditorPage';
 import SalesPage from './pages/SalesPage';
 import SettingsPage from './pages/SettingsPage';
 import UsersPage from './pages/UsersPage';
+import { AuditPage } from './pages/AuditPage';
 import AppShell from './components/AppShell';
 import { Toaster } from './components/ui/sonner';
 import { useAuthStore } from './stores/authStore';
-import { canViewSalesReports, canManageUsers } from './utils/permissions';
+import { canViewSalesReports, canManageUsers, canViewAudit } from './utils/permissions';
 import { restoreSession } from './api/sessionRestore';
 
 const rootRoute = createRootRoute({
@@ -159,10 +160,21 @@ const usersRoute = createRoute({
   component: UsersPage,
 });
 
+const auditRoute = createRoute({
+  getParentRoute: () => authedRoute,
+  path: '/audit',
+  beforeLoad: () => {
+    if (!canViewAudit(useAuthStore.getState().user)) {
+      throw redirect({ to: '/dashboard' });
+    }
+  },
+  component: AuditPage,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
   indexRoute,
-  authedRoute.addChildren([dashboardRoute, widgetNewRoute, widgetEditRoute, customersRoute, bookingsRoute, salesRoute, enquiriesRoute, enquiryDetailRoute, groupsRoute, groupNewRoute, groupResultsRoute, groupEditRoute, settingsRoute, usersRoute]),
+  authedRoute.addChildren([dashboardRoute, widgetNewRoute, widgetEditRoute, customersRoute, bookingsRoute, salesRoute, enquiriesRoute, enquiryDetailRoute, groupsRoute, groupNewRoute, groupResultsRoute, groupEditRoute, settingsRoute, usersRoute, auditRoute]),
 ]);
 
 export function createAppRouter(history?: RouterHistory) {

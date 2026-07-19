@@ -3,7 +3,7 @@ import {
   canViewSalesReports, canEditBookings, canDeleteBookings, canEditOrganization,
   isAdminOrAbove, canManageUsers, canImportExport,
   canCreateBookings, canCreateAdjustments, canCreateCustomers, canEditCustomers, canDeleteCustomers,
-  canSendInvoices, canSendQuotes, canResetPasswordOf,
+  canSendInvoices, canSendQuotes, canResetPasswordOf, canViewAudit, canViewUserHistory,
 } from './permissions';
 import { AuthUser } from '../stores/authStore';
 
@@ -363,5 +363,38 @@ describe('canSendQuotes', () => {
 
   it('is false for a null user', () => {
     expect(canSendQuotes(null)).toBe(false);
+  });
+});
+
+describe('canViewAudit', () => {
+  it('allows a superadmin', () => {
+    expect(canViewAudit({ role: 'superadmin' } as AuthUser)).toBe(true);
+  });
+  it('allows an admin', () => {
+    expect(canViewAudit({ role: 'admin' } as AuthUser)).toBe(true);
+  });
+  it('denies an agent', () => {
+    expect(canViewAudit({ role: 'agent' } as AuthUser)).toBe(false);
+  });
+  it('denies a null user', () => {
+    expect(canViewAudit(null)).toBe(false);
+  });
+});
+
+describe('canViewUserHistory', () => {
+  // Unlike canViewAudit, this is Super-Admin-only: the backend narrows an Admin's
+  // /audit query to LEDGER actions only, so a 'users'-collection query from an Admin
+  // always comes back empty. Showing the action to an Admin would be a dead end.
+  it('allows a superadmin', () => {
+    expect(canViewUserHistory({ role: 'superadmin' } as AuthUser)).toBe(true);
+  });
+  it('denies an admin', () => {
+    expect(canViewUserHistory({ role: 'admin' } as AuthUser)).toBe(false);
+  });
+  it('denies an agent', () => {
+    expect(canViewUserHistory({ role: 'agent' } as AuthUser)).toBe(false);
+  });
+  it('denies a null user', () => {
+    expect(canViewUserHistory(null)).toBe(false);
   });
 });
