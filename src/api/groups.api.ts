@@ -5,6 +5,7 @@ export type ConditionOperator =
   | 'equals'
   | 'contains'
   | 'in'
+  | 'notIn'
   | 'between'
   | 'greaterThan'
   | 'lessThan'

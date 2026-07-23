@@ -34,7 +34,7 @@ const VALUELESS_OPERATORS: ConditionOperator[] = ['thisMonth', 'thisYear'];
 function defaultValue(field: GroupFieldMeta, operator: ConditionOperator): ConditionValue {
   if (VALUELESS_OPERATORS.includes(operator)) return undefined;
   if (operator === 'inLastDays') return 30;
-  if (operator === 'in') return [];
+  if (operator === 'in' || operator === 'notIn') return [];
   if (operator === 'between') return field.type === 'number' ? [0, 0] : [todayIso(), todayIso()];
   switch (field.type) {
     case 'number':
@@ -131,7 +131,7 @@ export default function ConditionBuilder({ fields, users, conditions, onChange }
       );
     }
 
-    if (condition.operator === 'in') {
+    if (condition.operator === 'in' || condition.operator === 'notIn') {
       if (field.type === 'enum' || field.type === 'user') {
         const options =
           field.type === 'enum'

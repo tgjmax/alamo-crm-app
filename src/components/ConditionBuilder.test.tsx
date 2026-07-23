@@ -6,7 +6,7 @@ import ConditionBuilder from './ConditionBuilder';
 import { GroupCondition, GroupFieldMeta } from '../api/groups.api';
 
 const FIELDS: GroupFieldMeta[] = [
-  { key: 'airlineCode', label: 'Airline', type: 'string', operators: ['equals', 'contains', 'in'] },
+  { key: 'airlineCode', label: 'Airline', type: 'string', operators: ['equals', 'contains', 'in', 'notIn'] },
   { key: 'amount', label: 'Amount', type: 'number', operators: ['equals', 'greaterThan', 'lessThan', 'between'] },
   {
     key: 'date',
@@ -14,7 +14,7 @@ const FIELDS: GroupFieldMeta[] = [
     type: 'date',
     operators: ['equals', 'greaterThan', 'lessThan', 'between', 'inLastDays', 'thisMonth', 'thisYear'],
   },
-  { key: 'paymentType', label: 'Payment type', type: 'enum', enumValues: ['card', 'check', 'cash'], operators: ['equals', 'in'] },
+  { key: 'paymentType', label: 'Payment type', type: 'enum', enumValues: ['card', 'check', 'cash'], operators: ['equals', 'in', 'notIn'] },
   { key: 'customerVerified', label: 'Customer verified', type: 'boolean', operators: ['equals'] },
 ];
 const USERS = [{ id: 'u1', name: 'Anna' }];
@@ -93,12 +93,22 @@ describe('ConditionBuilder', () => {
     const onChange = setup([{ field: 'airlineCode', operator: 'equals', value: '' }]);
     await userEvent.click(screen.getByRole('combobox', { name: 'Condition 1 operator' }));
     const options = await screen.findAllByRole('option');
-    // Displayed as human labels ('in' reads as 'is one of'), though the emitted keys are unchanged.
-    expect(options.map((o) => o.textContent)).toEqual(['equals', 'contains', 'is one of']);
+    // Displayed as human labels ('in' reads as 'is one of', 'notIn' as 'is not one of'), though the
+    // emitted keys are unchanged.
+    expect(options.map((o) => o.textContent)).toEqual(['equals', 'contains', 'is one of', 'is not one of']);
     await userEvent.click(options[0]);
 
     await userEvent.type(screen.getByRole('textbox', { name: 'Condition 1 value' }), 'Q');
     expect(onChange).toHaveBeenLastCalledWith([{ field: 'airlineCode', operator: 'equals', value: 'Q' }]);
+  });
+
+  it('notIn takes the same multi-value input as in, and emits the notIn operator', async () => {
+    const onChange = setup([{ field: 'airlineCode', operator: 'notIn', value: [] }]);
+    const input = screen.getByRole('textbox', { name: 'Condition 1 value' });
+    // The multi-value comma input, not the single-value equals/contains input.
+    expect(input).toHaveAttribute('placeholder', 'Comma-separated values');
+    await userEvent.type(input, 'QR');
+    expect(onChange).toHaveBeenLastCalledWith([{ field: 'airlineCode', operator: 'notIn', value: ['QR'] }]);
   });
 
   it('switching field resets operator and value; number between renders two inputs', async () => {

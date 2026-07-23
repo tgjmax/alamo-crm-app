@@ -7,6 +7,7 @@ export const OPERATOR_LABELS: Record<ConditionOperator, string> = {
   equals: 'equals',
   contains: 'contains',
   in: 'is one of',
+  notIn: 'is not one of',
   between: 'between',
   greaterThan: 'after',
   lessThan: 'before',
