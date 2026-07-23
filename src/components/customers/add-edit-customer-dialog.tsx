@@ -140,7 +140,7 @@ export function AddEditCustomerDialog({ open, onOpenChange, customer, onCreated 
     setPassportActionError(null);
     try {
       const url = await getPassportDownloadUrl(customer.id, false);
-      window.open(url, '_blank');
+      window.open(url, '_blank', 'noopener,noreferrer');
     } catch {
       setPassportActionError('Could not load the passport document. Check your connection and try again.');
     }

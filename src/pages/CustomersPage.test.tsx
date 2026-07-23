@@ -131,7 +131,7 @@ describe('CustomersPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'View document' }));
     await waitFor(() => {
       expect(customersApi.getPassportDownloadUrl).toHaveBeenCalledWith('1', false);
-      expect(openSpy).toHaveBeenCalledWith('https://signed.example.com/passport.jpg', '_blank');
+      expect(openSpy).toHaveBeenCalledWith('https://signed.example.com/passport.jpg', '_blank', 'noopener,noreferrer');
     });
 
     await userEvent.click(screen.getByRole('button', { name: 'Download document' }));

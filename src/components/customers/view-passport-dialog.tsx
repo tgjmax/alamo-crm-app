@@ -19,7 +19,7 @@ export function ViewPassportDialog({ open, onOpenChange, customer }: ViewPasspor
     setError(null);
     try {
       const url = await getPassportDownloadUrl(customer.id, download);
-      window.open(url, '_blank');
+      window.open(url, '_blank', 'noopener,noreferrer');
     } catch {
       setError('Could not load the passport document. Check your connection and try again.');
     }
