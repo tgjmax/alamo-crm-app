@@ -22,6 +22,7 @@ vi.mock('@/api/groups.api', async () => {
     deleteGroup: vi.fn(),
     updateGroupView: vi.fn(),
     updateGroupExclusions: vi.fn(),
+    getGroupReport: vi.fn(),
   };
 });
 vi.mock('@tanstack/react-router', async () => {
@@ -96,6 +97,7 @@ beforeEach(() => {
   // see a PRIOR test's persist call and fail for the wrong reason.
   vi.mocked(groupsApi.updateGroupView).mockClear();
   vi.mocked(groupsApi.updateGroupExclusions).mockClear();
+  vi.mocked(groupsApi.getGroupReport).mockReset().mockResolvedValue(undefined);
 });
 
 describe('GroupResultsPage', () => {
@@ -393,5 +395,15 @@ describe('GroupResultsPage', () => {
     await user.click(screen.getByRole('button', { name: /excluded \(0\)/i }));
 
     expect(await screen.findByText('Excluded rows')).toBeInTheDocument();
+  });
+
+  it('downloads the group report when Print is clicked', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText('Qatar bookings');
+
+    await user.click(screen.getByRole('button', { name: /print/i }));
+
+    expect(groupsApi.getGroupReport).toHaveBeenCalledWith('g1', 'Qatar bookings');
   });
 });

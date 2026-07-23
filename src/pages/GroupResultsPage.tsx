@@ -3,6 +3,7 @@ import { OnChangeFn, RowSelectionState, SortingState, Updater, VisibilityState }
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams, useRouter } from '@tanstack/react-router';
 import { toast } from 'sonner';
+import { Printer } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +14,7 @@ import {
   deleteGroup,
   getGroup,
   getGroupFields,
+  getGroupReport,
   getGroupResults,
   GroupCondition,
   GroupDetail,
@@ -160,6 +162,19 @@ export default function GroupResultsPage() {
 
   const { data: group } = useQuery({ queryKey: ['groups', groupId], queryFn: () => getGroup(groupId) });
   const { data: fields = [] } = useQuery({ queryKey: ['groups', 'fields'], queryFn: getGroupFields });
+  const [downloading, setDownloading] = useState(false);
+
+  async function handlePrint() {
+    if (!group) return;
+    setDownloading(true);
+    try {
+      await getGroupReport(group.id, group.name);
+    } catch {
+      toast.error('Could not generate the report. Please try again.');
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteGroup(groupId),
@@ -195,6 +210,10 @@ export default function GroupResultsPage() {
             )}
           </div>
           <div className="flex shrink-0 gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={handlePrint} disabled={downloading || !group}>
+              {downloading ? <Spinner className="mr-2" /> : <Printer className="mr-2 h-4 w-4" />}
+              {downloading ? 'Preparing…' : 'Print'}
+            </Button>
             <Button type="button" variant="outline" size="sm" onClick={() => setShowExcluded(true)}>
               Excluded ({group?.excludedCount ?? 0})
             </Button>

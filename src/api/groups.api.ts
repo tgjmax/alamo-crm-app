@@ -1,4 +1,5 @@
 import { apiClient } from './client';
+import { downloadFile } from './download';
 
 export type ConditionOperator =
   | 'equals'
@@ -166,4 +167,14 @@ export async function previewGroup(
 ): Promise<GroupQueryResult> {
   const res = await apiClient.post<GroupQueryResult>('/groups/preview', { conditions, ...params });
   return res.data;
+}
+
+/** Mirror of the backend's Group-<name>.pdf attachment filename. */
+function safeFilename(name: string): string {
+  const cleaned = name.replace(/[^a-zA-Z0-9 _-]/g, '').trim().replace(/\s+/g, '-');
+  return cleaned.length ? cleaned : 'Group';
+}
+
+export async function getGroupReport(groupId: string, groupName: string): Promise<void> {
+  await downloadFile(`/groups/${groupId}/report`, `Group-${safeFilename(groupName)}.pdf`);
 }
