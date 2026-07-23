@@ -91,6 +91,9 @@ export function AdjustmentBookingForm({ bookingType, onDone, onCancel }: Adjustm
   function selectGroup(group: PnrGroup) {
     const first = group.passengers[0];
     setSelectedGroup(group);
+    // Reflect the chosen PNR in the search box (the query stays disabled while a group is
+    // selected, so this won't retrigger a search or reopen the results list).
+    setPnrQuery(group.pnr);
     setChecked(Object.fromEntries(group.passengers.map((p) => [p.id, true])));
     setAmounts(Object.fromEntries(group.passengers.map((p) => [p.id, String(p.amount)])));
     setShared((s) => ({

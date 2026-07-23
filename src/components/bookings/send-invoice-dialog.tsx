@@ -125,6 +125,9 @@ export function SendInvoiceDialog({ open, onOpenChange }: SendInvoiceDialogProps
   function pickGroup(group: PnrGroup) {
     const first = group.passengers[0];
     setPickedPnr(group.pnr);
+    // Reflect the chosen PNR in the search box (the query stays disabled once a group is
+    // picked, so this won't retrigger a search or reopen the results list).
+    setPnrQuery(group.pnr);
     setInvoiceNumber(first.invoiceNumber);
     setBillingToName(first.passengerName);
     setLineItems(
