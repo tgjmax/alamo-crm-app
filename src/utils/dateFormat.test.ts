@@ -53,6 +53,17 @@ describe('parseDateInput', () => {
     expect(parseDateInput('1953-09-02')).toBe('1953-09-02');
   });
 
+  it('parses the packed named-month format DDMMMYYYY (no separators)', () => {
+    expect(parseDateInput('02Sep1953')).toBe('1953-09-02');
+    expect(parseDateInput('2Sep1953')).toBe('1953-09-02');
+    expect(parseDateInput('2september1953')).toBe('1953-09-02');
+    expect(parseDateInput('31Dec2023')).toBe('2023-12-31');
+  });
+
+  it('rejects a packed value whose middle is not a real month name', () => {
+    expect(parseDateInput('02Xyz1953')).toBeNull();
+  });
+
   it('rejects impossible dates that do not round-trip', () => {
     expect(parseDateInput('02/30/2021')).toBeNull();
     expect(parseDateInput('13/40/2020')).toBeNull();

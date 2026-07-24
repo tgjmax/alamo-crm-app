@@ -9,7 +9,7 @@ export interface CustomerSearchResult {
   /** Computed by the API (firstName + ' ' + middleName); read-only, not user-inputtable. */
   givenName?: string;
   dob: string;
-  phone: string;
+  phone?: string;
   passportNumber?: string;
 }
 
@@ -35,7 +35,7 @@ export interface CustomerListItem {
   /** DD-MMM-YYYY */
   dob: string;
   gender: string;
-  phone: string;
+  phone?: string;
   email?: string;
   verified: boolean;
   passport?: CustomerPassportInfo;
@@ -78,7 +78,7 @@ export interface CreateCustomerInput {
   /** DD-MMM-YYYY */
   dob: string;
   gender: string;
-  phone: string;
+  phone?: string;
   email?: string;
   verified?: boolean;
   passport?: CustomerPassportInput;

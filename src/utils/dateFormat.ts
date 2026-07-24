@@ -91,9 +91,10 @@ function buildIsoDate(year: number, month: number, day: number): string | null {
 
 /**
  * Leniently parses a typed date into ISO 'YYYY-MM-DD', or null if unparseable.
- * Accepts: named-month in any order ('02 Sep 1953', 'Sep 2, 1953'), month-first numeric
- * ('09/02/1953', '09021953'), and ISO ('1953-09-02'). A 4-digit year is required and the
- * result is validated to be a real calendar date. All-numeric input is MONTH-FIRST by rule.
+ * Accepts: named-month in any order ('02 Sep 1953', 'Sep 2, 1953'), packed named-month
+ * ('02Sep1953', day-first), month-first numeric ('09/02/1953', '09021953'), and ISO ('1953-09-02').
+ * A 4-digit year is required and the result is validated to be a real calendar date. All-numeric
+ * input is MONTH-FIRST by rule.
  */
 export function parseDateInput(text: string): string | null {
   const trimmed = text.trim();
@@ -106,6 +107,15 @@ export function parseDateInput(text: string): string | null {
   // 8 packed digits: MMDDYYYY
   const packed = /^(\d{2})(\d{2})(\d{4})$/.exec(trimmed);
   if (packed) return buildIsoDate(Number(packed[3]), Number(packed[1]), Number(packed[2]));
+
+  // Packed day + named month + year, no separators: DDMMMYYYY (e.g. "02Sep1953", "2september1953").
+  // The named month makes it unambiguous, so — unlike the all-numeric case — this is DAY-first.
+  const packedNamed = /^(\d{1,2})([A-Za-z]+)(\d{4})$/.exec(trimmed);
+  if (packedNamed) {
+    const month = monthFromName(packedNamed[2]);
+    if (month === null) return null;
+    return buildIsoDate(Number(packedNamed[3]), month, Number(packedNamed[1]));
+  }
 
   const tokens = trimmed.split(/[\s,\-/.]+/).filter(Boolean);
   if (tokens.length !== 3) return null;

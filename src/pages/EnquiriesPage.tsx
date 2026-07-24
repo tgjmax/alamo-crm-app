@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/search-input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { ENQUIRY_PAGE_SIZES, ENQUIRY_STATUSES, EnquiryStatus, listEnquiries } from '@/api/enquiries.api';
@@ -58,12 +58,12 @@ export default function EnquiriesPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Input
+        <SearchInput
           aria-label="Search enquiries"
           placeholder="Search by name, phone, email, or route…"
           value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          className="h-8 w-[220px] lg:w-[300px]"
+          onChange={setSearchInput}
+          className="w-[220px] lg:w-[300px]"
         />
         <DataTableFacetedFilter title="Status" options={STATUS_OPTIONS} selectedValues={statusValues} onChange={setStatusValues} />
       </div>

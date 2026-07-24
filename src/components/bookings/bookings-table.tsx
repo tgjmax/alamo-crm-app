@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { SortingState, VisibilityState, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/search-input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { BOOKING_PAGE_SIZES, BookingRow, BookingSortBy, listBookings } from '@/api/bookings.api';
@@ -152,12 +152,12 @@ export function BookingsTable({ scope, defaultPageSize = 25, queryKeyPrefix }: B
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
-        <Input
+        <SearchInput
           aria-label="Search bookings"
           placeholder="Search by PAX name or PNR…"
           value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          className="h-8 w-[220px] lg:w-[300px]"
+          onChange={setSearchInput}
+          className="w-[220px] lg:w-[300px]"
         />
         <DataTableFacetedFilter
           title="Payment Status"

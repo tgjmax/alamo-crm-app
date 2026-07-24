@@ -67,7 +67,7 @@ export function AddEditCustomerDialog({ open, onOpenChange, customer, onCreated 
         dob: dobToIso(customer.dob),
         gender: customer.gender,
         verified: customer.verified,
-        phone: customer.phone,
+        phone: customer.phone ?? '',
         email: customer.email ?? '',
         passportNumber: customer.passport?.number ?? '',
         passportIssuingCountry: customer.passport?.issuingCountry ?? '',
@@ -103,7 +103,7 @@ export function AddEditCustomerDialog({ open, onOpenChange, customer, onCreated 
         lastName: form.lastName,
         dob: isoToDob(form.dob),
         gender: form.gender,
-        phone: form.phone,
+        phone: form.phone || undefined,
         email: form.email || undefined,
         verified: form.verified,
         passport,
@@ -226,14 +226,13 @@ export function AddEditCustomerDialog({ open, onOpenChange, customer, onCreated 
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="customer-phone" required>Phone</Label>
+                <Label htmlFor="customer-phone">Phone</Label>
                 <IconInput
                   id="customer-phone"
                   icon={<Phone />}
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  placeholder="e.g. +1 555 123 4567"
-                  required
+                  placeholder="e.g. +1 555 123 4567 (optional)"
                 />
               </div>
               <div className="space-y-2">

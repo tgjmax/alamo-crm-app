@@ -257,14 +257,16 @@ describe('BookingForm booking date', () => {
     expect(screen.getByText('Originally recorded as SMITH/JANE')).toBeInTheDocument();
   });
 
-  describe('future-only trip dates', () => {
-    it('floors Departure/Arrival Date at today when CREATING a booking', () => {
+  describe('trip dates', () => {
+    it('does NOT floor Departure/Arrival Date at today on create — old invoices can be entered', () => {
       renderForm();
-      expect(screen.getByLabelText('Departure Date')).toHaveAttribute('min', TODAY);
-      expect(screen.getByLabelText('Arrival Date')).toHaveAttribute('min', TODAY);
+      // A past trip date is legitimate: staff routinely enter invoices after the flight has flown.
+      expect(screen.getByLabelText('Departure Date')).not.toHaveAttribute('min');
+      // Arrival has no floor until a Departure Date is chosen.
+      expect(screen.getByLabelText('Arrival Date')).not.toHaveAttribute('min');
     });
 
-    it('raises the Arrival Date floor to the chosen Departure Date', () => {
+    it('still keeps Arrival Date on or after the chosen Departure Date', () => {
       renderForm();
       pickDate('Departure Date', FUTURE_DEP_DATE);
       // Arrival can't precede its own departure, so the later of the two bounds wins.

@@ -16,11 +16,9 @@ import { CodeSearchField } from '@/components/code-search-field';
 import { DateField } from '@/components/date-field';
 import { IconInput } from '@/components/icon-input';
 import { searchAirports, searchAirlines } from '@/api/flightData.api';
-import { useBranding } from '@/hooks/useBranding';
 import { useListNavigation } from '@/hooks/useListNavigation';
-import { agencyToday } from '@/utils/agencyTime';
 import { duplicateInvoice, errorMessage } from '@/utils/apiError';
-import { formatDisplayDate, maxIsoDate } from '@/utils/dateFormat';
+import { formatDisplayDate } from '@/utils/dateFormat';
 import { ticketingName } from '@/utils/ticketingName';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/authStore';
@@ -207,17 +205,12 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
     if (p.id && grandfathered.has(p.id) && p.name.trim().length > 0) return false;
     return true;
   }
-  // Earliest selectable Departure/Arrival date. A booking being ENTERED now is for a flight that
-  // hasn't happened yet, so the calendar floors at the agency's today. An EDIT is exempt: a
-  // historic invoice (bulk-imported from the old spreadsheet) has dates years in the past, and
-  // flooring them would make it impossible to fix an unrelated field like a typo'd PNR. Same
-  // grandfathering principle as the unlinked-passenger rule above. `bookingDate` is deliberately
-  // NOT floored even on create — back-dating the ledger entry itself is a legitimate action.
-  const { timeZone } = useBranding();
-  const minTripDate = initial ? undefined : agencyToday(timeZone);
-  // Arrival additionally can't precede its own departure. Both bounds are create-only for the same
-  // reason: a historic invoice may hold data that violates either rule, and must stay correctable.
-  const minArrDate = minTripDate && maxIsoDate(minTripDate, form.depDate);
+  // Departure/Arrival dates are NOT floored at today — old invoices are routinely entered after the
+  // flight has already happened, so a past trip date is legitimate on create just as it is on edit.
+  // The one bound kept is that Arrival can't precede its own Departure, and only on create (a
+  // historic invoice may hold data that violates even that, and must stay correctable). `bookingDate`
+  // is likewise unbounded — back-dating the ledger entry itself is a legitimate action.
+  const minArrDate = initial ? undefined : form.depDate || undefined;
 
   const queryClient = useQueryClient();
 
@@ -676,6 +669,22 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
           </div>
           );
         })}
+        {/* Add passenger sits directly under the passenger rows (above the payment controls). */}
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              // Reset the submit-attempt flag so a fresh blank row doesn't inherit the red
+              // "Select a customer" alert from a previous failed submit before it's even been used.
+              setLinkAttempted(false);
+              setPassengers((rows) => [...rows, { ...EMPTY_PASSENGER }]);
+            }}
+          >
+            Add passenger
+          </Button>
+        </div>
         {/* Shared payment/remark: one block applied to every passenger. Pending has NO amount field
             here — each passenger owes its own full ticket amount (see handleSubmit). */}
         {shareAll && (
@@ -733,21 +742,6 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
             )}
           </div>
         )}
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => {
-              // Reset the submit-attempt flag so a fresh blank row doesn't inherit the red
-              // "Select a customer" alert from a previous failed submit before it's even been used.
-              setLinkAttempted(false);
-              setPassengers((rows) => [...rows, { ...EMPTY_PASSENGER }]);
-            }}
-          >
-            Add passenger
-          </Button>
-        </div>
       </div>
       )}
 
@@ -827,7 +821,6 @@ export function BookingForm({ initial, typeSelector, onDone, onCancel }: Booking
                 value={form.depDate}
                 onChange={(iso) => setForm({ ...form, depDate: iso })}
                 required
-                minDate={minTripDate}
               />
             </div>
             <div className="space-y-1">

@@ -3,7 +3,7 @@ import { SortingState, VisibilityState, flexRender, getCoreRowModel, useReactTab
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/search-input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import {
@@ -179,12 +179,12 @@ export default function CustomersPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Input
+        <SearchInput
           aria-label="Search customers"
           placeholder="Search by name…"
           value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          className="h-8 w-[200px] lg:w-[300px]"
+          onChange={setSearchInput}
+          className="w-[200px] lg:w-[300px]"
         />
         <DataTableFacetedFilter
           title="Status"
