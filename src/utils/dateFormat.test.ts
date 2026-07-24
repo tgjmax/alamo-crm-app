@@ -1,4 +1,4 @@
-import { formatDisplayDate } from './dateFormat';
+import { formatDisplayDate, parseDateInput } from './dateFormat';
 
 describe('formatDisplayDate', () => {
   it('formats an ISO date-only string as "DD Mon YYYY"', () => {
@@ -21,5 +21,51 @@ describe('formatDisplayDate', () => {
 
   it('returns genuinely unrecognized text unchanged', () => {
     expect(formatDisplayDate('not-a-date')).toBe('not-a-date');
+  });
+});
+
+describe('parseDateInput', () => {
+  it('parses the space-separated display format (day first, named month)', () => {
+    expect(parseDateInput('02 Sep 1953')).toBe('1953-09-02');
+    expect(parseDateInput('2 Sep 1953')).toBe('1953-09-02');
+  });
+
+  it('parses the dash-separated named-month format', () => {
+    expect(parseDateInput('02-Sep-1953')).toBe('1953-09-02');
+  });
+
+  it('parses month-name-first, with or without a comma', () => {
+    expect(parseDateInput('Sep 2 1953')).toBe('1953-09-02');
+    expect(parseDateInput('Sep 2, 1953')).toBe('1953-09-02');
+  });
+
+  it('parses a full month name via its first three letters', () => {
+    expect(parseDateInput('September 2 1953')).toBe('1953-09-02');
+  });
+
+  it('parses numeric input as MONTH-FIRST', () => {
+    expect(parseDateInput('09/02/1953')).toBe('1953-09-02');
+    expect(parseDateInput('9-2-1953')).toBe('1953-09-02');
+    expect(parseDateInput('09021953')).toBe('1953-09-02');
+  });
+
+  it('parses ISO input unchanged', () => {
+    expect(parseDateInput('1953-09-02')).toBe('1953-09-02');
+  });
+
+  it('rejects impossible dates that do not round-trip', () => {
+    expect(parseDateInput('02/30/2021')).toBeNull();
+    expect(parseDateInput('13/40/2020')).toBeNull();
+  });
+
+  it('rejects a 2-digit year', () => {
+    expect(parseDateInput('09/02/53')).toBeNull();
+  });
+
+  it('rejects blanks and garbage', () => {
+    expect(parseDateInput('')).toBeNull();
+    expect(parseDateInput('   ')).toBeNull();
+    expect(parseDateInput('hello')).toBeNull();
+    expect(parseDateInput('2 Sep')).toBeNull();
   });
 });

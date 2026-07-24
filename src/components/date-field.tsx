@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { CalendarIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverAnchor } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { formatDisplayDate } from '@/utils/dateFormat';
+import { formatDisplayDate, parseDateInput } from '@/utils/dateFormat';
 
 interface DateFieldProps {
   /** Accessible name — carried by the hidden native input, so label-text queries and
@@ -17,11 +18,21 @@ interface DateFieldProps {
   /** Blocks submit when empty, via the hidden native input's own validation. */
   required?: boolean;
   /** Earliest selectable date, 'YYYY-MM-DD'. Omitted (the default) means any date — historic
-   * bookings must stay editable, so only NEW-entry forms pass this. Applied to BOTH the calendar
-   * and the hidden native input's `min`: the calendar alone would still let a keyboard or paste
-   * entry through, since the native input is what actually carries the form value. */
+   * bookings must stay editable, so only NEW-entry forms pass this. Applied to the calendar, the
+   * hidden native input's `min`, AND the typed-entry parser (all three must agree, since the
+   * native input is what carries the form value on submit). */
   minDate?: string;
 }
+
+/** The shadcn PopoverContent base styling, minus its Portal (see the render note below). */
+const POPOVER_CONTENT_CLASS = cn(
+  'z-50 w-auto rounded-md border bg-popover p-0 text-popover-foreground shadow-md outline-none',
+  'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
+  'data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
+  'data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2',
+  'data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
+  'origin-[--radix-popover-content-transform-origin]',
+);
 
 function toIso(date: Date): string {
   const year = date.getFullYear();
@@ -30,13 +41,46 @@ function toIso(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-/** A date input that DISPLAYS 'DD-MMM-YYYY' (native `<input type="date">` display format is
- * locale-controlled and can't be changed) — a popover calendar for sighted users, backed by a
- * visually-hidden native date input that keeps the accessible name, form value, and tests. */
+/** A date input that DISPLAYS 'DD Mon YYYY' (native `<input type="date">` display format is
+ * locale-controlled and can't be changed). The visible field is BOTH typeable (parsed on blur/Enter)
+ * AND the trigger that opens the popover calendar — clicking it opens the calendar for a fast
+ * year/month jump, while you can still type a date straight in. A visually-hidden native date input
+ * carries the accessible name, form value, `required`/`min` validation, and the existing tests.
+ *
+ * The popover is deliberately NON-MODAL and NON-PORTALED: modal (or portaled) content would trap
+ * focus / land in the pointer-events-disabled body of a parent Dialog, which would stop the field
+ * from staying focused-and-typeable while the calendar is open. Rendering the content inline (the
+ * Dialog content has no overflow clip) keeps it clickable inside a Dialog without a focus trap. */
 export function DateField({ ariaLabel, value, onChange, id, required, minDate }: DateFieldProps) {
   const [open, setOpen] = useState(false);
+  // `draft` is the raw text while the user is typing; null means "not editing, show the value".
+  const [draft, setDraft] = useState<string | null>(null);
+  const anchorRef = useRef<HTMLDivElement>(null);
   const selected = value ? new Date(`${value}T00:00:00`) : undefined;
   const min = minDate ? new Date(`${minDate}T00:00:00`) : undefined;
+
+  const currentYear = new Date().getFullYear();
+  const startMonth = min ?? new Date(currentYear - 100, 0, 1);
+  const endMonth = new Date(currentYear + 10, 11, 31);
+
+  const displayValue = draft ?? (value ? formatDisplayDate(value) : '');
+
+  function commitDraft() {
+    if (draft === null) return;
+    const trimmed = draft.trim();
+    if (trimmed === '') {
+      onChange('');
+      setDraft(null);
+      return;
+    }
+    const iso = parseDateInput(trimmed);
+    // Apply only a valid date that also respects minDate; otherwise revert (the calendar is the
+    // always-correct fallback, and rejecting sub-minDate mirrors the calendar's disabled days).
+    if (iso && (!minDate || iso >= minDate)) {
+      onChange(iso);
+    }
+    setDraft(null);
+  }
 
   return (
     <div className="relative">
@@ -51,33 +95,64 @@ export function DateField({ ariaLabel, value, onChange, id, required, minDate }:
         className="absolute h-px w-px opacity-0"
         tabIndex={-1}
       />
-      {/* modal: the calendar portals OUTSIDE the parent Dialog, which disables pointer events on
-          everything but itself while open — non-modal popovers are unclickable inside a dialog. */}
-      <Popover open={open} onOpenChange={setOpen} modal>
-        <PopoverTrigger asChild>
-          <Button
-            type="button"
-            variant="outline"
-            aria-label={`${ariaLabel} calendar`}
-            className={cn('w-full justify-start font-normal', !value && 'text-muted-foreground')}
-          >
-            <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
-            {value ? formatDisplayDate(value) : 'dd MMM yyyy'}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
+      <Popover open={open} onOpenChange={setOpen} modal={false}>
+        <PopoverAnchor asChild>
+          <div ref={anchorRef} className="relative">
+            <CalendarIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              aria-label={`${ariaLabel} — type a date`}
+              aria-haspopup="dialog"
+              aria-expanded={open}
+              placeholder="dd MMM yyyy"
+              className="pl-9"
+              value={displayValue}
+              // Clicking the field itself opens the calendar (ArrowDown opens it for keyboard users);
+              // typing straight in still works because the popover is non-modal (no focus trap).
+              onClick={() => setOpen(true)}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={commitDraft}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  commitDraft();
+                  setOpen(false);
+                } else if (e.key === 'Escape') {
+                  setOpen(false);
+                } else if (e.key === 'ArrowDown' && !open) {
+                  setOpen(true);
+                }
+              }}
+            />
+          </div>
+        </PopoverAnchor>
+        <PopoverPrimitive.Content
+          align="start"
+          sideOffset={4}
+          className={POPOVER_CONTENT_CLASS}
+          // Keep focus in the field so the user can keep typing while the calendar is open.
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          // Don't close when the click/focus that "left" the calendar was actually on the field.
+          onInteractOutside={(e) => {
+            if (anchorRef.current && e.target instanceof Node && anchorRef.current.contains(e.target)) {
+              e.preventDefault();
+            }
+          }}
+        >
           <Calendar
             mode="single"
+            captionLayout="dropdown"
             selected={selected}
             defaultMonth={selected}
+            startMonth={startMonth}
+            endMonth={endMonth}
             disabled={min && { before: min }}
-            startMonth={min}
             onSelect={(date) => {
               onChange(date ? toIso(date) : '');
+              setDraft(null);
               setOpen(false);
             }}
           />
-        </PopoverContent>
+        </PopoverPrimitive.Content>
       </Popover>
     </div>
   );

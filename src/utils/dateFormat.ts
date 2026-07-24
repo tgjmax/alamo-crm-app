@@ -67,3 +67,65 @@ export function maxIsoDate(...dates: (string | undefined)[]): string | undefined
   const present = dates.filter((d): d is string => Boolean(d));
   return present.length ? present.reduce((a, b) => (a >= b ? a : b)) : undefined;
 }
+
+/** 1-based month number for a token like "Sep"/"September"/"sept", or null if it isn't a month name. */
+function monthFromName(token: string): number | null {
+  if (!/^[A-Za-z]+$/.test(token)) return null;
+  const key = token.slice(0, 3).toLowerCase();
+  const index = MONTH_ABBREVIATIONS.findIndex((m) => m.toLowerCase() === key);
+  return index >= 0 ? index + 1 : null;
+}
+
+/** Builds a validated ISO 'YYYY-MM-DD' string, or null if the numbers don't form a real date. */
+function buildIsoDate(year: number, month: number, day: number): string | null {
+  if (year < 1000 || year > 9999) return null; // 4-digit years only — no century guessing
+  if (month < 1 || month > 12) return null;
+  if (day < 1 || day > 31) return null;
+  const probe = new Date(year, month - 1, day);
+  // Reject overflow (e.g. Feb 30 rolls into March): the constructed date must match the inputs.
+  if (probe.getFullYear() !== year || probe.getMonth() !== month - 1 || probe.getDate() !== day) {
+    return null;
+  }
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/**
+ * Leniently parses a typed date into ISO 'YYYY-MM-DD', or null if unparseable.
+ * Accepts: named-month in any order ('02 Sep 1953', 'Sep 2, 1953'), month-first numeric
+ * ('09/02/1953', '09021953'), and ISO ('1953-09-02'). A 4-digit year is required and the
+ * result is validated to be a real calendar date. All-numeric input is MONTH-FIRST by rule.
+ */
+export function parseDateInput(text: string): string | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+
+  // ISO: YYYY-MM-DD
+  const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(trimmed);
+  if (iso) return buildIsoDate(Number(iso[1]), Number(iso[2]), Number(iso[3]));
+
+  // 8 packed digits: MMDDYYYY
+  const packed = /^(\d{2})(\d{2})(\d{4})$/.exec(trimmed);
+  if (packed) return buildIsoDate(Number(packed[3]), Number(packed[1]), Number(packed[2]));
+
+  const tokens = trimmed.split(/[\s,\-/.]+/).filter(Boolean);
+  if (tokens.length !== 3) return null;
+
+  // Named month anywhere; the name fixes the month, the 4-digit token is the year, the rest is the day.
+  const namedIndex = tokens.findIndex((t) => monthFromName(t) !== null);
+  if (namedIndex >= 0) {
+    const month = monthFromName(tokens[namedIndex])!;
+    const rest = tokens.filter((_, i) => i !== namedIndex);
+    const yearToken = rest.find((t) => /^\d{4}$/.test(t));
+    const dayToken = rest.find((t) => t !== yearToken && /^\d{1,2}$/.test(t));
+    if (!yearToken || !dayToken) return null;
+    return buildIsoDate(Number(yearToken), month, Number(dayToken));
+  }
+
+  // All-numeric, month-first: MM DD YYYY (last token must be the 4-digit year).
+  if (tokens.every((t) => /^\d+$/.test(t))) {
+    if (!/^\d{4}$/.test(tokens[2])) return null;
+    return buildIsoDate(Number(tokens[2]), Number(tokens[0]), Number(tokens[1]));
+  }
+
+  return null;
+}
